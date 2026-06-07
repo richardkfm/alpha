@@ -12,6 +12,13 @@ per year.
 See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full methodology and phased
 roadmap.
 
+## Preview
+
+Clicking a rainforest region confirms backend connectivity and opens a side panel
+with its full Total Ecosystem Value breakdown:
+
+![alpha — clicking the Amazon Basin shows the ecosystem value side panel](./docs/screenshot.png)
+
 ---
 
 ## Stack
