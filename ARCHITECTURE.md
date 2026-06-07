@@ -76,7 +76,7 @@ sources (Copernicus satellite data, ESVD API, carbon market prices).
 
 ## Development Phases
 
-### Phase 1 — Foundation (current sprint)
+### Phase 1 — Foundation ✅ done
 
 - Monorepo scaffolding with `/backend` and `/frontend`
 - Docker Compose environment (PostGIS, FastAPI, Node frontend)
@@ -84,14 +84,17 @@ sources (Copernicus satellite data, ESVD API, carbon market prices).
   regions
 - Clicking a region shows a panel with mock TEV data from the backend API
 
-### Phase 2 — Valuation Engine
+### Phase 2 — Valuation Engine ✅ done
 
-- Build the real TEV calculation module in FastAPI using documented reference
-  values from ESVD and IPCC carbon pricing
-- `POST /api/v1/valuation` endpoint accepts a GeoJSON polygon and returns a full
-  structured TEV breakdown
-- Document every calculation formula with scientific citations in the codebase
-- Add a currency toggle (USD / EUR / BRL)
+- Real TEV calculation module in FastAPI using documented reference values from
+  ESVD (de Groot et al. 2012) and an IPCC-AR6-consistent carbon price
+- `POST /api/v1/valuation` computes the polygon's geodesic area and returns a full
+  structured TEV breakdown (per sqm/year and area-scaled annual total)
+- Every formula and reference value documented with scientific citations — see
+  [`backend/METHODOLOGY.md`](./backend/METHODOLOGY.md), `backend/valuation.py`, and
+  `backend/reference_data.py`
+- Currency toggle (USD / EUR / BRL) in the API and the web UI
+- `GET /api/v1/reference` exposes the supported biomes & currencies
 
 ### Phase 3 — Data Ingestion
 

@@ -1,0 +1,177 @@
+"""alpha — Phase 2 Total Ecosystem Value (TEV) engine.
+
+Pure-Python, dependency-free valuation: compute the geodesic area of a GeoJSON
+polygon, look up biome reference yields, scale by area, and convert to the
+requested currency. Every formula is documented here and in
+`backend/METHODOLOGY.md`, with citations in `reference_data.py`.
+"""
+from __future__ import annotations
+
+import math
+from typing import Any
+
+from reference_data import (
+    BIOMES,
+    CARBON_PRICE_USD_PER_TCO2,
+    CURRENCIES,
+    DEFAULT_BIOME,
+    DEFAULT_CURRENCY,
+    FX_AS_OF,
+    YIELD_CATEGORIES,
+    biome_per_sqm_usd,
+)
+
+# Mean Earth radius (metres), IUGG. Used for the spherical-excess area formula.
+EARTH_RADIUS_M = 6_371_008.8
+
+
+def _ring_area_sqm(ring: list[list[float]]) -> float:
+    """Signed geodesic area (m^2) of one linear ring of [lon, lat] degrees.
+
+    Spherical-excess formula (Chamberlain & Duquette, JPL; the same algorithm
+    used by OpenLayers / Google Maps geometry). Sign encodes winding order, so
+    callers take the absolute value for exterior rings and use the magnitude to
+    subtract holes.
+    """
+    n = len(ring)
+    if n < 3:
+        return 0.0
+    total = 0.0
+    for i in range(n):
+        lon1, lat1 = ring[i][0], ring[i][1]
+        lon2, lat2 = ring[(i + 1) % n][0], ring[(i + 1) % n][1]
+        total += math.radians(lon2 - lon1) * (
+            2 + math.sin(math.radians(lat1)) + math.sin(math.radians(lat2))
+        )
+    return total * EARTH_RADIUS_M * EARTH_RADIUS_M / 2.0
+
+
+def _polygon_area_sqm(rings: list[list[list[float]]]) -> float:
+    """Area (m^2) of a GeoJSON Polygon: exterior ring minus any holes."""
+    if not rings:
+        return 0.0
+    exterior = abs(_ring_area_sqm(rings[0]))
+    holes = sum(abs(_ring_area_sqm(r)) for r in rings[1:])
+    return max(exterior - holes, 0.0)
+
+
+def geodesic_area_sqm(geometry: dict[str, Any]) -> float:
+    """Area in square metres of a GeoJSON Polygon or MultiPolygon geometry.
+
+    Accepts a bare geometry or a Feature (unwraps ``geometry``). Returns 0.0 for
+    geometries with no usable polygonal coordinates rather than raising, so the
+    endpoint can surface a friendly validation error instead.
+    """
+    if not isinstance(geometry, dict):
+        return 0.0
+    if geometry.get("type") == "Feature":
+        geometry = geometry.get("geometry") or {}
+
+    gtype = geometry.get("type")
+    coords = geometry.get("coordinates")
+    if not coords:
+        return 0.0
+
+    if gtype == "Polygon":
+        return _polygon_area_sqm(coords)
+    if gtype == "MultiPolygon":
+        return sum(_polygon_area_sqm(poly) for poly in coords)
+    return 0.0
+
+
+def _round_money(value: float) -> float:
+    """Round currency totals to cents."""
+    return round(value, 2)
+
+
+def _round_per_sqm(value: float) -> float:
+    """Per-sqm yields are sub-cent; keep 6 significant decimals."""
+    return round(value, 6)
+
+
+def compute_valuation(
+    geometry: dict[str, Any],
+    biome: str = DEFAULT_BIOME,
+    currency: str = DEFAULT_CURRENCY,
+) -> dict[str, Any]:
+    """Compute the full TEV breakdown for a polygon.
+
+    Steps:
+      1. area_sqm = geodesic area of the polygon.
+      2. per-sqm reference yields for the biome (USD), converted to `currency`.
+      3. total annual yields = per-sqm * area_sqm.
+      4. TEV = sum of the five categories (per sqm, and total for the area).
+    """
+    biome_key = biome if biome in BIOMES else DEFAULT_BIOME
+    currency = currency.upper()
+    if currency not in CURRENCIES:
+        currency = DEFAULT_CURRENCY
+    fx = CURRENCIES[currency]
+    rate = fx["rate_per_usd"]
+
+    area_sqm = geodesic_area_sqm(geometry)
+
+    base_usd = biome_per_sqm_usd(biome_key)  # USD per sqm per year
+    b = BIOMES[biome_key]
+
+    yields_per_sqm: dict[str, float] = {}
+    yields_total: dict[str, float] = {}
+    for cat in YIELD_CATEGORIES:
+        per_sqm_cur = base_usd[cat] * rate
+        yields_per_sqm[cat] = _round_per_sqm(per_sqm_cur)
+        yields_total[cat] = _round_money(per_sqm_cur * area_sqm)
+
+    tev_per_sqm = sum(base_usd[c] for c in YIELD_CATEGORIES) * rate
+    tev_total = tev_per_sqm * area_sqm
+
+    methodology = {
+        "carbon_capture": {
+            "formula": "sequestration (tCO2/ha/yr) x carbon price (USD/tCO2) / 10000",
+            "sequestration_tco2_ha_yr": b["sequestration_tco2_ha_yr"],
+            "carbon_price_usd_per_tco2": CARBON_PRICE_USD_PER_TCO2,
+            "citation": "Pan et al. 2011; IPCC AR6 WGIII (2022)",
+        },
+        "climate_regulation": {
+            "formula": "ESVD climate-regulation reference (USD/ha/yr) / 10000",
+            "reference_usd_ha_yr": b["climate_regulation_usd_ha_yr"],
+            "citation": "de Groot et al. 2012; Costanza et al. 2014",
+        },
+        "water_filtration": {
+            "formula": "ESVD water purification + flow regulation (USD/ha/yr) / 10000",
+            "reference_usd_ha_yr": b["water_filtration_usd_ha_yr"],
+            "citation": "de Groot et al. 2012 (ESVD)",
+        },
+        "biodiversity_premium": {
+            "formula": "ESVD genetic resources + habitat/refugia (USD/ha/yr) / 10000",
+            "reference_usd_ha_yr": b["biodiversity_premium_usd_ha_yr"],
+            "citation": "de Groot et al. 2012 (ESVD)",
+        },
+        "soil_nutrient_value": {
+            "formula": "ESVD erosion prevention + soil fertility (USD/ha/yr) / 10000",
+            "reference_usd_ha_yr": b["soil_nutrient_value_usd_ha_yr"],
+            "citation": "de Groot et al. 2012 (ESVD)",
+        },
+    }
+
+    return {
+        "biome": b["label"],
+        "biome_key": biome_key,
+        "currency": currency,
+        "currency_symbol": fx["symbol"],
+        "area": {
+            "sqm": round(area_sqm, 2),
+            "hectares": round(area_sqm / 10_000.0, 4),
+        },
+        "yields_per_sqm_year": yields_per_sqm,
+        "yields_total_year": yields_total,
+        "total_ecosystem_value_per_sqm_year": _round_per_sqm(tev_per_sqm),
+        "total_ecosystem_value_per_year": _round_money(tev_total),
+        "fx": {"base": "USD", "rate_per_usd": rate, "as_of": FX_AS_OF},
+        "methodology": methodology,
+        "methodology_note": (
+            "Phase 2 valuation engine. Per-biome reference values from the ESVD "
+            "(de Groot et al. 2012) and carbon sequestration from Pan et al. 2011, "
+            "priced via an IPCC-AR6-consistent reference carbon price. FX rates are "
+            "indicative (as of {as_of}). See backend/METHODOLOGY.md.".format(as_of=FX_AS_OF)
+        ),
+    }
