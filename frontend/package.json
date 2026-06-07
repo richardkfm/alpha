@@ -1,0 +1,21 @@
+{
+  "name": "alpha-frontend",
+  "version": "0.1.0",
+  "description": "alpha — full-screen Leaflet world map for ecosystem valuation.",
+  "license": "AGPL-3.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 3000"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "vue": "^3.4.31"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.5",
+    "vite": "^5.3.3"
+  }
+}
