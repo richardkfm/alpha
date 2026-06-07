@@ -1,0 +1,47 @@
+/* alpha — global theme. Dark is default; the .light class on <html> flips it.
+   Environmental-financial palette: deep greens + teal accents. */
+
+:root {
+  --teal: #2dd4bf;
+  --teal-strong: #14b8a6;
+  --forest: #16a34a;
+  --forest-overlay: #22c55e;
+
+  /* dark theme (default) */
+  --bg: #0b1411;
+  --bg-panel: #0f1d18;
+  --bg-elevated: #14271f;
+  --border: #1f3a2e;
+  --text: #e6f2ec;
+  --text-muted: #8fae9f;
+  --accent: var(--teal);
+}
+
+:root.light {
+  --bg: #f3f7f4;
+  --bg-panel: #ffffff;
+  --bg-elevated: #eaf2ec;
+  --border: #cfe0d5;
+  --text: #0d2018;
+  --text-muted: #4d6b5c;
+  --accent: var(--teal-strong);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
