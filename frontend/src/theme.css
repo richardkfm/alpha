@@ -1,30 +1,71 @@
-/* alpha — global theme. Dark is default; the .light class on <html> flips it.
-   Environmental-financial palette: deep greens + teal accents. */
+/* alpha — global theme & design system.
+   Audience: ESG / sustainability-finance, impact investors, TNFD & conservation
+   teams. Identity: financial-grade credibility in a living-forest palette.
+   Dark is default; the .light class on <html> flips it. */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Spline+Sans+Mono:wght@500;600&display=swap");
 
 :root {
+  /* brand anchors */
   --teal: #2dd4bf;
   --teal-strong: #14b8a6;
   --forest: #16a34a;
   --forest-overlay: #22c55e;
+  --gold: #e7c873; /* "value" accent — used sparingly on currency figures */
 
   /* dark theme (default) */
-  --bg: #0b1411;
-  --bg-panel: #0f1d18;
-  --bg-elevated: #14271f;
-  --border: #1f3a2e;
-  --text: #e6f2ec;
-  --text-muted: #8fae9f;
+  --bg: #07110d;
+  --bg-deep: #050c09;
+  --bg-panel: #0c1814;
+  --bg-elevated: #122420;
+  --bg-glass: rgba(12, 24, 20, 0.72);
+  --border: #1d362b;
+  --border-soft: #16291f;
+  --text: #e9f4ee;
+  --text-muted: #8aab9b;
+  --text-faint: #5f7a6c;
   --accent: var(--teal);
+
+  /* depth + motion */
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-panel: -24px 0 60px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 0 1px rgba(45, 212, 191, 0.25), 0 0 28px rgba(45, 212, 191, 0.22);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ambient field behind the map */
+  --halo: radial-gradient(
+      1200px 600px at 18% -10%,
+      rgba(45, 212, 191, 0.1),
+      transparent 60%
+    ),
+    radial-gradient(900px 500px at 100% 110%, rgba(34, 197, 94, 0.08), transparent 60%);
 }
 
 :root.light {
-  --bg: #f3f7f4;
+  --bg: #eef4f0;
+  --bg-deep: #e4ece7;
   --bg-panel: #ffffff;
-  --bg-elevated: #eaf2ec;
-  --border: #cfe0d5;
-  --text: #0d2018;
+  --bg-elevated: #f1f7f3;
+  --bg-glass: rgba(255, 255, 255, 0.78);
+  --border: #d4e3da;
+  --border-soft: #e2ede7;
+  --text: #0c1f17;
   --text-muted: #4d6b5c;
+  --text-faint: #7c9588;
   --accent: var(--teal-strong);
+  --gold: #b8923a;
+  --shadow-soft: 0 1px 2px rgba(20, 50, 38, 0.06), 0 10px 30px rgba(20, 50, 38, 0.1);
+  --shadow-panel: -24px 0 60px rgba(20, 50, 38, 0.14);
+  --shadow-glow: 0 0 0 1px rgba(20, 184, 166, 0.25), 0 0 24px rgba(20, 184, 166, 0.16);
+  --halo: radial-gradient(
+      1200px 600px at 18% -10%,
+      rgba(20, 184, 166, 0.12),
+      transparent 60%
+    ),
+    radial-gradient(900px 500px at 100% 110%, rgba(22, 163, 74, 0.1), transparent 60%);
 }
 
 * {
@@ -44,4 +85,42 @@ body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* tabular figures everywhere numbers matter read as data, not prose */
+.mono,
+.num,
+.tev-value,
+.tev-total .v {
+  font-family: "Spline Sans Mono", "SFMono-Regular", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* refined scrollbars inside panels */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
