@@ -38,14 +38,18 @@ docker compose up --build
 Then open:
 
 - **Web app:** http://localhost:3000 — full-screen world map with the 4 major
-  rainforest regions. Click a region for its mock TEV breakdown.
+  rainforest regions. Click a region for its TEV breakdown; toggle USD / EUR / BRL.
 - **API health:** http://localhost:8000/health
 - **API docs (Swagger):** http://localhost:8000/docs
 
 ### Try the valuation endpoint
 
+The Phase 2 engine computes the polygon's geodesic area and returns a documented,
+citation-backed TEV breakdown (per sqm/year and an area-scaled annual total) in
+the requested currency. Methodology: [`backend/METHODOLOGY.md`](./backend/METHODOLOGY.md).
+
 ```bash
-curl -X POST http://localhost:8000/api/v1/valuation \
+curl -X POST "http://localhost:8000/api/v1/valuation?currency=EUR" \
   -H 'Content-Type: application/json' \
   -d '{"type":"Polygon","coordinates":[[[-60,-3],[-60,-2],[-59,-2],[-59,-3],[-60,-3]]]}'
 ```

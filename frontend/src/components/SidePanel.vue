@@ -10,27 +10,32 @@ const props = defineProps({
 })
 defineEmits(['close'])
 
-const hectares = computed(() => props.region.areaSqm / 10_000)
-
 // Human-readable yield rows, in the spec's order.
 const YIELD_ROWS = [
-  ['carbon_capture_usd', 'Carbon Capture'],
-  ['climate_regulation_usd', 'Climate Regulation'],
-  ['water_filtration_usd', 'Water Filtration'],
-  ['biodiversity_premium_usd', 'Biodiversity Premium'],
-  ['soil_nutrient_value_usd', 'Soil Nutrient Value'],
+  ['carbon_capture', 'Carbon Capture'],
+  ['climate_regulation', 'Climate Regulation'],
+  ['water_filtration', 'Water Filtration'],
+  ['biodiversity_premium', 'Biodiversity Premium'],
+  ['soil_nutrient_value', 'Soil Nutrient Value'],
 ]
+
+const symbol = computed(() => props.valuation?.currency_symbol ?? '$')
 
 const yieldRows = computed(() => {
   if (!props.valuation) return []
   return YIELD_ROWS.map(([key, label]) => ({
     label,
-    value: props.valuation.yields[key],
+    value: props.valuation.yields_per_sqm_year[key],
   }))
 })
 
-function fmtUsd(n) {
-  return n == null ? '—' : `$${Number(n).toFixed(2)}`
+// Per-sqm yields are sub-cent — show 4 decimals; area totals use grouping.
+function fmtPerSqm(n) {
+  return n == null ? '—' : `${symbol.value}${Number(n).toFixed(4)}`
+}
+function fmtTotal(n) {
+  if (n == null) return '—'
+  return symbol.value + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 function fmtInt(n) {
   return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -39,10 +44,11 @@ function fmtInt(n) {
 
 <template>
   <aside class="panel">
-    <button class="close" @click="$emit('close')" aria-label="Close">×</button>
-
     <header class="panel-head">
-      <h2>{{ region.name }}</h2>
+      <div class="title-row">
+        <h2>{{ region.name }}</h2>
+        <button class="close" @click="$emit('close')" aria-label="Close">×</button>
+      </div>
       <p class="region">{{ region.region }}</p>
       <span class="conn" :class="{ ok: backendOnline, down: backendOnline === false }">
         <template v-if="backendOnline">● backend online</template>
@@ -51,35 +57,43 @@ function fmtInt(n) {
       </span>
     </header>
 
-    <section class="area">
-      <div>
-        <span class="k">Area</span>
-        <span class="v">{{ fmtInt(region.areaSqm) }} sqm</span>
-      </div>
-      <div>
-        <span class="k">&nbsp;</span>
-        <span class="v">{{ fmtInt(hectares) }} ha</span>
-      </div>
-    </section>
-
     <div v-if="loading" class="state">Calculating ecosystem value…</div>
     <div v-else-if="error" class="state err">{{ error }}</div>
 
     <template v-else-if="valuation">
+      <section class="area">
+        <div>
+          <span class="k">Polygon area</span>
+          <span class="v">{{ fmtInt(valuation.area.sqm) }} sqm</span>
+        </div>
+        <div>
+          <span class="k">&nbsp;</span>
+          <span class="v">{{ fmtInt(valuation.area.hectares) }} ha</span>
+        </div>
+      </section>
+
       <section class="yields">
-        <h3>Ecosystem service yields <small>(USD / sqm / year)</small></h3>
+        <h3>
+          Ecosystem service yields
+          <small>({{ valuation.currency }} / sqm / year)</small>
+        </h3>
         <ul>
           <li v-for="row in yieldRows" :key="row.label">
             <span>{{ row.label }}</span>
-            <span class="num">{{ fmtUsd(row.value) }}</span>
+            <span class="num">{{ fmtPerSqm(row.value) }}</span>
           </li>
         </ul>
       </section>
 
       <section class="tev">
         <span class="tev-label">Total Ecosystem Value</span>
-        <span class="tev-value">{{ fmtUsd(valuation.total_ecosystem_value_usd) }}</span>
+        <span class="tev-value">{{ fmtPerSqm(valuation.total_ecosystem_value_per_sqm_year) }}</span>
         <span class="tev-unit">{{ valuation.currency }} / sqm / year</span>
+      </section>
+
+      <section class="tev-total">
+        <span class="k">Value of this area, per year</span>
+        <span class="v">{{ fmtTotal(valuation.total_ecosystem_value_per_year) }} {{ valuation.currency }}</span>
       </section>
 
       <section class="callout">{{ region.gdpCallout }}</section>
@@ -98,16 +112,21 @@ function fmtInt(n) {
   height: 100%;
   width: min(400px, 92vw);
   overflow-y: auto;
-  padding: 64px 22px 28px;
+  padding: 60px 22px 28px; /* clears the floating topbar */
   background: var(--bg-panel);
   border-left: 1px solid var(--border);
   box-shadow: -12px 0 40px rgba(0, 0, 0, 0.35);
 }
 
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .close {
-  position: absolute;
-  top: 14px;
-  right: 16px;
+  flex: none;
   width: 30px;
   height: 30px;
   border-radius: 8px;
@@ -222,6 +241,30 @@ function fmtInt(n) {
 .tev-unit {
   font-size: 0.78rem;
   color: var(--text-muted);
+}
+
+.tev-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -6px 0 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+.tev-total .k {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.tev-total .v {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .callout {
