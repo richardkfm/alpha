@@ -1,0 +1,95 @@
+{
+  "type": "FeatureCollection",
+  "name": "alpha_biome_boundaries_seed",
+  "description": "Phase 3 seed biome-boundary dataset. Coarse, simplified footprints derived from the WWF Terrestrial Ecoregions of the World (Olson et al. 2001) biome classes, plus blue-carbon (mangrove) and inland-wetland references. These are deliberately low-resolution polygons used to classify a point/polygon into one of alpha's five valuation biomes; they are NOT authoritative boundaries. Refresh from the authoritative source with `python ingest.py refresh` (see backend/INGESTION.md). Each feature maps to a biome_key in reference_data.BIOMES.",
+  "source": {
+    "primary": "Olson, D.M. et al. (2001). Terrestrial Ecoregions of the World. BioScience 51(11): 933-938. WWF/TEOW.",
+    "mangrove": "Giri, C. et al. (2011). Global mangrove forests distribution (USGS/MEoW).",
+    "wetland": "Ramsar / ESVD inland-wetland reference sites.",
+    "url": "https://www.worldwildlife.org/publications/terrestrial-ecoregions-of-the-world",
+    "as_of": "2026-06",
+    "note": "Simplified for in-repo point-in-polygon classification."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "tropical_rainforest", "name": "Amazon Basin", "wwf_biome": "Tropical & Subtropical Moist Broadleaf Forests" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-73, 5], [-50, 5], [-44, -2], [-50, -12], [-65, -16], [-75, -10], [-78, -2], [-73, 5]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "tropical_rainforest", "name": "Congo Basin", "wwf_biome": "Tropical & Subtropical Moist Broadleaf Forests" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[8, 4], [27, 5], [30, -2], [27, -8], [18, -6], [10, -3], [8, 4]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "tropical_rainforest", "name": "Southeast Asian Rainforests", "wwf_biome": "Tropical & Subtropical Moist Broadleaf Forests" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[95, 6], [106, -2], [114, -8], [141, -8], [141, 0], [120, 2], [100, 7], [95, 6]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "tropical_rainforest", "name": "Central American Rainforests", "wwf_biome": "Tropical & Subtropical Moist Broadleaf Forests" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-86, 11], [-82, 11], [-77, 9], [-80, 7], [-85, 8.5], [-86, 11]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "mangrove", "name": "Sundarbans", "wwf_biome": "Mangroves" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[88.0, 21.4], [89.9, 21.4], [89.9, 22.5], [88.0, 22.5], [88.0, 21.4]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "wetland", "name": "Pantanal", "wwf_biome": "Flooded Grasslands & Savannas" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-58.2, -20.2], [-55.0, -20.2], [-55.0, -16.0], [-58.2, -16.0], [-58.2, -20.2]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "temperate_forest", "name": "Pacific Northwest Forests", "wwf_biome": "Temperate Conifer / Broadleaf Forests" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-125, 42], [-121, 42], [-121, 49], [-125, 49], [-125, 42]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "temperate_forest", "name": "Central European Forests", "wwf_biome": "Temperate Broadleaf & Mixed Forests" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[8, 47], [15, 47], [15, 52], [8, 52], [8, 47]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "temperate_grassland", "name": "North American Great Plains", "wwf_biome": "Temperate Grasslands, Savannas & Shrublands" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-104, 38], [-97, 38], [-97, 46], [-104, 46], [-104, 38]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "temperate_grassland", "name": "Eurasian Steppe", "wwf_biome": "Temperate Grasslands, Savannas & Shrublands" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[50, 47], [75, 47], [75, 52], [50, 52], [50, 47]]]
+      }
+    }
+  ]
+}

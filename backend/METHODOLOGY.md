@@ -5,10 +5,13 @@ polygon into a **Total Ecosystem Value (TEV)**. Every formula and reference valu
 is documented here and in the code (`backend/valuation.py`,
 `backend/reference_data.py`).
 
-> **Status:** Phase 2 uses documented, peer-reviewed *reference values* per biome.
-> They are scientifically defensible estimates, **not** live measurements. Phase 3
-> replaces the static biome lookup with real land-cover classification; Phase 4
-> wires carbon prices and FX rates to live feeds.
+> **Status:** the engine uses documented, peer-reviewed *reference values* per
+> biome. They are scientifically defensible estimates, **not** live measurements.
+> **Phase 3 (done)** ingests real WWF ecoregion boundaries so the biome is detected
+> from the polygon rather than defaulted/accepted as input, and adds a Copernicus
+> land-cover intactness layer and an LLM-assisted ESV extractor — see
+> [`INGESTION.md`](./INGESTION.md). Phase 4 wires carbon prices and FX rates to live
+> feeds.
 
 ---
 
@@ -69,8 +72,11 @@ Values are deliberately conservative (lower-to-mid of published ranges).
 | Inland Wetland | 1.0 | 400 | 3,000 | 1,200 | 250 |
 | Temperate Grassland | 0.5 | 80 | 60 | 120 | 200 |
 
-The default biome is `tropical_rainforest`. Phase 3 will select the biome from
-real land-cover data instead of defaulting/accepting it as input.
+The default biome is `tropical_rainforest`. As of **Phase 3**, the biome is
+detected from the polygon against ingested WWF ecoregion boundaries
+(`biome_classifier.py`, `data/wwf_biomes.geojson`) when the caller does not supply
+one; the detection and its provenance are returned under `classification`. See
+[`INGESTION.md`](./INGESTION.md).
 
 ---
 
