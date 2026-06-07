@@ -96,13 +96,21 @@ sources (Copernicus satellite data, ESVD API, carbon market prices).
 - Currency toggle (USD / EUR / BRL) in the API and the web UI
 - `GET /api/v1/reference` exposes the supported biomes & currencies
 
-### Phase 3 — Data Ingestion
+### Phase 3 — Data Ingestion ✅ done
 
-- Ingest real biome boundary data (e.g., WWF Terrestrial Ecoregions, Global Forest
-  Watch)
-- Integrate Copernicus land cover data for dynamic land-use overlays
-- Build an LLM-assisted parsing module (Ollama/llama.cpp-compatible) to extract ESV
-  values from PDF scientific reports and TNFD disclosures
+- Ingest real biome boundary data (WWF Terrestrial Ecoregions, Olson et al. 2001):
+  `POST /api/v1/valuation` now **auto-detects** the biome from the polygon instead
+  of defaulting/accepting it as input, and a dedicated `POST /api/v1/classify`
+  endpoint returns the detected biome plus dataset provenance
+  (`backend/biome_classifier.py`, `backend/data/wwf_biomes.geojson`)
+- Copernicus land-cover ingestion layer (CGLS-LC100 legend → biome hint +
+  intactness factor) so realised yield reflects intact forest vs. cleared land
+  (`backend/landcover.py`)
+- LLM-assisted parsing module (Ollama/llama.cpp-compatible, with an offline regex
+  fallback) that extracts structured ESV values from report / TNFD-disclosure text
+  via `POST /api/v1/extract-esv` (`backend/esv_extraction.py`)
+- Full provenance, refresh procedure, and the WWF-biome → valuation-biome mapping
+  are documented in [`backend/INGESTION.md`](./backend/INGESTION.md)
 
 ### Phase 4 — API & Export Layer
 

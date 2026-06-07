@@ -21,6 +21,9 @@ const YIELD_ROWS = [
 
 const symbol = computed(() => props.valuation?.currency_symbol ?? '$')
 
+// Phase 3: the backend now detects the biome from ingested boundary data.
+const classification = computed(() => props.valuation?.classification ?? null)
+
 const yieldRows = computed(() => {
   if (!props.valuation) return []
   return YIELD_ROWS.map(([key, label]) => ({
@@ -70,6 +73,23 @@ function fmtInt(n) {
           <span class="k">&nbsp;</span>
           <span class="v">{{ fmtInt(valuation.area.hectares) }} ha</span>
         </div>
+      </section>
+
+      <section v-if="classification" class="biome">
+        <span class="k">Detected biome</span>
+        <span class="v">{{ classification.biome_label }}</span>
+        <span
+          class="biome-src"
+          :class="{ inferred: classification.confidence === 'default' }"
+        >
+          <template v-if="classification.confidence === 'matched'">
+            classified from {{ classification.matched_region }} · WWF ecoregions
+          </template>
+          <template v-else-if="classification.confidence === 'explicit'">
+            biome supplied by caller
+          </template>
+          <template v-else>no boundary match — default biome</template>
+        </span>
       </section>
 
       <section class="yields">
@@ -180,6 +200,31 @@ function fmtInt(n) {
 .area .v {
   font-size: 0.95rem;
   font-weight: 600;
+}
+
+.biome {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 16px;
+}
+.biome .k {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.biome .v {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.biome-src {
+  font-size: 0.72rem;
+  color: var(--teal);
+}
+.biome-src.inferred {
+  color: var(--text-muted);
 }
 
 .state {

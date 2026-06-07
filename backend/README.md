@@ -14,8 +14,10 @@ geographic area. Part of the [`alpha`](../README.md) monorepo.
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | Liveness probe → `{"status": "ok", "service": "alpha-backend"}` |
-| `POST` | `/api/v1/valuation` | GeoJSON polygon → full TEV breakdown (geodesic area, per-sqm + area totals, currency) |
+| `POST` | `/api/v1/valuation` | GeoJSON polygon → full TEV breakdown (geodesic area, per-sqm + area totals, currency). **Phase 3:** auto-detects the biome when none is supplied (`classification` in the response) |
 | `GET` | `/api/v1/reference` | Supported biomes & currencies + their per-sqm reference yields |
+| `POST` | `/api/v1/classify` | _(Phase 3)_ GeoJSON polygon → detected biome from ingested WWF boundaries + dataset provenance |
+| `POST` | `/api/v1/extract-esv` | _(Phase 3)_ report / TNFD text → structured ESV records (Ollama-compatible, offline regex fallback) |
 | `GET` | `/docs` | Auto-generated Swagger UI |
 
 ### `POST /api/v1/valuation` (Phase 2 engine)
@@ -63,7 +65,14 @@ Code layout:
 
 - `valuation.py` — geodesic area + TEV computation
 - `reference_data.py` — biome reference table, carbon price, FX rates (with citations)
-- `tests/test_valuation.py` — engine unit tests (`python -m pytest`)
+- `biome_classifier.py` — _(Phase 3)_ classify a polygon into a biome from ingested
+  WWF boundaries (`data/wwf_biomes.geojson`)
+- `landcover.py` — _(Phase 3)_ Copernicus CGLS-LC100 legend → biome hint + intactness
+- `esv_extraction.py` — _(Phase 3)_ LLM-assisted (Ollama-compatible) + regex ESV parser
+- `ingest.py` — _(Phase 3)_ ingestion CLI (`validate` / `classify` / `refresh`)
+- `tests/` — unit tests for the engine and the Phase 3 ingestion layer (`python -m pytest`)
+
+The Phase 3 ingestion layer is documented in [`INGESTION.md`](./INGESTION.md).
 
 ## Run with Docker (recommended)
 
@@ -91,6 +100,8 @@ python -m pytest
 
 ## Roadmap
 
-**Phase 3** swaps the static biome lookup for real land-cover classification
-(WWF ecoregions, Copernicus). **Phase 4** connects carbon prices and FX rates to
-live feeds and hardens the API (versioning, auth, rate limiting, export).
+**Phase 3 ✅** ingests real biome boundaries (WWF ecoregions) to auto-detect the
+biome, adds the Copernicus land-cover intactness layer, and an LLM-assisted ESV
+extractor — see [`INGESTION.md`](./INGESTION.md). **Phase 4** connects carbon prices
+and FX rates to live feeds and hardens the API (versioning, auth, rate limiting,
+export).

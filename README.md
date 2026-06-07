@@ -54,6 +54,22 @@ curl -X POST "http://localhost:8000/api/v1/valuation?currency=EUR" \
   -d '{"type":"Polygon","coordinates":[[[-60,-3],[-60,-2],[-59,-2],[-59,-3],[-60,-3]]]}'
 ```
 
+### Phase 3 — data ingestion
+
+The biome is now **detected from the polygon** against ingested WWF ecoregion
+boundaries (no need to pass `biome`); the detection is returned under
+`classification`. A dedicated `POST /api/v1/classify` returns just the biome, and
+`POST /api/v1/extract-esv` mines structured ecosystem-service values out of report /
+TNFD text (Ollama-compatible, with an offline fallback). See
+[`backend/INGESTION.md`](./backend/INGESTION.md).
+
+```bash
+# Detect the biome for a polygon
+curl -X POST http://localhost:8000/api/v1/classify \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"Polygon","coordinates":[[[-65,-5],[-60,-5],[-60,-2],[-65,-2],[-65,-5]]]}'
+```
+
 ## Repository layout
 
 ```

@@ -8,9 +8,15 @@ API-first FastAPI service.
   citation-backed TEV breakdown in the requested currency (USD / EUR / BRL).
 - ``GET /api/v1/reference`` — supported biomes, currencies, and per-sqm reference
   yields, so clients can build biome/currency toggles.
+- ``POST /api/v1/classify`` — Phase 3 data ingestion: classify a GeoJSON polygon
+  into a valuation biome using ingested WWF boundary data.
+- ``POST /api/v1/extract-esv`` — Phase 3 LLM-assisted extraction of structured ESV
+  values from report / TNFD-disclosure text (Ollama-compatible, offline fallback).
 
 The valuation maths and reference values live in ``valuation.py`` /
 ``reference_data.py``; the derivations are documented in ``backend/METHODOLOGY.md``.
+The Phase 3 ingestion layer lives in ``biome_classifier.py``, ``landcover.py`` and
+``esv_extraction.py`` and is documented in ``backend/INGESTION.md``.
 """
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +24,8 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from biome_classifier import boundary_source, classify_geometry
+from esv_extraction import extract_esv_records
 from reference_data import (
     BIOMES,
     CURRENCIES,
@@ -31,7 +39,7 @@ from valuation import compute_valuation
 app = FastAPI(
     title="alpha API",
     description="Putting nature on the balance sheet — ecosystem valuation API.",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 # Allow the Leaflet frontend (served on :3000) to call the API from the browser.
@@ -114,6 +122,13 @@ def valuation(
     The geodesic area of the polygon is computed and used to scale the biome's
     reference yields; results are returned both per sqm/year and as an annual
     total for the whole area, in the requested currency.
+
+    **Phase 3:** when no biome is supplied (query or body), the biome is detected
+    from the geometry against ingested WWF boundary data
+    (``biome_classifier.classify_geometry``) instead of silently defaulting. The
+    detection — including its source and confidence — is returned under
+    ``classification``. An explicit biome still wins and is echoed back as an
+    ``"explicit"`` classification.
     """
     geometry = body.to_geometry()
     if not geometry:
@@ -122,8 +137,20 @@ def valuation(
             detail="Provide a GeoJSON Polygon/MultiPolygon geometry (type+coordinates or a Feature).",
         )
 
-    chosen_biome = biome or body.biome or DEFAULT_BIOME
+    explicit_biome = biome or body.biome
     chosen_currency = currency or body.currency or DEFAULT_CURRENCY
+
+    if explicit_biome:
+        chosen_biome = explicit_biome
+        classification = {
+            "biome_key": explicit_biome if explicit_biome in BIOMES else DEFAULT_BIOME,
+            "biome_label": BIOMES.get(explicit_biome, BIOMES[DEFAULT_BIOME])["label"],
+            "confidence": "explicit",
+            "source": "biome supplied by caller",
+        }
+    else:
+        classification = classify_geometry(geometry)
+        chosen_biome = classification["biome_key"]
 
     result = compute_valuation(geometry, biome=chosen_biome, currency=chosen_currency)
 
@@ -132,4 +159,52 @@ def valuation(
             status_code=422,
             detail="Geometry has zero area — expected a Polygon or MultiPolygon with valid rings.",
         )
+    result["classification"] = classification
     return result
+
+
+@app.post("/api/v1/classify")
+def classify(body: ValuationRequest) -> Dict[str, Any]:
+    """Classify a GeoJSON polygon into a valuation biome from ingested boundaries.
+
+    Phase 3 data-ingestion endpoint: locates the geometry's representative point
+    inside the bundled WWF-derived biome boundaries and returns the matched biome
+    plus provenance. Useful on its own (e.g. to drive map styling) and the same
+    logic the valuation endpoint uses for auto-detection.
+    """
+    geometry = body.to_geometry()
+    if not geometry:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide a GeoJSON Polygon/MultiPolygon geometry (type+coordinates or a Feature).",
+        )
+    return {
+        "classification": classify_geometry(geometry),
+        "boundary_dataset": boundary_source(),
+    }
+
+
+class ExtractESVRequest(BaseModel):
+    """Report / disclosure text to mine for structured ESV values."""
+
+    text: str = Field(..., examples=["Carbon sequestration was valued at $120 per ha per year."])
+    backend: Optional[str] = Field(
+        default="auto",
+        description="'auto' (LLM if OLLAMA_HOST set, else regex), 'deterministic', or 'llm'.",
+        examples=["auto"],
+    )
+    model: Optional[str] = None
+
+
+@app.post("/api/v1/extract-esv")
+def extract_esv(body: ExtractESVRequest) -> Dict[str, Any]:
+    """Extract structured ESV values from report / TNFD-disclosure text.
+
+    Phase 3 LLM-assisted ingestion: pulls ``{service, value, currency, unit,
+    context}`` records out of prose. Uses an Ollama/llama.cpp-compatible model when
+    one is configured (``OLLAMA_HOST``), and transparently falls back to a
+    deterministic regex extractor otherwise — so it always returns a result.
+    """
+    if not body.text or not body.text.strip():
+        raise HTTPException(status_code=422, detail="Provide non-empty 'text' to extract from.")
+    return extract_esv_records(body.text, backend=body.backend or "auto", model=body.model)
