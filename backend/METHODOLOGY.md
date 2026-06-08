@@ -126,6 +126,37 @@ TEV                 = 0.1249 USD/m²/yr    →  1,249 USD/yr for the hectare
 
 ---
 
+## 6. Standing-asset value & the cost of conversion
+
+Two layers sit on top of the annual TEV. Both are reported separately so the
+scientific per-m²/yr figure stays untouched.
+
+**Capitalisation.** The annual flow is a perpetuity; its present value is
+`asset = annual ÷ discount_rate` (3% reference, between Stern ~1.4% and Nordhaus
+~4–5%). This is the land's value *as a standing natural asset* — a balance-sheet
+number, not an annual one.
+
+**Cost of conversion — deliberately *not* a price to outbid.** Converting land is
+framed as a permanent, externalised **liability**, never netted against
+development revenue, because a parcel's loss is more than its isolated value:
+
+- **Systemic premium** — `multiplier = 1 + scarcity × intactness`. Rare, intact
+  systems are load-bearing; fragmenting one degrades the wider network beyond the
+  parcel. The liability uses the systemic-weighted asset value.
+- **Irreversible carbon debt** — clearing releases the standing carbon *stock*
+  (vegetation + soil, `BIOME_CARBON_STOCK_TCO2_HA`) once, priced at the carbon
+  price. Distinct from the annual sequestration flow.
+- **Red lines** — non-substitutable / irreversible losses (extinction, ancient
+  soil & peat, permafrost, aquifers) are **flagged, not monetised**. They cannot
+  be netted against revenue at any price and are listed outside the figures.
+
+These weights are value-laden by design and kept separate from the ESV in
+`reference_data.py` (`BIOME_SCARCITY_WEIGHT`, `BIOME_CARBON_STOCK_TCO2_HA`,
+`BIOME_RED_LINES`). The intent is to make the full, distributed, permanent cost of
+conversion legible — and to refuse the framing that nature is for sale.
+
+---
+
 ## References
 
 - de Groot, R. et al. (2012). *Global estimates of the value of ecosystems and

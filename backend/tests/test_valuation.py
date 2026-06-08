@@ -117,6 +117,30 @@ def test_default_intactness_is_one_preserving_phase2_behaviour():
     assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.1249, abs_tol=1e-6)
 
 
+def test_systemic_premium_and_red_lines():
+    poly = _square_one_degree_at_equator()
+    rf = compute_valuation(poly, "tropical_rainforest", "USD")
+    crop = compute_valuation(poly, "cropland", "USD")
+    # rare, intact systems carry a larger systemic premium than converted land
+    assert rf["systemic"]["multiplier"] > crop["systemic"]["multiplier"] > 1.0
+    # biodiversity is flagged as an un-nettable red line for rainforest
+    assert any(r["service"] == "biodiversity_premium" for r in rf["red_lines"])
+
+
+def test_conversion_liability_is_systemic_present_value():
+    res = compute_valuation(_square_one_degree_at_equator(), "wetland", "USD")
+    cl = res["conversion_liability"]
+    expected = res["capitalized_value"]["asset_value_total"] * res["systemic"]["multiplier"]
+    assert math.isclose(cl["present_value"], expected, rel_tol=1e-3)
+    assert cl["carbon_debt_onetime"] > 0  # clearing releases stored carbon, once
+    assert "incidence" in cl and "note" in cl
+
+
+def test_peri_urban_has_no_red_lines():
+    res = compute_valuation(_square_one_degree_at_equator(), "peri_urban", "USD")
+    assert res["red_lines"] == []
+
+
 def test_new_ordinary_biomes_are_available():
     poly = _square_one_degree_at_equator()
     for biome in ("boreal_forest", "cropland", "freshwater", "peri_urban"):

@@ -214,6 +214,18 @@ onMounted(() => {
             {{ fmtTotal(r.capitalized_value && r.capitalized_value.asset_value_total) }}
           </div>
 
+          <!-- conversion liability (the perpetual debt of building over it) -->
+          <div class="cell rowlabel">Conversion liability</div>
+          <div v-for="r in selected" :key="'cl-' + r.id" class="cell num-cell liab">
+            {{ fmtTotal(r.conversion_liability && r.conversion_liability.present_value) }}
+          </div>
+
+          <!-- irreversible / un-nettable losses -->
+          <div class="cell rowlabel">Red lines</div>
+          <div v-for="r in selected" :key="'rl-' + r.id" class="cell num-cell muted">
+            {{ r.red_lines ? r.red_lines.length : 0 }} irreversible
+          </div>
+
           <!-- area -->
           <div class="cell rowlabel">Area</div>
           <div v-for="r in selected" :key="'ar-' + r.id" class="cell num-cell muted">
@@ -612,6 +624,11 @@ onMounted(() => {
   font-size: 1rem;
   font-weight: 800;
   background: color-mix(in srgb, var(--gold) 8%, var(--bg-deep));
+}
+.num-cell.liab {
+  color: #f87171;
+  font-weight: 700;
+  background: color-mix(in srgb, #f87171 8%, var(--bg-deep));
 }
 .num-cell.muted {
   color: var(--text-muted);

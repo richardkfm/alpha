@@ -103,6 +103,9 @@ def list_regions(
                 ],
                 "potential": valuation["potential"],
                 "capitalized_value": valuation["capitalized_value"],
+                "systemic": valuation["systemic"],
+                "conversion_liability": valuation["conversion_liability"],
+                "red_lines": valuation["red_lines"],
             }
         )
     return regions
