@@ -2,16 +2,25 @@
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { layers as LAYER_DEFS } from '../data/layers.js'
-import { rainforests } from '../data/rainforests.js'
+import 'leaflet.heat' // adds L.heatLayer
 
 const props = defineProps({
-  visibleLayers: { type: Object, default: () => ({ rainforest: true }) },
+  // Biome layer definitions and the region catalogue, both fetched from the
+  // backend by the parent (see data/useRegions.js).
+  layers: { type: Array, default: () => [] },
+  regions: { type: Array, default: () => [] },
+  // Value-bubble / heat points (FeatureCollection of Point).
+  points: { type: Object, default: () => ({ type: 'FeatureCollection', features: [] }) },
+  // 'polygons' | 'bubbles' | 'heat'
+  displayStyle: { type: String, default: 'polygons' },
+  visibleLayers: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['select'])
 const mapEl = ref(null)
 let map = null
 const leafletLayers = {} // id -> L.GeoJSON
+let bubbleLayer = null // L.LayerGroup of circle markers
+let heatLayer = null // L.HeatLayer
 
 onMounted(() => {
   map = L.map(mapEl.value, {
@@ -34,7 +43,7 @@ onMounted(() => {
 
   // Build one Leaflet layer per thematic layer from the shared registry, each
   // tinted with its own neon hue.
-  LAYER_DEFS.forEach((def) => {
+  props.layers.forEach((def) => {
     const baseStyle = {
       color: def.color,
       weight: 1.5,
@@ -65,29 +74,89 @@ onMounted(() => {
         // Only the real biome layer is clickable -> drives valuation.
         if (def.kind === 'real') {
           lyr.on('click', () => {
-            const region = rainforests.find((r) => r.id === feature.properties?.regionId)
+            const region = props.regions.find((r) => r.id === feature.properties?.regionId)
             if (region) emit('select', region)
           })
         }
       },
     })
     leafletLayers[def.id] = gjLayer
-    if (props.visibleLayers[def.id]) gjLayer.addTo(map)
   })
+
+  applyStyle()
 })
 
-function applyVisibility() {
-  if (!map) return
-  for (const def of LAYER_DEFS) {
-    const lyr = leafletLayers[def.id]
-    if (!lyr) continue
-    const shouldShow = !!props.visibleLayers[def.id]
-    if (shouldShow && !map.hasLayer(lyr)) lyr.addTo(map)
-    else if (!shouldShow && map.hasLayer(lyr)) map.removeLayer(lyr)
-  }
+// Points filtered to the currently-visible biomes (drives bubbles + heat).
+function visiblePoints() {
+  return (props.points.features || []).filter(
+    (f) => props.visibleLayers[f.properties.biome_key],
+  )
 }
 
-watch(() => props.visibleLayers, applyVisibility, { deep: true })
+function rebuildBubbles() {
+  if (bubbleLayer) {
+    map.removeLayer(bubbleLayer)
+    bubbleLayer = null
+  }
+  const markers = visiblePoints().map((f) => {
+    const [lng, lat] = f.geometry.coordinates
+    const p = f.properties
+    const m = L.circleMarker([lat, lng], {
+      radius: p.r,
+      color: p.color,
+      weight: 1.4,
+      fillColor: p.color,
+      fillOpacity: 0.4,
+      className: 'region-overlay',
+    })
+    m.bindTooltip(p.name, { direction: 'top', className: 'region-tooltip', offset: [0, -4] })
+    m.on('click', () => {
+      const region = props.regions.find((r) => r.id === p.regionId)
+      if (region) emit('select', region)
+    })
+    return m
+  })
+  bubbleLayer = L.layerGroup(markers)
+}
+
+function rebuildHeat() {
+  if (heatLayer) {
+    map.removeLayer(heatLayer)
+    heatLayer = null
+  }
+  const pts = visiblePoints().map((f) => {
+    const [lng, lat] = f.geometry.coordinates
+    return [lat, lng, Math.max(f.properties.wt, 0.06)]
+  })
+  heatLayer = L.heatLayer(pts, {
+    radius: 32,
+    blur: 22,
+    minOpacity: 0.25,
+    gradient: { 0.2: '#38bdf8', 0.45: '#2dd4bf', 0.7: '#a3e635', 1: '#f5b14e' },
+  })
+}
+
+// Reconcile all three styles: polygons honour the per-biome toggles; bubbles and
+// heat are rebuilt from the visible points and added only when their style is on.
+function applyStyle() {
+  if (!map) return
+  const polysOn = props.displayStyle === 'polygons'
+  for (const def of props.layers) {
+    const lyr = leafletLayers[def.id]
+    if (!lyr) continue
+    const show = polysOn && !!props.visibleLayers[def.id]
+    if (show && !map.hasLayer(lyr)) lyr.addTo(map)
+    else if (!show && map.hasLayer(lyr)) map.removeLayer(lyr)
+  }
+  rebuildBubbles()
+  if (props.displayStyle === 'bubbles') bubbleLayer.addTo(map)
+  rebuildHeat()
+  if (props.displayStyle === 'heat') heatLayer.addTo(map)
+}
+
+watch(() => props.visibleLayers, applyStyle, { deep: true })
+watch(() => props.displayStyle, applyStyle)
+watch(() => props.points, applyStyle)
 
 onBeforeUnmount(() => {
   if (map) map.remove()

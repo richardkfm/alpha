@@ -1,0 +1,139 @@
+{
+  "type": "FeatureCollection",
+  "name": "alpha_regions",
+  "description": "alpha region catalogue — coarse, illustrative footprints for named ecosystems across alpha's five valuation biomes. These are NOT authoritative boundaries; they are simplified polygons used to drive the map overlays and the Total Ecosystem Value comparison view. Each feature's biome_key maps to reference_data.BIOMES, and each polygon is valued server-side via valuation.compute_valuation. Refresh footprints from the authoritative sources noted below.",
+  "source": {
+    "primary": "Olson, D.M. et al. (2001). Terrestrial Ecoregions of the World. BioScience 51(11): 933-938. WWF/TEOW.",
+    "mangrove": "Giri, C. et al. (2011). Global mangrove forests distribution (USGS/MEoW).",
+    "wetland": "Ramsar / ESVD inland-wetland reference sites.",
+    "as_of": "2026-06",
+    "note": "Simplified, low-resolution footprints for in-app display and valuation; not survey-grade boundaries."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "amazon", "name": "Amazon Basin", "region": "Brazil, Peru, Colombia, Bolivia, Ecuador, Venezuela", "biome_key": "tropical_rainforest", "gdp_callout": "Standing, this basin generates more annual economic value than the entire cattle-ranching sector that drives its clearance in Brazil." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-73, 5], [-50, 5], [-44, -2], [-50, -12], [-65, -16], [-75, -10], [-78, -2], [-73, 5]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "congo", "name": "Congo Basin", "region": "DRC, Republic of Congo, Cameroon, Gabon", "biome_key": "tropical_rainforest", "gdp_callout": "Standing, this basin generates more annual economic value than the timber-export industry that threatens it across Central Africa." },
+      "geometry": { "type": "Polygon", "coordinates": [[[8, 4], [27, 5], [30, -2], [27, -8], [18, -6], [10, -3], [8, 4]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "southeast-asia", "name": "Southeast Asian Rainforests", "region": "Indonesia, Malaysia, Papua New Guinea, Borneo", "biome_key": "tropical_rainforest", "gdp_callout": "Standing, these forests generate more annual economic value than the palm-oil plantations replacing them across the region." },
+      "geometry": { "type": "MultiPolygon", "coordinates": [[[[109, 4], [119, 4], [118, -4], [110, -3], [109, 4]]], [[[95, 6], [106, -2], [114, -8], [141, -8], [141, 0], [120, 2], [100, 7], [95, 6]]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "central-america", "name": "Central American Rainforests", "region": "Costa Rica, Panama, Nicaragua", "biome_key": "tropical_rainforest", "gdp_callout": "Standing, these forests generate more annual economic value than the agricultural conversion pressuring them in the isthmus." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-86, 11], [-82, 11], [-77, 9], [-80, 7], [-85, 8.5], [-86, 11]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "atlantic-forest", "name": "Atlantic Forest", "region": "Brazil, Paraguay, Argentina", "biome_key": "tropical_rainforest", "gdp_callout": "What survives of this forest still out-earns the sugarcane and pasture that replaced 85% of it along Brazil's coast." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-46, -8], [-39, -13], [-48, -25], [-55, -26], [-53, -20], [-49, -13], [-46, -8]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "western-ghats", "name": "Western Ghats", "region": "India", "biome_key": "tropical_rainforest", "gdp_callout": "These hills water peninsular India; standing, they out-value the plantations creeping up their slopes." },
+      "geometry": { "type": "Polygon", "coordinates": [[[73, 21], [77, 15], [77, 8], [74.5, 8], [73, 15], [73, 21]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "new-guinea", "name": "New Guinea Rainforests", "region": "Papua New Guinea, Indonesia", "biome_key": "tropical_rainforest", "gdp_callout": "One of the last great intact tropical wildernesses — worth more whole than logged for tropical hardwood." },
+      "geometry": { "type": "Polygon", "coordinates": [[[131, 0], [151, -6], [150, -11], [138, -9], [131, -4], [131, 0]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "sundarbans", "name": "Sundarbans", "region": "Bangladesh, India", "biome_key": "mangrove", "gdp_callout": "The world's largest mangrove forest shields tens of millions from cyclones — a storm barrier no sea wall could afford to replace." },
+      "geometry": { "type": "Polygon", "coordinates": [[[88.0, 21.4], [89.9, 21.4], [89.9, 22.5], [88.0, 22.5], [88.0, 21.4]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "niger-delta-mangroves", "name": "Niger Delta Mangroves", "region": "Nigeria", "biome_key": "mangrove", "gdp_callout": "Africa's largest mangrove belt buries blue carbon and breeds the fisheries the delta lives on — value oil spills keep erasing." },
+      "geometry": { "type": "Polygon", "coordinates": [[[5.0, 4.3], [7.5, 4.3], [8.0, 5.2], [5.5, 5.5], [5.0, 4.3]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "mesoamerican-mangroves", "name": "Mesoamerican Reef Mangroves", "region": "Mexico, Belize, Honduras", "biome_key": "mangrove", "gdp_callout": "These coastal forests nurse the reef fisheries and absorb the hurricanes that batter the Yucatán — worth more rooted than cleared for resorts." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-88.5, 16], [-86.5, 15.7], [-87.5, 18.5], [-90, 21], [-90.5, 18], [-88.5, 16]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "mangroves-borneo", "name": "Borneo Coastal Mangroves", "region": "Indonesia, Malaysia, Brunei", "biome_key": "mangrove", "gdp_callout": "Standing, these tidal forests out-earn the shrimp ponds and plantations carved into them." },
+      "geometry": { "type": "Polygon", "coordinates": [[[109, 1.5], [110.5, 2.5], [117.5, 4.5], [118.5, 1], [116, -3.5], [113, -3], [109, 1.5]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "pantanal", "name": "Pantanal", "region": "Brazil, Bolivia, Paraguay", "biome_key": "wetland", "gdp_callout": "The world's largest tropical wetland filters a continent's water and buffers its floods — services no treatment plant could price." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-58.2, -20.2], [-55.0, -20.2], [-55.0, -16.0], [-58.2, -16.0], [-58.2, -20.2]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "okavango", "name": "Okavango Delta", "region": "Botswana", "biome_key": "wetland", "gdp_callout": "An inland delta that turns desert into one of Africa's richest wildlife economies — worth far more wet than drained." },
+      "geometry": { "type": "Polygon", "coordinates": [[[22.0, -18.5], [23.8, -18.5], [24.0, -19.8], [22.2, -20.0], [22.0, -18.5]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "everglades", "name": "Everglades", "region": "United States (Florida)", "biome_key": "wetland", "gdp_callout": "This 'river of grass' recharges South Florida's drinking water and blunts its storm surge — replacing it would cost billions a year." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-81.5, 25.1], [-80.3, 25.3], [-80.4, 26.5], [-81.6, 26.4], [-81.5, 25.1]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "sudd", "name": "Sudd Wetlands", "region": "South Sudan", "biome_key": "wetland", "gdp_callout": "One of the world's largest freshwater wetlands sustains pastoral economies and the White Nile's flow downstream." },
+      "geometry": { "type": "Polygon", "coordinates": [[[29.5, 6.0], [31.5, 6.5], [31.8, 9.0], [29.8, 9.2], [29.5, 6.0]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "pacific-northwest", "name": "Pacific Northwest Forests", "region": "United States, Canada", "biome_key": "temperate_forest", "gdp_callout": "These temperate rainforests store more carbon per hectare than almost any forest on earth — worth more standing than milled." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-125, 42], [-121, 42], [-121, 49], [-125, 49], [-125, 42]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "central-european", "name": "Central European Forests", "region": "Germany, Poland, Czechia, Austria", "biome_key": "temperate_forest", "gdp_callout": "Europe's mixed forests cool its cities and clean its watersheds — natural infrastructure worth more than the timber yield." },
+      "geometry": { "type": "Polygon", "coordinates": [[[8, 47], [15, 47], [15, 52], [8, 52], [8, 47]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "valdivian", "name": "Valdivian Forests", "region": "Chile, Argentina", "biome_key": "temperate_forest", "gdp_callout": "South America's only temperate rainforest harbours ancient endemics — standing, it out-earns the pulp plantations replacing it." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-74, -38], [-71, -38], [-71, -47], [-74.5, -47], [-74, -38]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "eastern-north-america", "name": "Appalachian Forests", "region": "United States", "biome_key": "temperate_forest", "gdp_callout": "These ancient mountains hold the richest temperate broadleaf diversity on the continent — and the watersheds that supply its cities." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-84, 34], [-78, 37], [-72, 44], [-76, 45], [-83, 38], [-84, 34]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "ussuri-taiga", "name": "Ussuri Broadleaf Forests", "region": "Russia, China", "biome_key": "temperate_forest", "gdp_callout": "The Amur tiger's last forest stores carbon and anchors a transboundary watershed worth more intact than logged." },
+      "geometry": { "type": "Polygon", "coordinates": [[[130, 43], [137, 45], [137, 49], [131, 49], [130, 43]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "great-plains", "name": "North American Great Plains", "region": "United States, Canada", "biome_key": "temperate_grassland", "gdp_callout": "Beneath the prairie lies one of earth's great soil-carbon stores — worth more rooted than plowed into the next dust bowl." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-104, 38], [-97, 38], [-97, 46], [-104, 46], [-104, 38]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "eurasian-steppe", "name": "Eurasian Steppe", "region": "Kazakhstan, Russia, Mongolia", "biome_key": "temperate_grassland", "gdp_callout": "The world's largest grassland holds vast soil carbon and pasture economies — value released to the air when it is tilled." },
+      "geometry": { "type": "Polygon", "coordinates": [[[50, 47], [75, 47], [75, 52], [50, 52], [50, 47]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "pampas", "name": "Pampas", "region": "Argentina, Uruguay, Brazil", "biome_key": "temperate_grassland", "gdp_callout": "South America's fertile grassland feeds the world's beef — but its soil nutrient bank is worth more conserved than mined." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-65, -38], [-57, -38], [-56, -32], [-63, -31], [-65, -38]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "mongolian-grassland", "name": "Mongolian Grasslands", "region": "Mongolia", "biome_key": "temperate_grassland", "gdp_callout": "One of the last intact temperate grasslands sustains nomadic herding and a deep soil-carbon reserve." },
+      "geometry": { "type": "Polygon", "coordinates": [[[96, 45], [114, 45], [114, 49.5], [96, 49.5], [96, 45]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "high-veld", "name": "South African Highveld", "region": "South Africa, Lesotho", "biome_key": "temperate_grassland", "gdp_callout": "The Highveld grasslands feed the rivers that supply Johannesburg — natural water infrastructure worth more than the cropland that displaces it." },
+      "geometry": { "type": "Polygon", "coordinates": [[[26, -26], [31, -26], [30, -31], [26.5, -30.5], [26, -26]]] }
+    }
+  ]
+}

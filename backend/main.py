@@ -8,6 +8,12 @@ API-first FastAPI service.
   citation-backed TEV breakdown in the requested currency (USD / EUR / BRL).
 - ``GET /api/v1/reference`` — supported biomes, currencies, and per-sqm reference
   yields, so clients can build biome/currency toggles.
+- ``GET /api/v1/regions`` — the bundled catalogue of named ecosystems across all
+  five biomes, each valued in the requested currency, powering the map overlays
+  and the Compare view.
+- ``GET /api/v1/datasets`` — the data catalogue: every data domain's source,
+  citation, status and "as-of" date, plus the "data we still need" roadmap, for
+  the GUI Data Hub.
 - ``POST /api/v1/classify`` — Phase 3 data ingestion: classify a GeoJSON polygon
   into a valuation biome using ingested WWF boundary data.
 - ``POST /api/v1/extract-esv`` — Phase 3 LLM-assisted extraction of structured ESV
@@ -25,6 +31,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from biome_classifier import boundary_source, classify_geometry
+from datasets import data_catalog
 from esv_extraction import extract_esv_records
 from reference_data import (
     BIOMES,
@@ -34,6 +41,7 @@ from reference_data import (
     YIELD_CATEGORIES,
     biome_per_sqm_usd,
 )
+from regions import dataset_provenance, list_regions
 from valuation import compute_valuation
 
 app = FastAPI(
@@ -109,6 +117,37 @@ def reference() -> Dict[str, Any]:
             for code, c in CURRENCIES.items()
         },
     }
+
+
+@app.get("/api/v1/regions")
+def regions(currency: Optional[str] = Query(default=None)) -> Dict[str, Any]:
+    """Return the catalogue of named ecosystems, each valued in ``currency``.
+
+    Every region across all five biomes is priced through the same TEV engine as
+    ``/api/v1/valuation``, so the frontend can draw the biome map overlays and the
+    Compare breakdowns from a single request without re-valuing each polygon.
+    """
+    chosen_currency = (currency or DEFAULT_CURRENCY).upper()
+    if chosen_currency not in CURRENCIES:
+        chosen_currency = DEFAULT_CURRENCY
+    return {
+        "currency": chosen_currency,
+        "regions": list_regions(chosen_currency),
+        "dataset": dataset_provenance(),
+    }
+
+
+@app.get("/api/v1/datasets")
+def datasets() -> Dict[str, Any]:
+    """Data catalogue + roadmap for the GUI Data Hub.
+
+    Returns one entry per data domain (biome boundaries, ESV reference values,
+    carbon price, FX, land cover, region catalogue) with its source, citation,
+    status and as-of date, plus a ``needs`` roadmap of the data still required.
+    Assembled from the same constants the valuation engine uses (see
+    ``datasets.py``).
+    """
+    return data_catalog()
 
 
 @app.post("/api/v1/valuation")

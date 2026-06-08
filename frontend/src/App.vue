@@ -3,10 +3,15 @@ import { ref, onMounted, defineAsyncComponent } from 'vue'
 import WorldMap from './components/WorldMap.vue'
 import SidePanel from './components/SidePanel.vue'
 import LayerControl from './components/LayerControl.vue'
-import { defaultVisibleLayers } from './data/layers.js'
+import { useRegions } from './data/useRegions.js'
 
-// The MapLibre globe (and its ~heavy bundle) loads only when 3D mode is active.
+// The MapLibre globe (and its ~heavy bundle) loads only when 3D mode is active;
+// the Compare dashboard and Data hub load only when their mode is opened.
 const GlobeMap = defineAsyncComponent(() => import('./components/GlobeMap.vue'))
+const CompareDashboard = defineAsyncComponent(() =>
+  import('./components/CompareDashboard.vue'),
+)
+const DataHub = defineAsyncComponent(() => import('./components/DataHub.vue'))
 
 const selectedRegion = ref(null)
 const valuation = ref(null)
@@ -14,11 +19,35 @@ const backendOnline = ref(null) // null = unknown, true/false once checked
 const loading = ref(false)
 const errorMsg = ref('')
 
+// Top-level mode: explore on the map, compare regions, or browse the data hub.
+const appMode = ref('map') // 'map' | 'compare' | 'data'
+
 // 2D Leaflet map vs 3D MapLibre globe. The globe is the hero view by default.
 const viewMode = ref('3d')
 
-// Thematic layer visibility, shared by both the 2D map and the 3D globe.
-const visibleLayers = ref({ ...defaultVisibleLayers })
+// How the areas are drawn on the map: filled polygons, value bubbles, or heat.
+const displayStyle = ref('polygons') // 'polygons' | 'bubbles' | 'heat'
+
+// Region catalogue (all biomes, pre-valued) fetched from the backend; drives
+// both maps, the layer control, the Compare dashboard, and the value bubbles.
+const {
+  regions,
+  biomeLayers,
+  pointFeatures,
+  loading: regionsLoading,
+  error: regionsError,
+  loaded: regionsLoaded,
+  load: loadRegions,
+} = useRegions()
+
+// Thematic layer visibility, shared by both the 2D map and the 3D globe. Every
+// biome layer defaults on so the full dataset is visible immediately.
+const visibleLayers = ref({})
+function syncLayerVisibility() {
+  const next = {}
+  for (const l of biomeLayers.value) next[l.id] = visibleLayers.value[l.id] ?? true
+  visibleLayers.value = next
+}
 function toggleLayer(id) {
   visibleLayers.value = { ...visibleLayers.value, [id]: !visibleLayers.value[id] }
 }
@@ -36,7 +65,12 @@ function toggleTheme() {
   isDark.value = !isDark.value
   applyTheme()
 }
-onMounted(applyTheme)
+
+onMounted(async () => {
+  applyTheme()
+  await loadRegions(currency.value)
+  syncLayerVisibility()
+})
 
 // Fetch the Phase 2 TEV breakdown for a region's polygon in the chosen currency.
 async function fetchValuation(region) {
@@ -71,6 +105,9 @@ async function onRegionSelect(region) {
 async function setCurrency(code) {
   if (code === currency.value) return
   currency.value = code
+  // Re-price the whole catalogue (map geometry is currency-independent, so the
+  // maps don't rebuild — only the Compare numbers and a selected region update).
+  loadRegions(code)
   if (!selectedRegion.value) return
   loading.value = true
   errorMsg.value = ''
@@ -117,7 +154,35 @@ function closePanel() {
         </span>
       </div>
       <div class="controls">
-        <div class="viewmode" role="group" aria-label="Map view">
+        <div class="viewmode" role="group" aria-label="App mode">
+          <button
+            class="view-btn"
+            :class="{ active: appMode === 'map' }"
+            @click="appMode = 'map'"
+          >
+            ◍ Map
+          </button>
+          <button
+            class="view-btn"
+            :class="{ active: appMode === 'compare' }"
+            @click="appMode = 'compare'"
+          >
+            ⊞ Compare
+          </button>
+          <button
+            class="view-btn"
+            :class="{ active: appMode === 'data' }"
+            @click="appMode = 'data'"
+          >
+            ⛁ Data
+          </button>
+        </div>
+        <div
+          v-if="appMode === 'map'"
+          class="viewmode"
+          role="group"
+          aria-label="Map view"
+        >
           <button
             class="view-btn"
             :class="{ active: viewMode === '3d' }"
@@ -152,34 +217,65 @@ function closePanel() {
     </header>
 
     <main class="stage">
-      <GlobeMap
-        v-if="viewMode === '3d'"
-        :visible-layers="visibleLayers"
-        :is-dark="isDark"
-        @select="onRegionSelect"
-      />
-      <WorldMap v-else :visible-layers="visibleLayers" @select="onRegionSelect" />
+      <CompareDashboard v-if="appMode === 'compare'" :regions="regions" />
+      <DataHub v-else-if="appMode === 'data'" />
 
-      <LayerControl :visible-layers="visibleLayers" @toggle="toggleLayer" />
-
-      <transition name="hint">
-        <div v-if="!selectedRegion" class="hint" aria-hidden="true">
-          <span class="hint-pulse"></span>
-          <span class="hint-text">Select a rainforest biome to reveal its Total Ecosystem Value</span>
+      <template v-else>
+        <div v-if="!regionsLoaded && regionsLoading" class="stage-state">
+          <span class="stage-spinner"></span>
+          Loading ecosystem data…
         </div>
-      </transition>
+        <div v-else-if="regionsError" class="stage-state err">{{ regionsError }}</div>
 
-      <transition name="panel">
-        <SidePanel
-          v-if="selectedRegion"
-          :region="selectedRegion"
-          :valuation="valuation"
-          :loading="loading"
-          :backend-online="backendOnline"
-          :error="errorMsg"
-          @close="closePanel"
-        />
-      </transition>
+        <template v-else>
+          <GlobeMap
+            v-if="viewMode === '3d'"
+            :layers="biomeLayers"
+            :regions="regions"
+            :points="pointFeatures"
+            :display-style="displayStyle"
+            :visible-layers="visibleLayers"
+            :is-dark="isDark"
+            @select="onRegionSelect"
+          />
+          <WorldMap
+            v-else
+            :layers="biomeLayers"
+            :regions="regions"
+            :points="pointFeatures"
+            :display-style="displayStyle"
+            :visible-layers="visibleLayers"
+            @select="onRegionSelect"
+          />
+
+          <LayerControl
+            :layers="biomeLayers"
+            :visible-layers="visibleLayers"
+            :display-style="displayStyle"
+            @toggle="toggleLayer"
+            @set-style="displayStyle = $event"
+          />
+
+          <transition name="hint">
+            <div v-if="!selectedRegion" class="hint" aria-hidden="true">
+              <span class="hint-pulse"></span>
+              <span class="hint-text">Select any ecosystem to reveal its Total Ecosystem Value</span>
+            </div>
+          </transition>
+
+          <transition name="panel">
+            <SidePanel
+              v-if="selectedRegion"
+              :region="selectedRegion"
+              :valuation="valuation"
+              :loading="loading"
+              :backend-online="backendOnline"
+              :error="errorMsg"
+              @close="closePanel"
+            />
+          </transition>
+        </template>
+      </template>
     </main>
   </div>
 </template>
@@ -350,6 +446,35 @@ function closePanel() {
   position: relative;
   flex: 1;
   min-height: 0;
+}
+
+/* Full-stage loading / error state while the region catalogue is fetched. */
+.stage-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  background: radial-gradient(circle at 50% 40%, #0a1424 0%, var(--bg) 70%);
+}
+.stage-state.err {
+  color: #f87171;
+}
+.stage-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: stage-spin 0.8s linear infinite;
+}
+@keyframes stage-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Inviting call-to-action while no region is selected. */
