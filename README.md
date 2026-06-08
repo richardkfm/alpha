@@ -48,6 +48,36 @@ with its full Total Ecosystem Value breakdown:
   display styles; a side-by-side **Compare** dashboard; a **Data Hub** with live
   tools and full provenance; custom-area search; and a dark/light theme.
 
+## Conversion is a liability, not a price
+
+A head-to-head _"value standing vs. value built"_ turns nature into a line item a
+developer can simply outbid — conceding that ecosystems are substitutable and
+that destroying a parcel costs no more than that parcel's isolated value. `alpha`
+rejects both. Alongside the scientific TEV (which it leaves unchanged), it carries
+a deliberately value-laden **systemic / irreversibility layer** built on three
+principles:
+
+- **A liability, not a price.** Conversion is reported as the present value of the
+  services lost _forever_ — a permanent, externalised debt borne by the public,
+  downstream communities, and future generations, not by whoever clears the land.
+  It is **never netted against development revenue**: a debt owed to others in
+  perpetuity, not a price the project can buy out.
+- **Systemic weight.** Rare, intact, load-bearing land is worth _more_ than the
+  isolated parcel, because fragmenting it degrades the wider network. A systemic
+  premium of `1 + scarcity × intactness` captures this, plus a one-time, largely
+  irreversible **carbon-stock debt** released when standing vegetation and soil
+  are cleared (distinct from the annual sequestration flow).
+- **Red lines, not line items.** Non-substitutable, irreversible losses —
+  extinctions, ancient soil & peat, permafrost, aquifers — are **flagged, not
+  monetised**. They sit outside the money figures on purpose: they cannot be
+  recreated at any price, so they must never be traded against revenue.
+
+This makes the full, distributed, permanent cost of conversion legible while
+refusing the premise that nature is for sale. The valuation surfaces it under
+`systemic`, `conversion_liability`, and `red_lines`, and the web app renders it in
+the side panel's _"If this land were converted"_ section. Full derivation:
+[`backend/METHODOLOGY.md`](./backend/METHODOLOGY.md) §6.
+
 ## Stack
 
 | Service | Tech | Port |
