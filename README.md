@@ -23,11 +23,36 @@ with its full Total Ecosystem Value breakdown:
 
 ---
 
+## What it does
+
+- **Total Ecosystem Value (TEV) engine** — geodesic-area valuation of any GeoJSON
+  polygon across **eleven biomes**, broken into five ecosystem-service yields
+  (carbon capture, climate regulation, water filtration, biodiversity, soil
+  nutrients), reported per sqm/year and area-scaled, in USD / EUR / BRL.
+- **Automatic biome detection** — classifies a polygon against real **RESOLVE
+  Ecoregions 2017** boundaries, layered with curated seeds for the land-use and
+  freshwater types RESOLVE omits (cropland, peri-urban, lakes & rivers).
+- **Land-cover intactness** — realised yield is scaled by how intact the ground
+  cover is (Copernicus CGLS-LC100 legend), with the intact *potential* shown
+  alongside.
+- **Balance-sheet framing** — capitalises the perpetual annual flow into a
+  standing **natural-asset value**, and reframes conversion as a permanent,
+  externalised **liability** with a one-time carbon debt and irreversible
+  "red line" flags, rather than a price a developer can outbid.
+- **Live market data** — carbon price + FX (ECB via Frankfurter) with a
+  transparent fallback to documented static references when a feed is unreachable.
+- **ESV text extraction** — pulls structured ecosystem-service values out of
+  report / TNFD-disclosure prose (Ollama-compatible, with an offline regex
+  fallback).
+- **Web app** — 3D MapLibre globe + 2D Leaflet map; polygon / value-bubble / heat
+  display styles; a side-by-side **Compare** dashboard; a **Data Hub** with live
+  tools and full provenance; custom-area search; and a dark/light theme.
+
 ## Stack
 
 | Service | Tech | Port |
 | --- | --- | --- |
-| `frontend` | Vue 3 + Vite, Leaflet.js | 3000 |
+| `frontend` | Vue 3 + Vite, MapLibre GL + Leaflet.js | 3000 |
 | `backend` | FastAPI, SQLAlchemy + GeoAlchemy2 | 8000 |
 | `db` | PostgreSQL 15 + PostGIS | 5432 |
 
@@ -59,7 +84,7 @@ curl -X POST "http://localhost:8000/api/v1/valuation?currency=EUR" \
 
 ### Phase 3 — data ingestion
 
-The biome is now **detected from the polygon** against ingested WWF ecoregion
+The biome is now **detected from the polygon** against ingested RESOLVE ecoregion
 boundaries (no need to pass `biome`); the detection is returned under
 `classification`. A dedicated `POST /api/v1/classify` returns just the biome, and
 `POST /api/v1/extract-esv` mines structured ecosystem-service values out of report /
@@ -80,7 +105,7 @@ alpha/
 ├── ARCHITECTURE.md        # methodology + phased roadmap
 ├── docker-compose.yml     # db + backend + frontend
 ├── backend/               # FastAPI valuation API
-└── frontend/              # Vue 3 + Vite + Leaflet world map
+└── frontend/              # Vue 3 + Vite — MapLibre globe + Leaflet flat map
 ```
 
 ## License

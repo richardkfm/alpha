@@ -98,11 +98,13 @@ sources (Copernicus satellite data, ESVD API, carbon market prices).
 
 ### Phase 3 — Data Ingestion ✅ done
 
-- Ingest real biome boundary data (WWF Terrestrial Ecoregions, Olson et al. 2001):
-  `POST /api/v1/valuation` now **auto-detects** the biome from the polygon instead
-  of defaulting/accepting it as input, and a dedicated `POST /api/v1/classify`
+- Ingest real biome boundary data (**RESOLVE Ecoregions 2017**, Dinerstein et al.,
+  layered with curated WWF-derived seeds for the land-use/freshwater types RESOLVE
+  omits): `POST /api/v1/valuation` now **auto-detects** the biome from the polygon
+  instead of defaulting/accepting it as input, and a dedicated `POST /api/v1/classify`
   endpoint returns the detected biome plus dataset provenance
-  (`backend/biome_classifier.py`, `backend/data/wwf_biomes.geojson`)
+  (`backend/biome_classifier.py`, `backend/data/ecoregions.geojson` +
+  `backend/data/wwf_biomes.geojson`)
 - Copernicus land-cover ingestion layer (CGLS-LC100 legend → biome hint +
   intactness factor) so realised yield reflects intact forest vs. cleared land
   (`backend/landcover.py`)
@@ -127,8 +129,9 @@ The visual centrepiece is a **full-screen world map** — a 3D MapLibre globe
 (hero view) with a 2D Leaflet "flat" alternative:
 
 - Highlighted overlay polygons for a catalogue of named ecosystems across **all
-  five valuation biomes** (tropical rainforest, mangrove, inland wetland,
-  temperate forest, temperate grassland), each as a separately toggleable,
+  eleven valuation biomes** (tropical rainforest, temperate forest, boreal forest,
+  mangrove, inland wetland, freshwater, temperate grassland, cropland, peri-urban,
+  tundra, and desert/xeric shrubland), each as a separately toggleable,
   colour-coded layer. The catalogue is served pre-valued by the backend from
   `GET /api/v1/regions` (see `backend/regions.py`, `backend/data/regions.geojson`)
   rather than hardcoded in the frontend, so adding regions is a data change.

@@ -14,9 +14,12 @@ geographic area. Part of the [`alpha`](../README.md) monorepo.
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | Liveness probe → `{"status": "ok", "service": "alpha-backend"}` |
-| `POST` | `/api/v1/valuation` | GeoJSON polygon → full TEV breakdown (geodesic area, per-sqm + area totals, currency). **Phase 3:** auto-detects the biome when none is supplied (`classification` in the response) |
+| `POST` | `/api/v1/valuation` | GeoJSON polygon → full TEV breakdown (geodesic area, per-sqm + area totals, intactness, standing-asset & conversion-liability framing, currency). **Phase 3:** auto-detects the biome when none is supplied (`classification` in the response) |
+| `GET` | `/api/v1/regions` | Pre-valued catalogue of named ecosystems across all biomes, powering the map overlays + Compare view |
 | `GET` | `/api/v1/reference` | Supported biomes & currencies + their per-sqm reference yields |
-| `POST` | `/api/v1/classify` | _(Phase 3)_ GeoJSON polygon → detected biome from ingested WWF boundaries + dataset provenance |
+| `GET` | `/api/v1/datasets` | Data catalogue + roadmap (source, citation, status, as-of per domain) for the Data Hub |
+| `GET` | `/api/v1/market` | Current carbon price + FX inputs with provenance and live/static flags |
+| `POST` | `/api/v1/classify` | _(Phase 3)_ GeoJSON polygon → detected biome from ingested RESOLVE ecoregions (+ curated seeds) + dataset provenance |
 | `POST` | `/api/v1/extract-esv` | _(Phase 3)_ report / TNFD text → structured ESV records (Ollama-compatible, offline regex fallback) |
 | `GET` | `/docs` | Auto-generated Swagger UI |
 
@@ -66,7 +69,7 @@ Code layout:
 - `valuation.py` — geodesic area + TEV computation
 - `reference_data.py` — biome reference table, carbon price, FX rates (with citations)
 - `biome_classifier.py` — _(Phase 3)_ classify a polygon into a biome from ingested
-  WWF boundaries (`data/wwf_biomes.geojson`)
+  RESOLVE ecoregions (`data/ecoregions.geojson`) + curated seeds (`data/wwf_biomes.geojson`)
 - `landcover.py` — _(Phase 3)_ Copernicus CGLS-LC100 legend → biome hint + intactness
 - `esv_extraction.py` — _(Phase 3)_ LLM-assisted (Ollama-compatible) + regex ESV parser
 - `ingest.py` — _(Phase 3)_ ingestion CLI (`validate` / `classify` / `refresh`)
