@@ -41,6 +41,27 @@ def test_sundarbans_point_is_mangrove():
     assert res["biome_key"] == "mangrove"
 
 
+def test_great_lakes_point_is_freshwater():
+    res = classify_point(-83, 44)
+    assert res["biome_key"] == "freshwater"
+    assert res["confidence"] == "matched"
+
+
+def test_corn_belt_point_is_cropland():
+    res = classify_point(-92, 41)
+    assert res["biome_key"] == "cropland"
+
+
+def test_canadian_boreal_point_is_boreal_forest():
+    res = classify_point(-100, 57)
+    assert res["biome_key"] == "boreal_forest"
+
+
+def test_london_green_belt_point_is_peri_urban():
+    res = classify_point(-0.1, 51.5)
+    assert res["biome_key"] == "peri_urban"
+
+
 def test_open_ocean_falls_back_to_default():
     res = classify_point(-30, 0)  # mid-Atlantic, inside no boundary
     assert res["confidence"] == "default"

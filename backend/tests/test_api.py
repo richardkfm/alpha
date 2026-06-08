@@ -69,15 +69,20 @@ def test_regions_returns_valued_catalogue():
     body = res.json()
     assert body["currency"] == "USD"
     regions = body["regions"]
-    # Many more than the original 4 hardcoded overlays, spanning all five biomes.
+    # Many more than the original 4 hardcoded overlays, spanning every biome —
+    # including the "ordinary land" types (cropland, freshwater, boreal, peri-urban).
     assert len(regions) >= 20
-    assert {r["biome_key"] for r in regions} == {
+    assert {
         "tropical_rainforest",
         "temperate_forest",
         "mangrove",
         "wetland",
         "temperate_grassland",
-    }
+        "boreal_forest",
+        "cropland",
+        "freshwater",
+        "peri_urban",
+    } <= {r["biome_key"] for r in regions}
     amazon = next(r for r in regions if r["id"] == "amazon")
     assert amazon["total_ecosystem_value_per_year"] > 0
     assert amazon["geometry"]["type"] in ("Polygon", "MultiPolygon")

@@ -68,11 +68,20 @@ Values are deliberately conservative (lower-to-mid of published ranges).
 | --- | --- | --- | --- | --- | --- |
 | Tropical Rainforest | 2.3 | 360 | 200 | 500 | 120 |
 | Temperate Forest | 1.5 | 250 | 150 | 250 | 100 |
+| Boreal Forest (Taiga) | 1.2 | 180 | 120 | 150 | 150 |
 | Mangrove | 6.0 | 500 | 900 | 800 | 300 |
 | Inland Wetland | 1.0 | 400 | 3,000 | 1,200 | 250 |
+| Freshwater (Lakes & Rivers) | 0.0 | 300 | 3,500 | 600 | 0 |
 | Temperate Grassland | 0.5 | 80 | 60 | 120 | 200 |
+| Cropland & Agriculture | 0.3 | 60 | 40 | 50 | 180 |
+| Peri-urban / Managed Open Land | 0.6 | 150 | 120 | 90 | 120 |
 
-The default biome is `tropical_rainforest`. As of **Phase 3**, the biome is
+The "ordinary land" biomes (boreal forest, freshwater, cropland, peri-urban) draw
+on the same ESVD biome groups (de Groot et al. 2012). They count **regulating and
+supporting services only** — provisioning revenue such as crop yield or
+drinking-water supply is excluded — so the figure represents the ecosystem value
+*lost when the land is sealed or converted*, the quantity that is normally invisible
+in a rezoning decision. The default biome is `tropical_rainforest`. As of **Phase 3**, the biome is
 detected from the polygon against ingested WWF ecoregion boundaries
 (`biome_classifier.py`, `data/wwf_biomes.geojson`) when the caller does not supply
 one; the detection and its provenance are returned under `classification`. See

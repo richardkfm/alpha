@@ -87,6 +87,30 @@ def test_unknown_biome_and_currency_fall_back_to_defaults():
     assert res["currency"] == "USD"
 
 
+def test_new_ordinary_biomes_are_available():
+    poly = _square_one_degree_at_equator()
+    for biome in ("boreal_forest", "cropland", "freshwater", "peri_urban"):
+        res = compute_valuation(poly, biome, "USD")
+        assert res["biome_key"] == biome
+        assert res["total_ecosystem_value_per_sqm_year"] > 0
+
+
+def test_freshwater_is_water_dominated():
+    res = compute_valuation(_square_one_degree_at_equator(), "freshwater", "USD")
+    yields = res["yields_per_sqm_year"]
+    assert yields["water_filtration"] == max(yields.values())
+
+
+def test_cropland_below_wetland():
+    poly = _square_one_degree_at_equator()
+    cropland = compute_valuation(poly, "cropland", "USD")
+    wetland = compute_valuation(poly, "wetland", "USD")
+    assert (
+        cropland["total_ecosystem_value_per_sqm_year"]
+        < wetland["total_ecosystem_value_per_sqm_year"]
+    )
+
+
 def test_mangrove_values_exceed_grassland():
     poly = _square_one_degree_at_equator()
     mangrove = compute_valuation(poly, "mangrove", "USD")

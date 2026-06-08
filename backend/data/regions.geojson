@@ -134,6 +134,66 @@
       "type": "Feature",
       "properties": { "id": "high-veld", "name": "South African Highveld", "region": "South Africa, Lesotho", "biome_key": "temperate_grassland", "gdp_callout": "The Highveld grasslands feed the rivers that supply Johannesburg — natural water infrastructure worth more than the cropland that displaces it." },
       "geometry": { "type": "Polygon", "coordinates": [[[26, -26], [31, -26], [30, -31], [26.5, -30.5], [26, -26]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "siberian-taiga", "name": "Siberian Taiga", "region": "Russia", "biome_key": "boreal_forest", "gdp_callout": "The taiga is the planet's largest land carbon store — worth more standing than logged for softwood or cleared for extraction." },
+      "geometry": { "type": "Polygon", "coordinates": [[[60, 55], [100, 55], [100, 66], [60, 66], [60, 55]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "canadian-boreal", "name": "Canadian Boreal Forest", "region": "Canada", "biome_key": "boreal_forest", "gdp_callout": "Canada's boreal forest filters a continent's water and locks away carbon worth more than the pulp and mining leases carving into it." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-130, 52], [-70, 52], [-70, 62], [-130, 62], [-130, 52]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "fennoscandian-taiga", "name": "Fennoscandian Taiga", "region": "Sweden, Finland, Norway", "biome_key": "boreal_forest", "gdp_callout": "Standing, these northern forests bank carbon and clean water worth more than the timber rotations replacing them." },
+      "geometry": { "type": "Polygon", "coordinates": [[[12, 60], [31, 60], [31, 68], [12, 68], [12, 60]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "us-corn-belt", "name": "US Corn Belt", "region": "United States (Midwest)", "biome_key": "cropland", "gdp_callout": "Even as cropland, this soil holds nutrient and carbon value that simply vanishes when it is paved for warehouses and subdivisions." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-96, 39], [-88, 39], [-88, 43], [-96, 43], [-96, 39]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "north-european-plain", "name": "North European Plain Farmland", "region": "Germany, Poland", "biome_key": "cropland", "gdp_callout": "Europe's breadbasket soils are living infrastructure — worth defending for the water and carbon they hold, not just this year's harvest." },
+      "geometry": { "type": "Polygon", "coordinates": [[[7, 51], [20, 51], [20, 54], [7, 54], [7, 51]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "punjab-cropland", "name": "Punjab Croplands", "region": "India, Pakistan", "biome_key": "cropland", "gdp_callout": "Beneath the wheat lies a soil-and-water system worth more maintained than mined by over-extraction and sprawl." },
+      "geometry": { "type": "Polygon", "coordinates": [[[73, 29], [77, 29], [77, 32], [73, 32], [73, 29]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "great-lakes", "name": "Laurentian Great Lakes", "region": "United States, Canada", "biome_key": "freshwater", "gdp_callout": "One-fifth of the world's surface fresh water — a drinking-water reserve no treatment plant could ever replace." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-88, 43], [-82, 43], [-76, 43.5], [-76, 45], [-84, 47], [-88, 46], [-88, 43]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "lake-baikal", "name": "Lake Baikal", "region": "Russia", "biome_key": "freshwater", "gdp_callout": "The world's deepest lake holds a fifth of its unfrozen fresh water; its filtration and habitat value is effectively priceless." },
+      "geometry": { "type": "Polygon", "coordinates": [[[104, 51.5], [106, 51.5], [110, 55], [109, 56], [105, 53], [104, 51.5]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "lake-victoria", "name": "Lake Victoria", "region": "Uganda, Kenya, Tanzania", "biome_key": "freshwater", "gdp_callout": "Africa's great lake waters and feeds tens of millions — a freshwater asset worth far more than the pollution degrading it." },
+      "geometry": { "type": "Polygon", "coordinates": [[[31.6, -2.8], [34.9, -2.8], [34.9, 0.4], [31.6, 0.4], [31.6, -2.8]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "london-green-belt", "name": "London Green Belt", "region": "United Kingdom", "biome_key": "peri_urban", "gdp_callout": "The green belt cools the capital, soaks up its floods and feeds its rivers — value that disappears the day it is built over." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-0.6, 51.2], [0.4, 51.2], [0.4, 51.8], [-0.6, 51.8], [-0.6, 51.2]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "randstad-fringe", "name": "Randstad Green Heart", "region": "Netherlands", "biome_key": "peri_urban", "gdp_callout": "The open land between the Dutch cities buffers floods and stores carbon — worth far more than another logistics park." },
+      "geometry": { "type": "Polygon", "coordinates": [[[4.4, 51.9], [5.2, 51.9], [5.2, 52.4], [4.4, 52.4], [4.4, 51.9]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "rhine-ruhr-fringe", "name": "Rhine-Ruhr Open Land", "region": "Germany", "biome_key": "peri_urban", "gdp_callout": "The open land threading Europe's densest conurbation is natural infrastructure — quietly worth more green than sealed." },
+      "geometry": { "type": "Polygon", "coordinates": [[[6.4, 51.2], [7.6, 51.2], [7.6, 51.8], [6.4, 51.8], [6.4, 51.2]]] }
     }
   ]
 }
