@@ -87,6 +87,36 @@ def test_unknown_biome_and_currency_fall_back_to_defaults():
     assert res["currency"] == "USD"
 
 
+def test_capitalized_value_is_annual_over_discount_rate():
+    res = compute_valuation(_square_one_degree_at_equator(), "tropical_rainforest", "USD")
+    cap = res["capitalized_value"]
+    expected = res["total_ecosystem_value_per_year"] / cap["discount_rate"]
+    assert math.isclose(cap["asset_value_total"], expected, rel_tol=1e-6)
+
+
+def test_intactness_scales_realised_value_but_not_potential():
+    full = compute_valuation(_square_one_degree_at_equator(), "wetland", "USD")
+    half = compute_valuation(_square_one_degree_at_equator(), "wetland", "USD", intactness=0.5)
+    assert half["intactness"] == 0.5
+    # realised value halves; the intact ceiling is reported unchanged
+    assert math.isclose(
+        half["total_ecosystem_value_per_sqm_year"],
+        full["total_ecosystem_value_per_sqm_year"] * 0.5,
+        rel_tol=1e-6,
+    )
+    assert math.isclose(
+        half["potential"]["total_ecosystem_value_per_sqm_year"],
+        full["total_ecosystem_value_per_sqm_year"],
+        rel_tol=1e-9,
+    )
+
+
+def test_default_intactness_is_one_preserving_phase2_behaviour():
+    res = compute_valuation(_square_one_degree_at_equator(), "tropical_rainforest", "USD")
+    assert res["intactness"] == 1.0
+    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.1249, abs_tol=1e-6)
+
+
 def test_new_ordinary_biomes_are_available():
     poly = _square_one_degree_at_equator()
     for biome in ("boreal_forest", "cropland", "freshwater", "peri_urban"):

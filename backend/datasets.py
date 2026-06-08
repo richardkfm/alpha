@@ -161,9 +161,10 @@ def _domains() -> List[Dict[str, Any]]:
             "status": _AUTHORITATIVE,
             "sources": [{"citation": _LC100_CITATION, "url": "https://doi.org/10.5281/zenodo.3939050"}],
             "as_of": "2020",
-            "note": "Authoritative CGLS-LC100 legend + intactness factors are wired; per-polygon "
-            "raster sampling is a deployment (PostGIS) concern, not yet applied to live valuations.",
-            "exposed_via": ["internal (landcover.py)"],
+            "note": "Authoritative CGLS-LC100 legend + intactness factors. Realised value is now "
+            "scaled by intactness via per-biome/region defaults; per-polygon raster sampling "
+            "(PostGIS) to derive true intactness is still pending.",
+            "exposed_via": ["POST /api/v1/valuation (intactness)", "internal (landcover.py)"],
         },
     ]
 

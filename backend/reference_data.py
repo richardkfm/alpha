@@ -141,6 +141,42 @@ BIOMES: dict[str, dict] = {
 
 DEFAULT_BIOME = "tropical_rainforest"
 
+# ---------------------------------------------------------------------------
+# Capitalisation discount rate.
+#
+# Ecosystem services are a perpetual annual flow; capitalising them into a
+# present-value "standing natural asset" lets a hectare of intact land sit on a
+# balance sheet next to its development/sale price. asset_value = annual / rate.
+# 3% sits between Stern (~1.4%) and Nordhaus (~4-5%) social-discount estimates
+# and matches common natural-capital accounting practice. Phase 4 may expose it.
+# ---------------------------------------------------------------------------
+DEFAULT_DISCOUNT_RATE = 0.03
+
+# ---------------------------------------------------------------------------
+# Default land-cover intactness by biome — the fraction of the reference yield a
+# typical parcel of this biome still delivers, used until real per-polygon
+# land-cover sampling (``landcover.py``) is wired in. Wild biomes are high but
+# not pristine at scale; managed/converted land is substantially lower. A region
+# may override this with an explicit ``intactness`` property.
+# ---------------------------------------------------------------------------
+BIOME_DEFAULT_INTACTNESS: dict[str, float] = {
+    "tropical_rainforest": 0.85,
+    "temperate_forest": 0.80,
+    "boreal_forest": 0.90,
+    "mangrove": 0.85,
+    "wetland": 0.85,
+    "freshwater": 0.95,
+    "temperate_grassland": 0.80,
+    "cropland": 0.45,
+    "peri_urban": 0.50,
+}
+
+
+def biome_default_intactness(biome_key: str) -> float:
+    """Default intactness for a biome (1.0 if unknown)."""
+    return BIOME_DEFAULT_INTACTNESS.get(biome_key, 1.0)
+
+
 # Order in which yield categories are reported (matches the product spec).
 YIELD_CATEGORIES = (
     "carbon_capture",

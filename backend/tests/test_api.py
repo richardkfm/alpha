@@ -106,6 +106,28 @@ def test_valuation_echoes_market_provenance():
     assert "live" in market["carbon"]
 
 
+def test_valuation_includes_capitalized_asset_and_intactness():
+    res = client.post("/api/v1/valuation", json=AMAZON)
+    assert res.status_code == 200
+    body = res.json()
+    assert "capitalized_value" in body and body["capitalized_value"]["asset_value_total"] > 0
+    assert "intactness" in body and "potential" in body
+
+
+def test_valuation_intactness_query_scales_value():
+    full = client.post("/api/v1/valuation", json=AMAZON).json()
+    half = client.post("/api/v1/valuation?intactness=0.5", json=AMAZON).json()
+    assert half["intactness"] == 0.5
+    assert half["total_ecosystem_value_per_year"] < full["total_ecosystem_value_per_year"]
+
+
+def test_regions_carry_intactness_and_asset_value():
+    regions = client.get("/api/v1/regions").json()["regions"]
+    crop = next(r for r in regions if r["biome_key"] == "cropland")
+    assert 0 < crop["intactness"] < 1  # managed land is below full intactness
+    assert crop["capitalized_value"]["asset_value_total"] > 0
+
+
 def test_datasets_catalogue():
     res = client.get("/api/v1/datasets")
     assert res.status_code == 200

@@ -18,7 +18,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List
 
-from reference_data import BIOMES, DEFAULT_BIOME
+from reference_data import BIOMES, DEFAULT_BIOME, biome_default_intactness
 from valuation import compute_valuation
 
 _DATA_PATH = Path(__file__).parent / "data" / "regions.geojson"
@@ -47,6 +47,7 @@ def list_regions(
     carbon_price: float | None = None,
     fx_rate: float | None = None,
     fx_as_of: str | None = None,
+    discount_rate: float | None = None,
 ) -> List[Dict[str, Any]]:
     """Value every catalogue region in ``currency`` and return flat summaries.
 
@@ -55,6 +56,8 @@ def list_regions(
     numbers match the ``/api/v1/valuation`` endpoint exactly. ``carbon_price`` /
     ``fx_rate`` / ``fx_as_of`` are resolved once by the endpoint (live or static)
     and injected so the whole catalogue prices off one consistent snapshot.
+    Realised value is scaled by each region's ``intactness`` (an explicit property
+    or the biome default), and the annual flow is capitalised at ``discount_rate``.
     """
     regions: List[Dict[str, Any]] = []
     for feature in _load_catalogue().get("features", []):
@@ -64,6 +67,10 @@ def list_regions(
         if biome_key not in BIOMES:
             biome_key = DEFAULT_BIOME
 
+        intactness = props.get("intactness")
+        if intactness is None:
+            intactness = biome_default_intactness(biome_key)
+
         valuation = compute_valuation(
             geometry,
             biome=biome_key,
@@ -71,6 +78,8 @@ def list_regions(
             carbon_price=carbon_price,
             fx_rate=fx_rate,
             fx_as_of=fx_as_of,
+            intactness=intactness,
+            discount_rate=discount_rate,
         )
         regions.append(
             {
@@ -84,6 +93,7 @@ def list_regions(
                 "area": valuation["area"],
                 "currency": valuation["currency"],
                 "currency_symbol": valuation["currency_symbol"],
+                "intactness": valuation["intactness"],
                 "yields_per_sqm_year": valuation["yields_per_sqm_year"],
                 "total_ecosystem_value_per_sqm_year": valuation[
                     "total_ecosystem_value_per_sqm_year"
@@ -91,6 +101,8 @@ def list_regions(
                 "total_ecosystem_value_per_year": valuation[
                     "total_ecosystem_value_per_year"
                 ],
+                "potential": valuation["potential"],
+                "capitalized_value": valuation["capitalized_value"],
             }
         )
     return regions

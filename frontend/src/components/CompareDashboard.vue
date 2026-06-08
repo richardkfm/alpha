@@ -208,10 +208,22 @@ onMounted(() => {
             {{ fmtTotal(r.total_ecosystem_value_per_year) }}
           </div>
 
+          <!-- standing natural-asset value (capitalised) -->
+          <div class="cell rowlabel strong">Standing asset value</div>
+          <div v-for="r in selected" :key="'as-' + r.id" class="cell num-cell asset">
+            {{ fmtTotal(r.capitalized_value && r.capitalized_value.asset_value_total) }}
+          </div>
+
           <!-- area -->
           <div class="cell rowlabel">Area</div>
           <div v-for="r in selected" :key="'ar-' + r.id" class="cell num-cell muted">
             {{ fmtInt(r.area.hectares) }} ha
+          </div>
+
+          <!-- land-cover intactness -->
+          <div class="cell rowlabel">Intactness</div>
+          <div v-for="r in selected" :key="'in-' + r.id" class="cell num-cell muted">
+            {{ r.intactness != null ? Math.round(r.intactness * 100) + '%' : '—' }}
           </div>
 
           <!-- yield breakdown rows -->
@@ -594,6 +606,12 @@ onMounted(() => {
 }
 .num-cell.gold {
   color: var(--gold);
+}
+.num-cell.asset {
+  color: var(--gold);
+  font-size: 1rem;
+  font-weight: 800;
+  background: color-mix(in srgb, var(--gold) 8%, var(--bg-deep));
 }
 .num-cell.muted {
   color: var(--text-muted);

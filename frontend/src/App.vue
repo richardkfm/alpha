@@ -80,6 +80,7 @@ onMounted(async () => {
 async function fetchValuation(region) {
   const params = new URLSearchParams({ currency: currency.value })
   if (region.biome_key) params.set('biome', region.biome_key)
+  if (region.intactness != null) params.set('intactness', region.intactness)
   const res = await fetch(`/api/v1/valuation?${params}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

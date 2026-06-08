@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 // Shared yield-category metadata, also used by the Compare dashboard.
 import { YIELD_ROWS } from '../data/yields.js'
 
@@ -32,6 +32,27 @@ const yieldRows = computed(() => {
     }
   })
 })
+
+// --- Standing natural-asset value (capitalised perpetual flow) -------------
+// Capitalise the annual flow locally so the discount rate can be explored
+// without a server round-trip: asset = annual / rate.
+const DISCOUNT_RATES = [0.01, 0.03, 0.05]
+const discountRate = ref(0.03)
+const assetValue = computed(() => {
+  const annual = props.valuation?.total_ecosystem_value_per_year
+  if (annual == null) return null
+  return annual / discountRate.value
+})
+
+// Intactness: share of the intact-biome potential the land currently delivers.
+const intactness = computed(() => props.valuation?.intactness ?? null)
+const potentialAnnual = computed(
+  () => props.valuation?.potential?.total_ecosystem_value_per_year ?? null,
+)
+
+function fmtPct(n) {
+  return n == null ? '—' : `${Math.round(n * 100)}%`
+}
 
 // Per-sqm yields are sub-cent — show 4 decimals; area totals use grouping.
 function fmtPerSqm(n) {
@@ -100,6 +121,20 @@ function fmtInt(n) {
         </span>
       </section>
 
+      <section v-if="intactness != null && intactness < 1" class="intactness">
+        <div class="intact-head">
+          <span class="k">Land-cover intactness</span>
+          <span class="intact-pct">{{ fmtPct(intactness) }}</span>
+        </div>
+        <div class="intact-track">
+          <div class="intact-bar" :style="{ width: fmtPct(intactness) }"></div>
+        </div>
+        <span class="intact-note">
+          Delivering {{ fmtPct(intactness) }} of its intact potential of
+          {{ fmtTotal(potentialAnnual) }} {{ valuation.currency }}/yr.
+        </span>
+      </section>
+
       <section class="yields">
         <h3>
           Ecosystem service yields
@@ -131,6 +166,25 @@ function fmtInt(n) {
       <section class="tev-total">
         <span class="k">Value of this area, per year</span>
         <span class="v">{{ fmtTotal(valuation.total_ecosystem_value_per_year) }} {{ valuation.currency }}</span>
+      </section>
+
+      <section class="asset">
+        <div class="asset-head">
+          <span class="asset-label">Standing natural asset value</span>
+          <div class="asset-rates" role="group" aria-label="Discount rate">
+            <button
+              v-for="r in DISCOUNT_RATES"
+              :key="r"
+              :class="{ on: discountRate === r }"
+              @click="discountRate = r"
+            >{{ Math.round(r * 100) }}%</button>
+          </div>
+        </div>
+        <span class="asset-value">{{ fmtTotal(assetValue) }} <em>{{ valuation.currency }}</em></span>
+        <span class="asset-sub">
+          capitalised perpetual value at {{ Math.round(discountRate * 100) }}% — what this
+          area is worth on the balance sheet, left standing
+        </span>
       </section>
 
       <section v-if="region.gdpCallout" class="callout">
@@ -469,6 +523,116 @@ function fmtInt(n) {
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--gold);
+}
+
+.intactness {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+}
+.intact-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.intact-head .k {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-faint);
+}
+.intact-pct {
+  font-family: 'Spline Sans Mono', ui-monospace, monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.intact-track {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--bg-deep);
+  overflow: hidden;
+}
+.intact-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--forest-overlay));
+  box-shadow: 0 0 10px -2px var(--accent);
+}
+.intact-note {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.asset {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: radial-gradient(120% 140% at 100% 0%, rgba(231, 200, 115, 0.14), transparent 60%),
+    var(--bg-elevated);
+  border: 1px solid rgba(231, 200, 115, 0.4);
+}
+.asset-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.asset-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--text-muted);
+}
+.asset-rates {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+}
+.asset-rates button {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.asset-rates button.on {
+  background: var(--gold);
+  color: #1c1606;
+}
+.asset-value {
+  font-family: 'Spline Sans Mono', ui-monospace, monospace;
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--gold);
+}
+.asset-value em {
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.asset-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .callout {
