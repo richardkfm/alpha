@@ -51,6 +51,16 @@ export const BIOME_META = {
     sublabel: 'urban fringe & managed open',
     color: '#f472b6', // magenta
   },
+  tundra: {
+    label: 'Tundra',
+    sublabel: 'arctic & alpine',
+    color: '#9fb6c2', // icy grey-blue
+  },
+  desert: {
+    label: 'Desert & Xeric',
+    sublabel: 'deserts & dry shrubland',
+    color: '#c2a878', // sand / khaki
+  },
 }
 
 // Render + legend order for the layers and the Compare picker.
@@ -64,6 +74,8 @@ export const BIOME_ORDER = [
   'temperate_grassland',
   'cropland',
   'peri_urban',
+  'tundra',
+  'desert',
 ]
 
 export function biomeColor(key) {

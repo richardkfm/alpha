@@ -75,13 +75,25 @@ Values are deliberately conservative (lower-to-mid of published ranges).
 | Temperate Grassland | 0.5 | 80 | 60 | 120 | 200 |
 | Cropland & Agriculture | 0.3 | 60 | 40 | 50 | 180 |
 | Peri-urban / Managed Open Land | 0.6 | 150 | 120 | 90 | 120 |
+| Tundra | 0.3 | 40 | 30 | 60 | 80 |
+| Desert & Xeric Shrubland | 0.1 | 20 | 10 | 40 | 20 |
 
-The "ordinary land" biomes (boreal forest, freshwater, cropland, peri-urban) draw
-on the same ESVD biome groups (de Groot et al. 2012). They count **regulating and
-supporting services only** — provisioning revenue such as crop yield or
-drinking-water supply is excluded — so the figure represents the ecosystem value
-*lost when the land is sealed or converted*, the quantity that is normally invisible
-in a rezoning decision. The default biome is `tropical_rainforest`. As of **Phase 3**, the biome is
+The "ordinary land" biomes (boreal forest, freshwater, cropland, peri-urban) plus
+tundra and desert draw on the same ESVD biome groups (de Groot et al. 2012). They
+count **regulating and supporting services only** — provisioning revenue such as
+crop yield or drinking-water supply is excluded — so the figure represents the
+ecosystem value *lost when the land is sealed or converted*, the quantity that is
+normally invisible in a rezoning decision. The default biome is
+`tropical_rainforest`.
+
+As of **Phase 4**, the biome is detected from the polygon against **real RESOLVE
+Ecoregions 2017** boundaries (Dinerstein et al.; `data/ecoregions.geojson`),
+generalized for fast offline point-in-polygon classification and mapped from the
+14 RESOLVE biomes to alpha's valuation biomes. Curated seeds
+(`data/wwf_biomes.geojson`) layer on top for the land-use/freshwater types RESOLVE
+omits (cropland, peri-urban, lakes). Realised value is then scaled by land-cover
+**intactness** (`landcover.py`), and the annual flow is **capitalised** into a
+present-value standing asset at a 3% reference discount rate. As of **Phase 3**, the biome is
 detected from the polygon against ingested WWF ecoregion boundaries
 (`biome_classifier.py`, `data/wwf_biomes.geojson`) when the caller does not supply
 one; the detection and its provenance are returned under `classification`. See

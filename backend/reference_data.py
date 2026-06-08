@@ -137,6 +137,26 @@ BIOMES: dict[str, dict] = {
         "biodiversity_premium_usd_ha_yr": 90.0,
         "soil_nutrient_value_usd_ha_yr": 120.0,
     },
+    # Cold and arid natural biomes — low per-hectare yields, but they cover vast
+    # areas and store large soil/permafrost carbon. Added so the real RESOLVE
+    # ecoregion mapping (Tundra, Deserts & Xeric Shrublands) is faithful rather
+    # than folded into grassland and over-valued.
+    "tundra": {
+        "label": "Tundra",
+        "sequestration_tco2_ha_yr": 0.3,   # slow, but permafrost soils hold huge stores
+        "climate_regulation_usd_ha_yr": 40.0,
+        "water_filtration_usd_ha_yr": 30.0,
+        "biodiversity_premium_usd_ha_yr": 60.0,
+        "soil_nutrient_value_usd_ha_yr": 80.0,
+    },
+    "desert": {
+        "label": "Desert & Xeric Shrubland",
+        "sequestration_tco2_ha_yr": 0.1,
+        "climate_regulation_usd_ha_yr": 20.0,
+        "water_filtration_usd_ha_yr": 10.0,
+        "biodiversity_premium_usd_ha_yr": 40.0,
+        "soil_nutrient_value_usd_ha_yr": 20.0,
+    },
 }
 
 DEFAULT_BIOME = "tropical_rainforest"
@@ -169,6 +189,8 @@ BIOME_DEFAULT_INTACTNESS: dict[str, float] = {
     "temperate_grassland": 0.80,
     "cropland": 0.45,
     "peri_urban": 0.50,
+    "tundra": 0.95,
+    "desert": 0.90,
 }
 
 

@@ -62,6 +62,23 @@ def test_london_green_belt_point_is_peri_urban():
     assert res["biome_key"] == "peri_urban"
 
 
+def test_sahara_point_is_desert():
+    # Real RESOLVE ecoregion coverage (no curated seed here).
+    res = classify_point(10, 23)
+    assert res["biome_key"] == "desert"
+    assert res["confidence"] == "matched"
+
+
+def test_north_siberia_point_is_tundra():
+    res = classify_point(90, 73)
+    assert res["biome_key"] == "tundra"
+
+
+def test_central_europe_point_is_temperate_forest():
+    res = classify_point(10, 50)
+    assert res["biome_key"] == "temperate_forest"
+
+
 def test_open_ocean_falls_back_to_default():
     res = classify_point(-30, 0)  # mid-Atlantic, inside no boundary
     assert res["confidence"] == "default"

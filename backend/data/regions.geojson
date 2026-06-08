@@ -194,6 +194,26 @@
       "type": "Feature",
       "properties": { "id": "rhine-ruhr-fringe", "name": "Rhine-Ruhr Open Land", "region": "Germany", "biome_key": "peri_urban", "gdp_callout": "The open land threading Europe's densest conurbation is natural infrastructure — quietly worth more green than sealed." },
       "geometry": { "type": "Polygon", "coordinates": [[[6.4, 51.2], [7.6, 51.2], [7.6, 51.8], [6.4, 51.8], [6.4, 51.2]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "sahara", "name": "Sahara", "region": "North Africa", "biome_key": "desert", "gdp_callout": "Even the desert works: its mineral dust fertilises distant oceans and the Amazon, and its intact ground stores ancient carbon and water." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-8, 18], [30, 18], [30, 28], [-8, 28], [-8, 18]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "arabian-desert", "name": "Arabian Desert", "region": "Saudi Arabia, Oman, UAE", "biome_key": "desert", "gdp_callout": "Arid land is not empty land — its sparse ecosystems regulate dust and water and host biodiversity found nowhere else." },
+      "geometry": { "type": "Polygon", "coordinates": [[[44, 18], [55, 18], [55, 28], [44, 28], [44, 18]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "siberian-tundra", "name": "Siberian Arctic Tundra", "region": "Russia", "biome_key": "tundra", "gdp_callout": "Frozen ground holds more carbon than the world's forests combined — worth vastly more kept frozen than thawed." },
+      "geometry": { "type": "Polygon", "coordinates": [[[70, 70], [110, 70], [110, 76], [70, 76], [70, 70]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "canadian-tundra", "name": "Canadian Arctic Tundra", "region": "Canada", "biome_key": "tundra", "gdp_callout": "The tundra's permafrost is a global carbon vault; disturbing it releases value the whole planet pays for." },
+      "geometry": { "type": "Polygon", "coordinates": [[[-110, 66], [-75, 66], [-75, 73], [-110, 73], [-110, 66]]] }
     }
   ]
 }

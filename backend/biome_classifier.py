@@ -4,11 +4,13 @@ Phase 2 accepted (or defaulted) the biome as an input. Phase 3 *ingests* real
 biome-boundary data and classifies a geometry into one of alpha's five valuation
 biomes by locating its representative point inside the ingested boundaries.
 
-The boundaries live in ``data/wwf_biomes.geojson`` — a coarse, simplified seed
-derived from the WWF Terrestrial Ecoregions of the World (Olson et al. 2001) plus
-mangrove / inland-wetland references. They are NOT authoritative; see
-``backend/INGESTION.md`` for the dataset provenance and how to refresh it from the
-authoritative source.
+The primary boundaries live in ``data/ecoregions.geojson`` — real terrestrial
+ecoregion boundaries (RESOLVE Ecoregions 2017, Dinerstein et al.), generalized and
+mapped from the 14 RESOLVE biomes to alpha's valuation biomes. They are layered
+with the curated ``data/wwf_biomes.geojson`` seeds, which cover the land-use and
+freshwater types RESOLVE does not (cropland, peri-urban, lakes) and a few specific
+sites; where boundaries overlap, the most specific (smallest bbox) wins. See
+``backend/INGESTION.md`` for provenance and refresh.
 
 Pure-Python and dependency-free (ray-casting point-in-polygon), matching the
 valuation engine's design. When a point falls inside no ingested boundary, the
@@ -24,8 +26,15 @@ from typing import Any, Optional
 
 from reference_data import BIOMES, DEFAULT_BIOME
 
-# The ingested boundary dataset ships with the backend.
-DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "wwf_biomes.geojson")
+# The ingested boundary datasets ship with the backend. The real RESOLVE
+# ecoregions are the primary source; the curated seeds add the land-use /
+# freshwater types RESOLVE lacks and a few specific sites.
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+ECOREGIONS_PATH = os.path.join(_DATA_DIR, "ecoregions.geojson")
+SEEDS_PATH = os.path.join(_DATA_DIR, "wwf_biomes.geojson")
+# Ordered so the real ecoregions load first; seeds layer on top (smaller bbox
+# seeds still win via the specificity ranking in classify_point).
+DATA_PATHS = [ECOREGIONS_PATH, SEEDS_PATH]
 
 
 def _iter_polygons(geometry: dict[str, Any]):
@@ -124,35 +133,49 @@ def _load_boundaries() -> list[dict[str, Any]]:
     prefer smaller, more specific biomes (e.g. a mangrove patch inside a wider
     tropical region) when boundaries overlap.
     """
-    with open(DATA_PATH, "r", encoding="utf-8") as fh:
-        fc = json.load(fh)
-
     boundaries: list[dict[str, Any]] = []
-    for feat in fc.get("features", []):
-        props = feat.get("properties", {})
-        biome_key = props.get("biome_key")
-        if biome_key not in BIOMES:
+    for path in DATA_PATHS:
+        if not os.path.exists(path):
             continue
-        for poly in _iter_polygons(feat.get("geometry", {})):
-            if not poly:
+        # Curated seeds take priority over the real ecoregions: they intentionally
+        # override RESOLVE for the land-use / freshwater types it lacks (a lake or
+        # farmland sits on a "forest" ecoregion) and for a few specific sites.
+        is_seed = os.path.basename(path) == os.path.basename(SEEDS_PATH)
+        with open(path, "r", encoding="utf-8") as fh:
+            fc = json.load(fh)
+        for feat in fc.get("features", []):
+            props = feat.get("properties", {})
+            biome_key = props.get("biome_key")
+            if biome_key not in BIOMES:
                 continue
-            boundaries.append(
-                {
-                    "biome_key": biome_key,
-                    "name": props.get("name", ""),
-                    "wwf_biome": props.get("wwf_biome", ""),
-                    "polygon": poly,
-                    "specificity": _bbox_area(poly),
-                }
-            )
+            for poly in _iter_polygons(feat.get("geometry", {})):
+                if not poly:
+                    continue
+                boundaries.append(
+                    {
+                        "biome_key": biome_key,
+                        "name": props.get("name", ""),
+                        "wwf_biome": props.get("wwf_biome", ""),
+                        "polygon": poly,
+                        "specificity": _bbox_area(poly),
+                        "priority": 1 if is_seed else 0,
+                    }
+                )
     return boundaries
 
 
 def boundary_source() -> dict[str, Any]:
-    """The provenance block from the ingested dataset (for API transparency)."""
-    with open(DATA_PATH, "r", encoding="utf-8") as fh:
-        fc = json.load(fh)
-    return fc.get("source", {})
+    """The provenance block from the ingested datasets (for API transparency)."""
+    src: dict[str, Any] = {}
+    if os.path.exists(ECOREGIONS_PATH):
+        with open(ECOREGIONS_PATH, "r", encoding="utf-8") as fh:
+            src = dict(json.load(fh).get("source", {}))
+    src.setdefault(
+        "seeds",
+        "Curated seeds (data/wwf_biomes.geojson) supply land-use/freshwater types "
+        "RESOLVE omits (cropland, peri-urban, lakes).",
+    )
+    return src
 
 
 def classify_point(lon: float, lat: float) -> dict[str, Any]:
@@ -166,7 +189,9 @@ def classify_point(lon: float, lat: float) -> dict[str, Any]:
         b for b in _load_boundaries() if _point_in_polygon(lon, lat, b["polygon"])
     ]
     if matches:
-        best = min(matches, key=lambda b: b["specificity"])
+        # Prefer a curated seed (priority) over an ecoregion; then the most
+        # specific (smallest bbox) among equal priority.
+        best = min(matches, key=lambda b: (-b["priority"], b["specificity"]))
         return {
             "biome_key": best["biome_key"],
             "biome_label": BIOMES[best["biome_key"]]["label"],
@@ -174,7 +199,7 @@ def classify_point(lon: float, lat: float) -> dict[str, Any]:
             "wwf_biome": best["wwf_biome"],
             "point": {"lon": round(lon, 5), "lat": round(lat, 5)},
             "confidence": "matched",
-            "source": "WWF Terrestrial Ecoregions (Olson et al. 2001), simplified seed",
+            "source": "RESOLVE Ecoregions 2017 (Dinerstein et al.), generalized; curated seeds for land-use/freshwater types",
         }
     return {
         "biome_key": DEFAULT_BIOME,
