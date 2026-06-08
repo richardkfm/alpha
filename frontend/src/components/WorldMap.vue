@@ -1,12 +1,17 @@
 <script setup>
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { layers as LAYER_DEFS } from '../data/layers.js'
 import { rainforests } from '../data/rainforests.js'
 
+const props = defineProps({
+  visibleLayers: { type: Object, default: () => ({ rainforest: true }) },
+})
 const emit = defineEmits(['select'])
 const mapEl = ref(null)
 let map = null
+const leafletLayers = {} // id -> L.GeoJSON
 
 onMounted(() => {
   map = L.map(mapEl.value, {
@@ -16,7 +21,7 @@ onMounted(() => {
     zoomControl: true,
   })
 
-  // Dark basemap (CARTO) keeps the green overlays as the focal point.
+  // Dark basemap (CARTO) keeps the neon overlays as the focal point.
   L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     {
@@ -27,34 +32,62 @@ onMounted(() => {
     }
   ).addTo(map)
 
-  const baseStyle = {
-    color: '#22c55e',
-    weight: 1.5,
-    fillColor: '#22c55e',
-    fillOpacity: 0.28,
-    className: 'region-overlay',
-  }
-  const hoverStyle = {
-    fillOpacity: 0.55,
-    weight: 2.5,
-    color: '#2dd4bf',
-    className: 'region-overlay region-overlay--hover',
-  }
+  // Build one Leaflet layer per thematic layer from the shared registry, each
+  // tinted with its own neon hue.
+  LAYER_DEFS.forEach((def) => {
+    const baseStyle = {
+      color: def.color,
+      weight: 1.5,
+      fillColor: def.color,
+      fillOpacity: 0.22,
+      className: 'region-overlay',
+    }
+    const hoverStyle = {
+      fillOpacity: 0.5,
+      weight: 2.5,
+      className: 'region-overlay region-overlay--hover',
+    }
 
-  rainforests.forEach((region) => {
-    const layer = L.geoJSON(region.geojson, { style: baseStyle })
-    layer.bindTooltip(region.name, {
-      sticky: true,
-      direction: 'top',
-      className: 'region-tooltip',
-      offset: [0, -6],
+    const gjLayer = L.geoJSON(def.geojson, {
+      style: baseStyle,
+      onEachFeature: (feature, lyr) => {
+        const name = feature.properties?.name
+        if (name) {
+          lyr.bindTooltip(name, {
+            sticky: true,
+            direction: 'top',
+            className: 'region-tooltip',
+            offset: [0, -6],
+          })
+        }
+        lyr.on('mouseover', () => lyr.setStyle(hoverStyle))
+        lyr.on('mouseout', () => gjLayer.resetStyle(lyr))
+        // Only the real biome layer is clickable -> drives valuation.
+        if (def.kind === 'real') {
+          lyr.on('click', () => {
+            const region = rainforests.find((r) => r.id === feature.properties?.regionId)
+            if (region) emit('select', region)
+          })
+        }
+      },
     })
-    layer.on('mouseover', () => layer.setStyle(hoverStyle))
-    layer.on('mouseout', () => layer.setStyle(baseStyle))
-    layer.on('click', () => emit('select', region))
-    layer.addTo(map)
+    leafletLayers[def.id] = gjLayer
+    if (props.visibleLayers[def.id]) gjLayer.addTo(map)
   })
 })
+
+function applyVisibility() {
+  if (!map) return
+  for (const def of LAYER_DEFS) {
+    const lyr = leafletLayers[def.id]
+    if (!lyr) continue
+    const shouldShow = !!props.visibleLayers[def.id]
+    if (shouldShow && !map.hasLayer(lyr)) lyr.addTo(map)
+    else if (!shouldShow && map.hasLayer(lyr)) map.removeLayer(lyr)
+  }
+}
+
+watch(() => props.visibleLayers, applyVisibility, { deep: true })
 
 onBeforeUnmount(() => {
   if (map) map.remove()

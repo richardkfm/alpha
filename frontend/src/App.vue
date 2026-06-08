@@ -1,13 +1,27 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import WorldMap from './components/WorldMap.vue'
 import SidePanel from './components/SidePanel.vue'
+import LayerControl from './components/LayerControl.vue'
+import { defaultVisibleLayers } from './data/layers.js'
+
+// The MapLibre globe (and its ~heavy bundle) loads only when 3D mode is active.
+const GlobeMap = defineAsyncComponent(() => import('./components/GlobeMap.vue'))
 
 const selectedRegion = ref(null)
 const valuation = ref(null)
 const backendOnline = ref(null) // null = unknown, true/false once checked
 const loading = ref(false)
 const errorMsg = ref('')
+
+// 2D Leaflet map vs 3D MapLibre globe. The globe is the hero view by default.
+const viewMode = ref('3d')
+
+// Thematic layer visibility, shared by both the 2D map and the 3D globe.
+const visibleLayers = ref({ ...defaultVisibleLayers })
+function toggleLayer(id) {
+  visibleLayers.value = { ...visibleLayers.value, [id]: !visibleLayers.value[id] }
+}
 
 // Currency toggle (Phase 2). The backend converts USD reference values via FX.
 const CURRENCIES = ['USD', 'EUR', 'BRL']
@@ -103,6 +117,22 @@ function closePanel() {
         </span>
       </div>
       <div class="controls">
+        <div class="viewmode" role="group" aria-label="Map view">
+          <button
+            class="view-btn"
+            :class="{ active: viewMode === '3d' }"
+            @click="viewMode = '3d'"
+          >
+            ◐ Globe
+          </button>
+          <button
+            class="view-btn"
+            :class="{ active: viewMode === '2d' }"
+            @click="viewMode = '2d'"
+          >
+            ▦ Flat
+          </button>
+        </div>
         <div class="currency" role="group" aria-label="Currency">
           <button
             v-for="c in CURRENCIES"
@@ -122,7 +152,15 @@ function closePanel() {
     </header>
 
     <main class="stage">
-      <WorldMap @select="onRegionSelect" />
+      <GlobeMap
+        v-if="viewMode === '3d'"
+        :visible-layers="visibleLayers"
+        :is-dark="isDark"
+        @select="onRegionSelect"
+      />
+      <WorldMap v-else :visible-layers="visibleLayers" @select="onRegionSelect" />
+
+      <LayerControl :visible-layers="visibleLayers" @toggle="toggleLayer" />
 
       <transition name="hint">
         <div v-if="!selectedRegion" class="hint" aria-hidden="true">
@@ -224,6 +262,35 @@ function closePanel() {
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
   box-shadow: var(--shadow-soft);
   pointer-events: auto;
+}
+
+.viewmode {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+}
+.view-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.18s var(--ease), background 0.18s var(--ease);
+}
+.view-btn:hover {
+  color: var(--text);
+}
+.view-btn.active {
+  background: var(--bg-elevated);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .currency {
