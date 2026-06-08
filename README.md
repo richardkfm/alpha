@@ -39,8 +39,9 @@ docker compose up --build
 
 Then open:
 
-- **Web app:** http://localhost:3000 — full-screen world map with the 4 major
-  rainforest regions. Click a region for its TEV breakdown; toggle USD / EUR / BRL.
+- **Web app:** http://localhost:3000 — full-screen 3D globe (with a 2D flat map)
+  showing named ecosystems across all valuation biomes. Click any region for its
+  TEV breakdown; switch Map / Compare / Data modes; toggle USD / EUR / BRL.
 - **API health:** http://localhost:8000/health
 - **API docs (Swagger):** http://localhost:8000/docs
 

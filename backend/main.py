@@ -17,7 +17,7 @@ API-first FastAPI service.
 - ``GET /api/v1/market`` — current carbon price + FX inputs with provenance and
   live/static flags (Phase 4 live market data; see ``live_data.py``).
 - ``POST /api/v1/classify`` — Phase 3 data ingestion: classify a GeoJSON polygon
-  into a valuation biome using ingested WWF boundary data.
+  into a valuation biome using ingested RESOLVE ecoregion boundaries (+ seeds).
 - ``POST /api/v1/extract-esv`` — Phase 3 LLM-assisted extraction of structured ESV
   values from report / TNFD-disclosure text (Ollama-compatible, offline fallback).
 
@@ -214,8 +214,8 @@ def valuation(
     total for the whole area, in the requested currency.
 
     **Phase 3:** when no biome is supplied (query or body), the biome is detected
-    from the geometry against ingested WWF boundary data
-    (``biome_classifier.classify_geometry``) instead of silently defaulting. The
+    from the geometry against ingested RESOLVE ecoregion boundaries (+ curated
+    seeds) (``biome_classifier.classify_geometry``) instead of silently defaulting. The
     detection — including its source and confidence — is returned under
     ``classification``. An explicit biome still wins and is echoed back as an
     ``"explicit"`` classification.
@@ -272,8 +272,9 @@ def classify(body: ValuationRequest) -> Dict[str, Any]:
     """Classify a GeoJSON polygon into a valuation biome from ingested boundaries.
 
     Phase 3 data-ingestion endpoint: locates the geometry's representative point
-    inside the bundled WWF-derived biome boundaries and returns the matched biome
-    plus provenance. Useful on its own (e.g. to drive map styling) and the same
+    inside the bundled RESOLVE ecoregion boundaries (+ curated seeds) and returns
+    the matched biome plus provenance. Useful on its own (e.g. to drive map
+    styling) and the same
     logic the valuation endpoint uses for auto-detection.
     """
     geometry = body.to_geometry()

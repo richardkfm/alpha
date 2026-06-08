@@ -86,11 +86,21 @@ async function fetchValuation(region) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(region.geojson),
   })
-  if (!res.ok) throw new Error(`valuation HTTP ${res.status}`)
+  if (!res.ok) {
+    // Surface the backend's own validation message (e.g. zero-area geometry)
+    // instead of a bare HTTP status, so search/paste mistakes are actionable.
+    const detail = await res
+      .json()
+      .then((b) => b.detail)
+      .catch(() => null)
+    throw new Error(detail || `valuation HTTP ${res.status}`)
+  }
   return res.json()
 }
 
 // On region click, confirm backend connectivity via GET /health, then value it.
+// Connectivity and valuation are reported separately: a reachable backend that
+// rejects a geometry must not masquerade as "backend offline".
 async function onRegionSelect(region) {
   selectedRegion.value = region
   valuation.value = null
@@ -99,10 +109,18 @@ async function onRegionSelect(region) {
   try {
     const health = await fetch('/health').then((r) => r.json())
     backendOnline.value = health.status === 'ok'
-    valuation.value = await fetchValuation(region)
   } catch (e) {
     backendOnline.value = false
     errorMsg.value = 'Could not reach the alpha backend. Is it running on :8000?'
+    loading.value = false
+    return
+  }
+  try {
+    valuation.value = await fetchValuation(region)
+  } catch (e) {
+    errorMsg.value = e.message
+      ? `Could not value this area: ${e.message}`
+      : 'Could not value this area.'
   } finally {
     loading.value = false
   }

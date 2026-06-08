@@ -100,7 +100,8 @@ python -m pytest
 
 ## Roadmap
 
-**Phase 3 ✅** ingests real biome boundaries (WWF ecoregions) to auto-detect the
+**Phase 3 ✅** ingests real biome boundaries (RESOLVE Ecoregions 2017, with curated
+seeds for the land-use/freshwater types RESOLVE omits) to auto-detect the
 biome, adds the Copernicus land-cover intactness layer, and an LLM-assisted ESV
 extractor — see [`INGESTION.md`](./INGESTION.md). **Phase 4** connects carbon prices
 and FX rates to live feeds and hardens the API (versioning, auth, rate limiting,
