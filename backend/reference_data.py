@@ -199,6 +199,112 @@ def biome_default_intactness(biome_key: str) -> float:
     return BIOME_DEFAULT_INTACTNESS.get(biome_key, 1.0)
 
 
+# ---------------------------------------------------------------------------
+# Systemic / irreversibility layer — the "cost of conversion" reframing.
+#
+# A parcel's loss is more than its isolated annual value: it depends on how rare
+# and load-bearing the wider system is, and some losses cannot be undone at any
+# price. These weights are deliberately value-laden and kept SEPARATE from the
+# scientific per-sqm ESV (the headline TEV is unchanged); they drive a systemic
+# premium and red-line flags so the tool frames conversion as a permanent,
+# externalised liability rather than a price a developer can outbid.
+# ---------------------------------------------------------------------------
+
+# Scarcity / irreplaceability in [0,1]: how rare, threatened and load-bearing the
+# biome is globally (share already lost, endemism, time to recover). Higher -> a
+# larger systemic premium when the parcel is still intact.
+BIOME_SCARCITY_WEIGHT: dict[str, float] = {
+    "tropical_rainforest": 0.70,
+    "temperate_forest": 0.50,
+    "boreal_forest": 0.60,
+    "mangrove": 0.90,
+    "wetland": 0.85,
+    "freshwater": 0.70,
+    "temperate_grassland": 0.60,
+    "cropland": 0.10,
+    "peri_urban": 0.15,
+    "tundra": 0.80,
+    "desert": 0.40,
+}
+
+# Ecosystem carbon stock (vegetation + soil), tonnes CO2e per hectare, released
+# ~once when the land is cleared/sealed — the irreversible carbon debt of
+# conversion, distinct from the annual sequestration flow. Order-of-magnitude from
+# IPCC AR6, Pan et al. 2011 and blue-carbon / peat literature.
+BIOME_CARBON_STOCK_TCO2_HA: dict[str, float] = {
+    "tropical_rainforest": 900.0,
+    "temperate_forest": 600.0,
+    "boreal_forest": 1300.0,
+    "mangrove": 1500.0,
+    "wetland": 1400.0,
+    "freshwater": 0.0,
+    "temperate_grassland": 350.0,
+    "cropland": 150.0,
+    "peri_urban": 150.0,
+    "tundra": 1800.0,
+    "desert": 50.0,
+}
+
+# Non-substitutable / irreversible losses — flagged, not monetised. Marked outside
+# the money figures on purpose: they cannot be netted against revenue at any price.
+_RL_BIODIVERSITY = {
+    "service": "biodiversity_premium",
+    "label": "Species & habitat",
+    "reason": "Extinctions are irreversible — biodiversity cannot be recreated at any price.",
+}
+_RL_OLD_GROWTH = {
+    "service": "biodiversity_premium",
+    "label": "Old-growth structure",
+    "reason": "Centuries to regenerate the structure and soils, if ever.",
+}
+_RL_PEAT = {
+    "service": "carbon_capture",
+    "label": "Ancient soil & peat carbon",
+    "reason": "Stored over millennia, released in years — not recoverable on human timescales.",
+}
+_RL_PERMAFROST = {
+    "service": "carbon_capture",
+    "label": "Permafrost carbon",
+    "reason": "Thaw is self-reinforcing and irreversible on human timescales.",
+}
+_RL_AQUIFER = {
+    "service": "water_filtration",
+    "label": "Aquifer & water supply",
+    "reason": "Aquifers, once depleted or contaminated, may never recover.",
+}
+_RL_TOPSOIL = {
+    "service": "soil_nutrient_value",
+    "label": "Topsoil",
+    "reason": "Fertile topsoil takes centuries to build and is lost in a single conversion.",
+}
+
+BIOME_RED_LINES: dict[str, list[dict]] = {
+    "tropical_rainforest": [_RL_BIODIVERSITY, _RL_OLD_GROWTH],
+    "temperate_forest": [_RL_BIODIVERSITY, _RL_OLD_GROWTH],
+    "boreal_forest": [_RL_BIODIVERSITY, _RL_PEAT],
+    "mangrove": [_RL_BIODIVERSITY, _RL_PEAT],
+    "wetland": [_RL_BIODIVERSITY, _RL_PEAT, _RL_AQUIFER],
+    "freshwater": [_RL_AQUIFER, _RL_BIODIVERSITY],
+    "temperate_grassland": [_RL_TOPSOIL, _RL_BIODIVERSITY],
+    "cropland": [_RL_TOPSOIL],
+    "peri_urban": [],
+    "tundra": [_RL_PERMAFROST, _RL_BIODIVERSITY],
+    "desert": [_RL_BIODIVERSITY],
+}
+
+
+def biome_scarcity_weight(biome_key: str) -> float:
+    return BIOME_SCARCITY_WEIGHT.get(biome_key, 0.3)
+
+
+def biome_carbon_stock_tco2_ha(biome_key: str) -> float:
+    return BIOME_CARBON_STOCK_TCO2_HA.get(biome_key, 0.0)
+
+
+def biome_red_lines(biome_key: str) -> list[dict]:
+    return list(BIOME_RED_LINES.get(biome_key, []))
+
+
 # Order in which yield categories are reported (matches the product spec).
 YIELD_CATEGORIES = (
     "carbon_capture",

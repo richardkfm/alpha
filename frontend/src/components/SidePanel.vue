@@ -44,6 +44,12 @@ const assetValue = computed(() => {
   return annual / discountRate.value
 })
 
+// Cost-of-conversion reframing: a permanent liability + red lines, never a
+// price to net against revenue.
+const liability = computed(() => props.valuation?.conversion_liability ?? null)
+const systemicMult = computed(() => props.valuation?.systemic?.multiplier ?? 1)
+const redLines = computed(() => props.valuation?.red_lines ?? [])
+
 // Intactness: share of the intact-biome potential the land currently delivers.
 const intactness = computed(() => props.valuation?.intactness ?? null)
 const potentialAnnual = computed(
@@ -185,6 +191,40 @@ function fmtInt(n) {
           capitalised perpetual value at {{ Math.round(discountRate * 100) }}% — what this
           area is worth on the balance sheet, left standing
         </span>
+      </section>
+
+      <section v-if="liability" class="conversion">
+        <h3>If this land were converted</h3>
+        <div class="liab">
+          <span class="liab-label">Perpetual liability</span>
+          <span class="liab-value">{{ fmtTotal(liability.present_value) }} <em>{{ valuation.currency }}</em></span>
+          <span class="liab-sub">
+            ~{{ fmtTotal(liability.annual_loss) }}/yr of lost services, owed in perpetuity —
+            {{ liability.incidence }}
+          </span>
+        </div>
+
+        <div v-if="systemicMult > 1.05" class="systemic-tag">
+          <strong>×{{ systemicMult }} systemic.</strong> Rare, intact land is load-bearing for the
+          wider system — fragmenting it costs more than the parcel alone.
+        </div>
+
+        <div v-if="liability.carbon_debt_onetime > 0" class="carbon-debt">
+          Clearing also releases ~{{ fmtTotal(liability.carbon_debt_onetime) }} of stored carbon —
+          once, and largely irreversibly.
+        </div>
+
+        <div v-if="redLines.length" class="redlines">
+          <span class="rl-head">⛔ Cannot be replaced at any price</span>
+          <ul>
+            <li v-for="rl in redLines" :key="rl.label">
+              <strong>{{ rl.label }}</strong> — {{ rl.reason }}
+            </li>
+          </ul>
+          <span class="rl-foot">Red lines, not line items — deliberately left out of the figures above.</span>
+        </div>
+
+        <p class="conv-note">{{ liability.note }}</p>
       </section>
 
       <section v-if="region.gdpCallout" class="callout">
@@ -633,6 +673,111 @@ function fmtInt(n) {
   font-size: 0.72rem;
   color: var(--text-muted);
   line-height: 1.4;
+}
+
+.conversion {
+  margin: 18px 0;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.06), transparent),
+    var(--bg-elevated);
+  border: 1px solid rgba(248, 113, 113, 0.32);
+}
+.conversion h3 {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: #f8a8a8;
+}
+.liab {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.liab-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+.liab-value {
+  font-family: 'Spline Sans Mono', ui-monospace, monospace;
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.05;
+  color: #f87171;
+}
+.liab-value em {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.liab-sub {
+  margin-top: 4px;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.systemic-tag,
+.carbon-debt {
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-soft);
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.systemic-tag strong {
+  color: var(--accent);
+}
+.redlines {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: var(--radius-sm);
+  background: rgba(248, 113, 113, 0.07);
+  border: 1px solid rgba(248, 113, 113, 0.28);
+}
+.rl-head {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #f8a8a8;
+  margin-bottom: 7px;
+}
+.redlines ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.redlines li {
+  font-size: 0.74rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+.redlines li strong {
+  color: #f8a8a8;
+}
+.rl-foot {
+  display: block;
+  margin-top: 9px;
+  font-size: 0.68rem;
+  font-style: italic;
+  color: var(--text-faint);
+}
+.conv-note {
+  margin: 12px 0 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.45;
 }
 
 .callout {

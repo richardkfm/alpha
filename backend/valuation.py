@@ -19,7 +19,10 @@ from reference_data import (
     DEFAULT_DISCOUNT_RATE,
     FX_AS_OF,
     YIELD_CATEGORIES,
+    biome_carbon_stock_tco2_ha,
     biome_per_sqm_usd,
+    biome_red_lines,
+    biome_scarcity_weight,
 )
 
 # Mean Earth radius (metres), IUGG. Used for the spherical-excess area formula.
@@ -150,6 +153,23 @@ def compute_valuation(
     asset_per_sqm = tev_per_sqm / discount_rate if discount_rate else 0.0
     asset_total = tev_total / discount_rate if discount_rate else 0.0
 
+    # --- Systemic / conversion layer (the "cost of conversion" reframing) -----
+    # A parcel's loss carries the weight of the wider system: rare + intact land
+    # is load-bearing, so it earns a systemic premium (>=1). This is NOT a price
+    # to outbid — it frames conversion as a perpetual liability owed to others.
+    scarcity = biome_scarcity_weight(biome_key)
+    systemic_multiplier = 1.0 + scarcity * intactness
+    systemic_per_sqm = tev_per_sqm * systemic_multiplier
+    systemic_asset_total = asset_total * systemic_multiplier
+
+    # One-time, largely irreversible carbon debt of clearing the standing stock.
+    area_ha = area_sqm / 10_000.0
+    carbon_debt_onetime = (
+        biome_carbon_stock_tco2_ha(biome_key) * area_ha * carbon_price * rate
+    )
+
+    red_lines = biome_red_lines(biome_key)
+
     methodology = {
         "carbon_capture": {
             "formula": "sequestration (tCO2/ha/yr) x carbon price (USD/tCO2) / 10000",
@@ -202,6 +222,28 @@ def compute_valuation(
             "asset_value_per_sqm": _round_per_sqm(asset_per_sqm),
             "asset_value_total": _round_money(asset_total),
         },
+        "systemic": {
+            "scarcity_weight": round(scarcity, 3),
+            "multiplier": round(systemic_multiplier, 3),
+            "value_per_sqm_year": _round_per_sqm(systemic_per_sqm),
+            "rationale": (
+                "Rare, intact systems are load-bearing; their loss degrades the wider "
+                "network beyond the parcel itself. Premium = 1 + scarcity x intactness."
+            ),
+        },
+        # Conversion reframed as a permanent, externalised liability — deliberately
+        # not a figure to net against development revenue.
+        "conversion_liability": {
+            "annual_loss": _round_money(tev_total),
+            "present_value": _round_money(systemic_asset_total),
+            "carbon_debt_onetime": _round_money(carbon_debt_onetime),
+            "incidence": (
+                "Borne by the public, downstream communities and future generations — "
+                "not captured by whoever converts the land."
+            ),
+            "note": "A debt owed to others in perpetuity, not a price the project can buy out.",
+        },
+        "red_lines": red_lines,
         "fx": {"base": "USD", "rate_per_usd": rate, "as_of": as_of},
         "methodology": methodology,
         "methodology_note": (
