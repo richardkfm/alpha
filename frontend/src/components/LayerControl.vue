@@ -1,7 +1,7 @@
 <script setup>
-import { layers } from '../data/layers.js'
-
 defineProps({
+  // Biome layer definitions derived from the backend catalogue (useRegions.js).
+  layers: { type: Array, default: () => [] },
   visibleLayers: { type: Object, required: true },
 })
 defineEmits(['toggle'])

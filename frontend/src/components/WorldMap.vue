@@ -2,11 +2,13 @@
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { layers as LAYER_DEFS } from '../data/layers.js'
-import { rainforests } from '../data/rainforests.js'
 
 const props = defineProps({
-  visibleLayers: { type: Object, default: () => ({ rainforest: true }) },
+  // Biome layer definitions and the region catalogue, both fetched from the
+  // backend by the parent (see data/useRegions.js).
+  layers: { type: Array, default: () => [] },
+  regions: { type: Array, default: () => [] },
+  visibleLayers: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['select'])
 const mapEl = ref(null)
@@ -34,7 +36,7 @@ onMounted(() => {
 
   // Build one Leaflet layer per thematic layer from the shared registry, each
   // tinted with its own neon hue.
-  LAYER_DEFS.forEach((def) => {
+  props.layers.forEach((def) => {
     const baseStyle = {
       color: def.color,
       weight: 1.5,
@@ -65,7 +67,7 @@ onMounted(() => {
         // Only the real biome layer is clickable -> drives valuation.
         if (def.kind === 'real') {
           lyr.on('click', () => {
-            const region = rainforests.find((r) => r.id === feature.properties?.regionId)
+            const region = props.regions.find((r) => r.id === feature.properties?.regionId)
             if (region) emit('select', region)
           })
         }
@@ -78,7 +80,7 @@ onMounted(() => {
 
 function applyVisibility() {
   if (!map) return
-  for (const def of LAYER_DEFS) {
+  for (const def of props.layers) {
     const lyr = leafletLayers[def.id]
     if (!lyr) continue
     const shouldShow = !!props.visibleLayers[def.id]

@@ -1,5 +1,7 @@
 <script setup>
 import { computed } from 'vue'
+// Shared yield-category metadata, also used by the Compare dashboard.
+import { YIELD_ROWS } from '../data/yields.js'
 
 const props = defineProps({
   region: { type: Object, required: true },
@@ -10,16 +12,6 @@ const props = defineProps({
 })
 defineEmits(['close'])
 
-// Human-readable yield rows, in the spec's order. Each carries a hue so the
-// breakdown bars read as a small, branded data-viz for finance audiences.
-const YIELD_ROWS = [
-  ['carbon_capture', 'Carbon Capture', '#2dd4bf'],
-  ['climate_regulation', 'Climate Regulation', '#34d399'],
-  ['water_filtration', 'Water Filtration', '#38bdf8'],
-  ['biodiversity_premium', 'Biodiversity Premium', '#a3e635'],
-  ['soil_nutrient_value', 'Soil Nutrient Value', '#e7c873'],
-]
-
 const symbol = computed(() => props.valuation?.currency_symbol ?? '$')
 
 // Phase 3: the backend now detects the biome from ingested boundary data.
@@ -27,9 +19,9 @@ const classification = computed(() => props.valuation?.classification ?? null)
 
 const yieldRows = computed(() => {
   if (!props.valuation) return []
-  const values = YIELD_ROWS.map(([key]) => props.valuation.yields_per_sqm_year[key] ?? 0)
+  const values = YIELD_ROWS.map((r) => props.valuation.yields_per_sqm_year[r.key] ?? 0)
   const max = Math.max(...values, 0) || 1
-  return YIELD_ROWS.map(([key, label, color]) => {
+  return YIELD_ROWS.map(({ key, label, color }) => {
     const value = props.valuation.yields_per_sqm_year[key]
     return {
       label,

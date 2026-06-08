@@ -8,6 +8,9 @@ API-first FastAPI service.
   citation-backed TEV breakdown in the requested currency (USD / EUR / BRL).
 - ``GET /api/v1/reference`` — supported biomes, currencies, and per-sqm reference
   yields, so clients can build biome/currency toggles.
+- ``GET /api/v1/regions`` — the bundled catalogue of named ecosystems across all
+  five biomes, each valued in the requested currency, powering the map overlays
+  and the Compare view.
 - ``POST /api/v1/classify`` — Phase 3 data ingestion: classify a GeoJSON polygon
   into a valuation biome using ingested WWF boundary data.
 - ``POST /api/v1/extract-esv`` — Phase 3 LLM-assisted extraction of structured ESV
@@ -34,6 +37,7 @@ from reference_data import (
     YIELD_CATEGORIES,
     biome_per_sqm_usd,
 )
+from regions import dataset_provenance, list_regions
 from valuation import compute_valuation
 
 app = FastAPI(
@@ -108,6 +112,24 @@ def reference() -> Dict[str, Any]:
             code: {"label": c["label"], "symbol": c["symbol"], "rate_per_usd": c["rate_per_usd"]}
             for code, c in CURRENCIES.items()
         },
+    }
+
+
+@app.get("/api/v1/regions")
+def regions(currency: Optional[str] = Query(default=None)) -> Dict[str, Any]:
+    """Return the catalogue of named ecosystems, each valued in ``currency``.
+
+    Every region across all five biomes is priced through the same TEV engine as
+    ``/api/v1/valuation``, so the frontend can draw the biome map overlays and the
+    Compare breakdowns from a single request without re-valuing each polygon.
+    """
+    chosen_currency = (currency or DEFAULT_CURRENCY).upper()
+    if chosen_currency not in CURRENCIES:
+        chosen_currency = DEFAULT_CURRENCY
+    return {
+        "currency": chosen_currency,
+        "regions": list_regions(chosen_currency),
+        "dataset": dataset_provenance(),
     }
 
 

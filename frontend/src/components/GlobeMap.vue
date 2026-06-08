@@ -2,10 +2,12 @@
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { layers as LAYER_DEFS } from '../data/layers.js'
-import { rainforests } from '../data/rainforests.js'
 
 const props = defineProps({
+  // Biome layer definitions and the region catalogue, both fetched from the
+  // backend by the parent (see data/useRegions.js).
+  layers: { type: Array, default: () => [] },
+  regions: { type: Array, default: () => [] },
   visibleLayers: { type: Object, required: true },
   isDark: { type: Boolean, default: true },
 })
@@ -75,7 +77,7 @@ function buildStyle(dark) {
 }
 
 function addThematicLayers() {
-  for (const l of LAYER_DEFS) {
+  for (const l of props.layers) {
     const srcId = `layer-${l.id}`
     if (!map.getSource(srcId)) {
       map.addSource(srcId, { type: 'geojson', data: l.geojson, promoteId: 'regionId' })
@@ -99,27 +101,30 @@ function addThematicLayers() {
       source: srcId,
       paint: { 'line-color': l.color, 'line-width': 1.4, 'line-opacity': 0.9 },
     })
+
+    // Every biome layer is real -> clicking any region drives its valuation.
+    if (l.kind === 'real') {
+      const fillId = `${l.id}-fill`
+      map.on('click', fillId, (e) => {
+        const f = e.features && e.features[0]
+        if (!f) return
+        const region = props.regions.find((r) => r.id === f.properties.regionId)
+        if (region) emit('select', region)
+      })
+      map.on('mouseenter', fillId, () => {
+        map.getCanvas().style.cursor = 'pointer'
+      })
+      map.on('mouseleave', fillId, () => {
+        map.getCanvas().style.cursor = ''
+      })
+    }
   }
   applyVisibility()
-
-  // Only the real biome layer is clickable -> drives valuation.
-  map.on('click', 'rainforest-fill', (e) => {
-    const f = e.features && e.features[0]
-    if (!f) return
-    const region = rainforests.find((r) => r.id === f.properties.regionId)
-    if (region) emit('select', region)
-  })
-  map.on('mouseenter', 'rainforest-fill', () => {
-    map.getCanvas().style.cursor = 'pointer'
-  })
-  map.on('mouseleave', 'rainforest-fill', () => {
-    map.getCanvas().style.cursor = ''
-  })
 }
 
 function applyVisibility() {
   if (!map) return
-  for (const l of LAYER_DEFS) {
+  for (const l of props.layers) {
     const v = props.visibleLayers[l.id] ? 'visible' : 'none'
     for (const suffix of ['-glow', '-fill', '-line']) {
       const id = l.id + suffix
