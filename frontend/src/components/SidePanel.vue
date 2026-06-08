@@ -71,6 +71,13 @@ function fmtTotal(n) {
 function fmtInt(n) {
   return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
+// Hectares: whole numbers for large regions, but keep decimals for small custom
+// areas that would otherwise round to a meaningless "0 ha".
+function fmtHa(n) {
+  if (n == null) return '—'
+  const v = Number(n)
+  return v.toLocaleString('en-US', { maximumFractionDigits: v < 100 ? 2 : 0 })
+}
 </script>
 
 <template>
@@ -106,7 +113,7 @@ function fmtInt(n) {
         </div>
         <div>
           <span class="k">&nbsp;</span>
-          <span class="v num">{{ fmtInt(valuation.area.hectares) }} <em>ha</em></span>
+          <span class="v num">{{ fmtHa(valuation.area.hectares) }} <em>ha</em></span>
         </div>
       </section>
 
@@ -118,7 +125,10 @@ function fmtInt(n) {
           :class="{ inferred: classification.confidence === 'default' }"
         >
           <template v-if="classification.confidence === 'matched'">
-            classified from {{ classification.matched_region }} · WWF ecoregions
+            <template v-if="classification.matched_region && classification.matched_region !== 'N/A'">
+              classified from {{ classification.matched_region }} · RESOLVE ecoregions
+            </template>
+            <template v-else>classified from ingested RESOLVE ecoregions</template>
           </template>
           <template v-else-if="classification.confidence === 'explicit'">
             biome supplied by caller
