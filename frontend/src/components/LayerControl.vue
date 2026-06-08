@@ -3,8 +3,16 @@ defineProps({
   // Biome layer definitions derived from the backend catalogue (useRegions.js).
   layers: { type: Array, default: () => [] },
   visibleLayers: { type: Object, required: true },
+  // Active map display style: 'polygons' | 'bubbles' | 'heat'.
+  displayStyle: { type: String, default: 'polygons' },
 })
-defineEmits(['toggle'])
+defineEmits(['toggle', 'set-style'])
+
+const STYLES = [
+  { id: 'polygons', label: 'Polygons', icon: '▦' },
+  { id: 'bubbles', label: 'Bubbles', icon: '⦿' },
+  { id: 'heat', label: 'Heat', icon: '◍' },
+]
 </script>
 
 <template>
@@ -13,6 +21,22 @@ defineEmits(['toggle'])
       <span class="layers-title">Layers</span>
       <span class="layers-hint">toggle data overlays</span>
     </header>
+
+    <div class="style-switch" role="group" aria-label="Display style">
+      <button
+        v-for="s in STYLES"
+        :key="s.id"
+        class="style-btn"
+        :class="{ on: displayStyle === s.id }"
+        @click="$emit('set-style', s.id)"
+      >
+        <span class="style-icon">{{ s.icon }}</span>{{ s.label }}
+      </button>
+    </div>
+    <p v-if="displayStyle !== 'polygons'" class="style-note">
+      {{ displayStyle === 'bubbles' ? 'Bubble size' : 'Heat' }} = annual ecosystem value
+    </p>
+
     <ul>
       <li v-for="l in layers" :key="l.id">
         <button
@@ -70,6 +94,51 @@ defineEmits(['toggle'])
 .layers-hint {
   font-size: 0.66rem;
   color: var(--text-faint);
+}
+
+.style-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 8px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+}
+.style-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.18s var(--ease), background 0.18s var(--ease);
+}
+.style-btn:hover {
+  color: var(--text);
+}
+.style-btn.on {
+  background: var(--bg-elevated);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.style-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.style-note {
+  margin: 0 0 10px;
+  font-size: 0.66rem;
+  color: var(--text-faint);
+  text-align: center;
 }
 
 .layers ul {

@@ -7,6 +7,7 @@
 // Compare dashboard, replacing the old hardcoded 4-region file.
 import { ref, computed } from 'vue'
 import { BIOME_META, BIOME_ORDER, biomeColor } from './biomeMeta.js'
+import { centroid } from './geo.js'
 
 export function useRegions() {
   const regions = ref([])
@@ -64,5 +65,39 @@ export function useRegions() {
     }))
   })
 
-  return { regions, biomeLayers, loading, error, loaded, load }
+  // Value "bubble" / heat points: one Point per region at its centroid, carrying
+  // a sqrt-scaled pixel radius and a normalised heat weight derived from the
+  // annual Total Ecosystem Value. Relative sizes are FX-invariant (every value
+  // scales by the same rate), so these stay stable across currency re-prices.
+  const pointFeatures = computed(() => {
+    const values = regions.value.map((r) => r.total_ecosystem_value_per_year || 0)
+    const maxValue = Math.max(...values, 1)
+    const maxRoot = Math.sqrt(maxValue) || 1
+    const R_MIN = 6
+    const R_MAX = 40
+    const features = []
+    for (const r of regions.value) {
+      const c = centroid(r.geometry)
+      if (!c) continue
+      const value = r.total_ecosystem_value_per_year || 0
+      const wt = value / maxValue
+      const radius = R_MIN + (Math.sqrt(value) / maxRoot) * (R_MAX - R_MIN)
+      features.push({
+        type: 'Feature',
+        properties: {
+          regionId: r.id,
+          name: r.name,
+          biome_key: r.biome_key,
+          color: biomeColor(r.biome_key),
+          value,
+          r: Math.round(radius * 10) / 10,
+          wt: Math.round(wt * 1000) / 1000,
+        },
+        geometry: { type: 'Point', coordinates: c },
+      })
+    }
+    return { type: 'FeatureCollection', features }
+  })
+
+  return { regions, biomeLayers, pointFeatures, loading, error, loaded, load }
 }

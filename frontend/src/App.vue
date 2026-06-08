@@ -6,11 +6,12 @@ import LayerControl from './components/LayerControl.vue'
 import { useRegions } from './data/useRegions.js'
 
 // The MapLibre globe (and its ~heavy bundle) loads only when 3D mode is active;
-// the Compare dashboard loads only when that mode is opened.
+// the Compare dashboard and Data hub load only when their mode is opened.
 const GlobeMap = defineAsyncComponent(() => import('./components/GlobeMap.vue'))
 const CompareDashboard = defineAsyncComponent(() =>
   import('./components/CompareDashboard.vue'),
 )
+const DataHub = defineAsyncComponent(() => import('./components/DataHub.vue'))
 
 const selectedRegion = ref(null)
 const valuation = ref(null)
@@ -18,17 +19,21 @@ const backendOnline = ref(null) // null = unknown, true/false once checked
 const loading = ref(false)
 const errorMsg = ref('')
 
-// Top-level mode: explore on the map, or compare regions side by side.
-const appMode = ref('map') // 'map' | 'compare'
+// Top-level mode: explore on the map, compare regions, or browse the data hub.
+const appMode = ref('map') // 'map' | 'compare' | 'data'
 
 // 2D Leaflet map vs 3D MapLibre globe. The globe is the hero view by default.
 const viewMode = ref('3d')
 
+// How the areas are drawn on the map: filled polygons, value bubbles, or heat.
+const displayStyle = ref('polygons') // 'polygons' | 'bubbles' | 'heat'
+
 // Region catalogue (all biomes, pre-valued) fetched from the backend; drives
-// both maps, the layer control, and the Compare dashboard.
+// both maps, the layer control, the Compare dashboard, and the value bubbles.
 const {
   regions,
   biomeLayers,
+  pointFeatures,
   loading: regionsLoading,
   error: regionsError,
   loaded: regionsLoaded,
@@ -164,6 +169,13 @@ function closePanel() {
           >
             ⊞ Compare
           </button>
+          <button
+            class="view-btn"
+            :class="{ active: appMode === 'data' }"
+            @click="appMode = 'data'"
+          >
+            ⛁ Data
+          </button>
         </div>
         <div
           v-if="appMode === 'map'"
@@ -206,6 +218,7 @@ function closePanel() {
 
     <main class="stage">
       <CompareDashboard v-if="appMode === 'compare'" :regions="regions" />
+      <DataHub v-else-if="appMode === 'data'" />
 
       <template v-else>
         <div v-if="!regionsLoaded && regionsLoading" class="stage-state">
@@ -219,6 +232,8 @@ function closePanel() {
             v-if="viewMode === '3d'"
             :layers="biomeLayers"
             :regions="regions"
+            :points="pointFeatures"
+            :display-style="displayStyle"
             :visible-layers="visibleLayers"
             :is-dark="isDark"
             @select="onRegionSelect"
@@ -227,6 +242,8 @@ function closePanel() {
             v-else
             :layers="biomeLayers"
             :regions="regions"
+            :points="pointFeatures"
+            :display-style="displayStyle"
             :visible-layers="visibleLayers"
             @select="onRegionSelect"
           />
@@ -234,7 +251,9 @@ function closePanel() {
           <LayerControl
             :layers="biomeLayers"
             :visible-layers="visibleLayers"
+            :display-style="displayStyle"
             @toggle="toggleLayer"
+            @set-style="displayStyle = $event"
           />
 
           <transition name="hint">

@@ -84,6 +84,20 @@ def test_regions_returns_valued_catalogue():
     assert body["dataset"]["count"] == len(regions)
 
 
+def test_datasets_catalogue():
+    res = client.get("/api/v1/datasets")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["domains"] and body["needs"]
+    ids = {d["id"] for d in body["domains"]}
+    assert {"biome_boundaries", "esv_reference", "carbon_price", "fx_rates"} <= ids
+    for d in body["domains"]:
+        assert d["status"] in ("authoritative", "reference", "placeholder")
+        assert d["sources"] and "label" in d
+    # roadmap entries describe a current -> planned upgrade
+    assert all({"current", "planned", "why"} <= n.keys() for n in body["needs"])
+
+
 def test_regions_respects_currency():
     usd = client.get("/api/v1/regions").json()["regions"]
     brl = client.get("/api/v1/regions?currency=BRL").json()["regions"]

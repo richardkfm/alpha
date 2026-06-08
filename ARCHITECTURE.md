@@ -132,11 +132,22 @@ The visual centrepiece is a **full-screen world map** — a 3D MapLibre globe
   colour-coded layer. The catalogue is served pre-valued by the backend from
   `GET /api/v1/regions` (see `backend/regions.py`, `backend/data/regions.geojson`)
   rather than hardcoded in the frontend, so adding regions is a data change.
+- A **display-style switch** (in the Layers panel) renders the same areas three
+  ways: filled **polygons**, value-proportional **bubbles** at each region's
+  centroid (sized by annual TEV, tinted by biome), or a value-weighted **heat**
+  layer. Implemented natively in MapLibre (`circle`/`heatmap`) and Leaflet
+  (`circleMarker` + `leaflet.heat`); points are derived client-side in
+  `frontend/src/data/useRegions.js` (no backend change).
 - A **Compare** mode (`frontend/src/components/CompareDashboard.vue`) lets users
   pick several ecosystems and compare their Total Ecosystem Value breakdowns side
   by side — sortable by value/area/name and reusing the same `/api/v1/regions`
   payload, so no extra requests are needed.
-- Clicking a polygon opens a **side panel** that shows:
+- A **Data Hub** mode (`frontend/src/components/DataHub.vue`, backed by
+  `GET /api/v1/datasets`) surfaces every data domain's source, citation, status
+  (authoritative / reference / placeholder) and "as-of" date, a "data we still
+  need" roadmap, and two live tools wired to existing endpoints
+  (`/api/v1/extract-esv` for ESV-from-text, `/api/v1/classify` for biome lookup).
+- Clicking a polygon (or a bubble) opens a **side panel** that shows:
   - Ecosystem name, country/region
   - Total area (sqm and hectares)
   - Breakdown of all ecosystem service values (carbon, water, climate,

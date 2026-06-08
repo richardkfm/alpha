@@ -8,6 +8,11 @@ const props = defineProps({
   // backend by the parent (see data/useRegions.js).
   layers: { type: Array, default: () => [] },
   regions: { type: Array, default: () => [] },
+  // Value-bubble / heat points (FeatureCollection of Point) for the non-polygon
+  // display styles.
+  points: { type: Object, default: () => ({ type: 'FeatureCollection', features: [] }) },
+  // 'polygons' | 'bubbles' | 'heat'
+  displayStyle: { type: String, default: 'polygons' },
   visibleLayers: { type: Object, required: true },
   isDark: { type: Boolean, default: true },
 })
@@ -119,18 +124,92 @@ function addThematicLayers() {
       })
     }
   }
+  // Value bubbles + heat share a single points source (one Point per region).
+  if (!map.getSource('region-points')) {
+    map.addSource('region-points', { type: 'geojson', data: visiblePointData(), promoteId: 'regionId' })
+  }
+  map.addLayer({
+    id: 'region-heat',
+    type: 'heatmap',
+    source: 'region-points',
+    paint: {
+      'heatmap-weight': ['get', 'wt'],
+      'heatmap-intensity': 1.1,
+      'heatmap-radius': 38,
+      'heatmap-opacity': 0.75,
+      'heatmap-color': [
+        'interpolate', ['linear'], ['heatmap-density'],
+        0, 'rgba(5,7,13,0)',
+        0.2, 'rgba(56,189,248,0.45)',
+        0.45, 'rgba(45,212,191,0.7)',
+        0.7, 'rgba(163,230,53,0.85)',
+        1, 'rgba(245,177,78,0.95)',
+      ],
+    },
+  })
+  map.addLayer({
+    id: 'region-bubbles',
+    type: 'circle',
+    source: 'region-points',
+    paint: {
+      'circle-radius': ['get', 'r'],
+      'circle-color': ['get', 'color'],
+      'circle-opacity': 0.45,
+      'circle-stroke-color': ['get', 'color'],
+      'circle-stroke-width': 1.4,
+      'circle-stroke-opacity': 0.95,
+    },
+  })
+  map.on('click', 'region-bubbles', (e) => {
+    const f = e.features && e.features[0]
+    if (!f) return
+    const region = props.regions.find((r) => r.id === f.properties.regionId)
+    if (region) emit('select', region)
+  })
+  map.on('mouseenter', 'region-bubbles', () => {
+    map.getCanvas().style.cursor = 'pointer'
+  })
+  map.on('mouseleave', 'region-bubbles', () => {
+    map.getCanvas().style.cursor = ''
+  })
+
   applyVisibility()
 }
 
+// Points filtered to the currently-visible biomes (drives bubbles + heat).
+function visiblePointData() {
+  return {
+    type: 'FeatureCollection',
+    features: (props.points.features || []).filter(
+      (f) => props.visibleLayers[f.properties.biome_key],
+    ),
+  }
+}
+
+function updatePoints() {
+  const src = map && map.getSource('region-points')
+  if (src) src.setData(visiblePointData())
+}
+
+// Visibility is the product of the active display style and the per-biome
+// toggles: polygons honour both; bubbles/heat are filtered via the source data.
 function applyVisibility() {
   if (!map) return
+  const polysOn = props.displayStyle === 'polygons'
   for (const l of props.layers) {
-    const v = props.visibleLayers[l.id] ? 'visible' : 'none'
+    const v = polysOn && props.visibleLayers[l.id] ? 'visible' : 'none'
     for (const suffix of ['-glow', '-fill', '-line']) {
       const id = l.id + suffix
       if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v)
     }
   }
+  if (map.getLayer('region-bubbles')) {
+    map.setLayoutProperty('region-bubbles', 'visibility', props.displayStyle === 'bubbles' ? 'visible' : 'none')
+  }
+  if (map.getLayer('region-heat')) {
+    map.setLayoutProperty('region-heat', 'visibility', props.displayStyle === 'heat' ? 'visible' : 'none')
+  }
+  updatePoints()
 }
 
 // ----- auto-spin -----------------------------------------------------------
@@ -219,6 +298,8 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.visibleLayers, applyVisibility, { deep: true })
+watch(() => props.displayStyle, applyVisibility)
+watch(() => props.points, updatePoints)
 watch(() => props.isDark, updateTheme)
 </script>
 
