@@ -1,3 +1,5 @@
+<img width="2316" height="746" alt="alpha" src="https://github.com/user-attachments/assets/e4a98274-dd61-436b-b9b9-e28751f4aafe" />
+
 # alpha
 
 > _Putting nature on the balance sheet._
