@@ -90,6 +90,66 @@
         "type": "Polygon",
         "coordinates": [[[50, 47], [75, 47], [75, 52], [50, 52], [50, 47]]]
       }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "boreal_forest", "name": "Canadian Boreal Forest", "wwf_biome": "Boreal Forests / Taiga" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-130, 52], [-70, 52], [-70, 62], [-130, 62], [-130, 52]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "boreal_forest", "name": "Siberian Taiga", "wwf_biome": "Boreal Forests / Taiga" },
+      "geometry": { "type": "Polygon", "coordinates": [[[60, 55], [100, 55], [100, 66], [60, 66], [60, 55]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "boreal_forest", "name": "Fennoscandian Taiga", "wwf_biome": "Boreal Forests / Taiga" },
+      "geometry": { "type": "Polygon", "coordinates": [[[12, 60], [31, 60], [31, 68], [12, 68], [12, 60]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "cropland", "name": "US Corn Belt", "wwf_biome": "Croplands (anthropogenic)" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-96, 39], [-88, 39], [-88, 43], [-96, 43], [-96, 39]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "cropland", "name": "North European Plain Farmland", "wwf_biome": "Croplands (anthropogenic)" },
+      "geometry": { "type": "Polygon", "coordinates": [[[7, 51], [20, 51], [20, 54], [7, 54], [7, 51]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "cropland", "name": "Punjab Croplands", "wwf_biome": "Croplands (anthropogenic)" },
+      "geometry": { "type": "Polygon", "coordinates": [[[73, 29], [77, 29], [77, 32], [73, 32], [73, 29]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "freshwater", "name": "Laurentian Great Lakes", "wwf_biome": "Lakes & Rivers (freshwater)" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-88, 43], [-76, 43], [-76, 45], [-84, 47], [-88, 46], [-88, 43]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "freshwater", "name": "Lake Baikal", "wwf_biome": "Lakes & Rivers (freshwater)" },
+      "geometry": { "type": "Polygon", "coordinates": [[[104, 51.5], [106, 51.5], [110, 55], [109, 56], [105, 53], [104, 51.5]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "freshwater", "name": "Lake Victoria", "wwf_biome": "Lakes & Rivers (freshwater)" },
+      "geometry": { "type": "Polygon", "coordinates": [[[31.6, -2.8], [34.9, -2.8], [34.9, 0.4], [31.6, 0.4], [31.6, -2.8]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "peri_urban", "name": "London Green Belt", "wwf_biome": "Urban & peri-urban open land" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-0.6, 51.2], [0.4, 51.2], [0.4, 51.8], [-0.6, 51.8], [-0.6, 51.2]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "peri_urban", "name": "Randstad Green Heart", "wwf_biome": "Urban & peri-urban open land" },
+      "geometry": { "type": "Polygon", "coordinates": [[[4.4, 51.9], [5.2, 51.9], [5.2, 52.4], [4.4, 52.4], [4.4, 51.9]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "biome_key": "peri_urban", "name": "Rhine-Ruhr Open Land", "wwf_biome": "Urban & peri-urban open land" },
+      "geometry": { "type": "Polygon", "coordinates": [[[6.4, 51.2], [7.6, 51.2], [7.6, 51.8], [6.4, 51.8], [6.4, 51.2]]] }
     }
   ]
 }

@@ -31,15 +31,51 @@ export const BIOME_META = {
     sublabel: 'steppe & prairie',
     color: '#f5b14e', // amber
   },
+  boreal_forest: {
+    label: 'Boreal Forest',
+    sublabel: 'northern taiga',
+    color: '#10b981', // emerald
+  },
+  cropland: {
+    label: 'Cropland & Agriculture',
+    sublabel: 'farmland & managed crops',
+    color: '#fb923c', // orange
+  },
+  freshwater: {
+    label: 'Freshwater',
+    sublabel: 'lakes, rivers & reservoirs',
+    color: '#22d3ee', // cyan
+  },
+  peri_urban: {
+    label: 'Peri-urban Land',
+    sublabel: 'urban fringe & managed open',
+    color: '#f472b6', // magenta
+  },
+  tundra: {
+    label: 'Tundra',
+    sublabel: 'arctic & alpine',
+    color: '#9fb6c2', // icy grey-blue
+  },
+  desert: {
+    label: 'Desert & Xeric',
+    sublabel: 'deserts & dry shrubland',
+    color: '#c2a878', // sand / khaki
+  },
 }
 
 // Render + legend order for the layers and the Compare picker.
 export const BIOME_ORDER = [
   'tropical_rainforest',
+  'boreal_forest',
+  'temperate_forest',
   'mangrove',
   'wetland',
-  'temperate_forest',
+  'freshwater',
   'temperate_grassland',
+  'cropland',
+  'peri_urban',
+  'tundra',
+  'desert',
 ]
 
 export function biomeColor(key) {

@@ -87,6 +87,60 @@ def test_unknown_biome_and_currency_fall_back_to_defaults():
     assert res["currency"] == "USD"
 
 
+def test_capitalized_value_is_annual_over_discount_rate():
+    res = compute_valuation(_square_one_degree_at_equator(), "tropical_rainforest", "USD")
+    cap = res["capitalized_value"]
+    expected = res["total_ecosystem_value_per_year"] / cap["discount_rate"]
+    assert math.isclose(cap["asset_value_total"], expected, rel_tol=1e-6)
+
+
+def test_intactness_scales_realised_value_but_not_potential():
+    full = compute_valuation(_square_one_degree_at_equator(), "wetland", "USD")
+    half = compute_valuation(_square_one_degree_at_equator(), "wetland", "USD", intactness=0.5)
+    assert half["intactness"] == 0.5
+    # realised value halves; the intact ceiling is reported unchanged
+    assert math.isclose(
+        half["total_ecosystem_value_per_sqm_year"],
+        full["total_ecosystem_value_per_sqm_year"] * 0.5,
+        rel_tol=1e-6,
+    )
+    assert math.isclose(
+        half["potential"]["total_ecosystem_value_per_sqm_year"],
+        full["total_ecosystem_value_per_sqm_year"],
+        rel_tol=1e-9,
+    )
+
+
+def test_default_intactness_is_one_preserving_phase2_behaviour():
+    res = compute_valuation(_square_one_degree_at_equator(), "tropical_rainforest", "USD")
+    assert res["intactness"] == 1.0
+    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.1249, abs_tol=1e-6)
+
+
+def test_new_ordinary_biomes_are_available():
+    poly = _square_one_degree_at_equator()
+    for biome in ("boreal_forest", "cropland", "freshwater", "peri_urban"):
+        res = compute_valuation(poly, biome, "USD")
+        assert res["biome_key"] == biome
+        assert res["total_ecosystem_value_per_sqm_year"] > 0
+
+
+def test_freshwater_is_water_dominated():
+    res = compute_valuation(_square_one_degree_at_equator(), "freshwater", "USD")
+    yields = res["yields_per_sqm_year"]
+    assert yields["water_filtration"] == max(yields.values())
+
+
+def test_cropland_below_wetland():
+    poly = _square_one_degree_at_equator()
+    cropland = compute_valuation(poly, "cropland", "USD")
+    wetland = compute_valuation(poly, "wetland", "USD")
+    assert (
+        cropland["total_ecosystem_value_per_sqm_year"]
+        < wetland["total_ecosystem_value_per_sqm_year"]
+    )
+
+
 def test_mangrove_values_exceed_grassland():
     poly = _square_one_degree_at_equator()
     mangrove = compute_valuation(poly, "mangrove", "USD")

@@ -204,6 +204,8 @@ def valuation(
     body: ValuationRequest,
     biome: Optional[str] = Query(default=None),
     currency: Optional[str] = Query(default=None),
+    intactness: Optional[float] = Query(default=None, ge=0.0, le=1.0),
+    discount_rate: Optional[float] = Query(default=None, gt=0.0),
 ) -> Dict[str, Any]:
     """Compute the Total Ecosystem Value (TEV) breakdown for a GeoJSON polygon.
 
@@ -251,6 +253,8 @@ def valuation(
         carbon_price=mkt["carbon_price"],
         fx_rate=mkt["fx_rate"],
         fx_as_of=mkt["fx_as_of"],
+        intactness=1.0 if intactness is None else intactness,
+        discount_rate=discount_rate,
     )
 
     if result["area"]["sqm"] <= 0:

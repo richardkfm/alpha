@@ -74,8 +74,14 @@ onMounted(async () => {
 })
 
 // Fetch the Phase 2 TEV breakdown for a region's polygon in the chosen currency.
+// Catalogue regions carry an authoritative biome_key, so we pass it through to
+// keep the side-panel value consistent with the map/Compare numbers; custom
+// search areas have none, so the backend auto-classifies them from the geometry.
 async function fetchValuation(region) {
-  const res = await fetch(`/api/v1/valuation?currency=${currency.value}`, {
+  const params = new URLSearchParams({ currency: currency.value })
+  if (region.biome_key) params.set('biome', region.biome_key)
+  if (region.intactness != null) params.set('intactness', region.intactness)
+  const res = await fetch(`/api/v1/valuation?${params}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(region.geojson),

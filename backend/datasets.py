@@ -102,15 +102,14 @@ def _domains() -> List[Dict[str, Any]]:
             "id": "biome_boundaries",
             "label": "Biome boundaries",
             "category": "geospatial",
-            "status": _PLACEHOLDER,
+            "status": _AUTHORITATIVE,
             "sources": [
                 {"citation": boundaries.get("primary", ""), "url": boundaries.get("url", "")},
-                {"citation": boundaries.get("mangrove", "")},
-                {"citation": boundaries.get("wetland", "")},
+                {"citation": boundaries.get("seeds", "")},
             ],
-            "as_of": boundaries.get("as_of", ""),
+            "as_of": boundaries.get("as_of", "2017"),
             "note": boundaries.get("note", "")
-            or "Coarse, simplified seed footprints — not authoritative boundaries.",
+            or "Real RESOLVE ecoregion boundaries, generalized for fast classification.",
             "exposed_via": ["POST /api/v1/classify", "POST /api/v1/valuation"],
         },
         {
@@ -161,9 +160,10 @@ def _domains() -> List[Dict[str, Any]]:
             "status": _AUTHORITATIVE,
             "sources": [{"citation": _LC100_CITATION, "url": "https://doi.org/10.5281/zenodo.3939050"}],
             "as_of": "2020",
-            "note": "Authoritative CGLS-LC100 legend + intactness factors are wired; per-polygon "
-            "raster sampling is a deployment (PostGIS) concern, not yet applied to live valuations.",
-            "exposed_via": ["internal (landcover.py)"],
+            "note": "Authoritative CGLS-LC100 legend + intactness factors. Realised value is now "
+            "scaled by intactness via per-biome/region defaults; per-polygon raster sampling "
+            "(PostGIS) to derive true intactness is still pending.",
+            "exposed_via": ["POST /api/v1/valuation (intactness)", "internal (landcover.py)"],
         },
     ]
 
@@ -196,12 +196,12 @@ def _needs() -> List[Dict[str, Any]]:
             "phase": "Phase 4",
         },
         {
-            "id": "authoritative_boundaries",
-            "label": "Authoritative biome boundaries",
-            "current": "Coarse simplified seed polygons",
-            "planned": "Full WWF Terrestrial Ecoregions (TEOW) + GMW mangroves, dissolved & ingested",
-            "why": "Accurate areas and classification depend on real boundaries, not boxes.",
-            "phase": "Phase 4",
+            "id": "parcel_boundaries",
+            "label": "Parcel-scale boundaries",
+            "current": "Real RESOLVE ecoregions (2017), generalized to ~tens of km",
+            "planned": "Full-resolution ecoregions + cadastral/parcel overlays for site-level work",
+            "why": "Classification now uses real boundaries; parcel precision would let users value an exact lot, not a generalized region.",
+            "phase": "Phase 4+",
         },
         {
             "id": "live_esvd",

@@ -16,6 +16,7 @@ from reference_data import (
     CURRENCIES,
     DEFAULT_BIOME,
     DEFAULT_CURRENCY,
+    DEFAULT_DISCOUNT_RATE,
     FX_AS_OF,
     YIELD_CATEGORIES,
     biome_per_sqm_usd,
@@ -96,19 +97,26 @@ def compute_valuation(
     carbon_price: float | None = None,
     fx_rate: float | None = None,
     fx_as_of: str | None = None,
+    intactness: float = 1.0,
+    discount_rate: float | None = None,
 ) -> dict[str, Any]:
     """Compute the full TEV breakdown for a polygon.
 
     Steps:
       1. area_sqm = geodesic area of the polygon.
       2. per-sqm reference yields for the biome (USD), converted to `currency`.
-      3. total annual yields = per-sqm * area_sqm.
-      4. TEV = sum of the five categories (per sqm, and total for the area).
+      3. scale by ``intactness`` (the share of reference yield the land actually
+         delivers given its current land cover); report the intact ceiling too.
+      4. total annual yields = realised per-sqm * area_sqm.
+      5. TEV = sum of the five categories (per sqm, and total for the area).
+      6. capitalise the annual flow into a present-value "standing asset"
+         (annual / discount_rate).
 
     ``carbon_price``, ``fx_rate`` and ``fx_as_of`` default to the documented
     static references; the API layer injects live values when Phase 4 market data
-    is enabled (see ``live_data.py``). Passing nothing reproduces the Phase 2
-    static behaviour exactly.
+    is enabled (see ``live_data.py``). ``intactness`` defaults to 1.0 and
+    ``discount_rate`` to the documented reference, so passing nothing reproduces
+    the Phase 2 static behaviour exactly.
     """
     biome_key = biome if biome in BIOMES else DEFAULT_BIOME
     currency = currency.upper()
@@ -118,6 +126,8 @@ def compute_valuation(
     rate = fx["rate_per_usd"] if fx_rate is None else fx_rate
     as_of = FX_AS_OF if fx_as_of is None else fx_as_of
     carbon_price = CARBON_PRICE_USD_PER_TCO2 if carbon_price is None else carbon_price
+    intactness = min(max(intactness, 0.0), 1.0)
+    discount_rate = DEFAULT_DISCOUNT_RATE if discount_rate is None else discount_rate
 
     area_sqm = geodesic_area_sqm(geometry)
 
@@ -127,12 +137,18 @@ def compute_valuation(
     yields_per_sqm: dict[str, float] = {}
     yields_total: dict[str, float] = {}
     for cat in YIELD_CATEGORIES:
-        per_sqm_cur = base_usd[cat] * rate
+        per_sqm_cur = base_usd[cat] * rate * intactness  # realised (intactness-scaled)
         yields_per_sqm[cat] = _round_per_sqm(per_sqm_cur)
         yields_total[cat] = _round_money(per_sqm_cur * area_sqm)
 
-    tev_per_sqm = sum(base_usd[c] for c in YIELD_CATEGORIES) * rate
+    tev_per_sqm_intact = sum(base_usd[c] for c in YIELD_CATEGORIES) * rate  # full potential
+    tev_per_sqm = tev_per_sqm_intact * intactness  # realised
     tev_total = tev_per_sqm * area_sqm
+    tev_total_intact = tev_per_sqm_intact * area_sqm
+
+    # Capitalise the realised annual flow into a present-value standing asset.
+    asset_per_sqm = tev_per_sqm / discount_rate if discount_rate else 0.0
+    asset_total = tev_total / discount_rate if discount_rate else 0.0
 
     methodology = {
         "carbon_capture": {
@@ -176,6 +192,16 @@ def compute_valuation(
         "yields_total_year": yields_total,
         "total_ecosystem_value_per_sqm_year": _round_per_sqm(tev_per_sqm),
         "total_ecosystem_value_per_year": _round_money(tev_total),
+        "intactness": round(intactness, 3),
+        "potential": {
+            "total_ecosystem_value_per_sqm_year": _round_per_sqm(tev_per_sqm_intact),
+            "total_ecosystem_value_per_year": _round_money(tev_total_intact),
+        },
+        "capitalized_value": {
+            "discount_rate": discount_rate,
+            "asset_value_per_sqm": _round_per_sqm(asset_per_sqm),
+            "asset_value_total": _round_money(asset_total),
+        },
         "fx": {"base": "USD", "rate_per_usd": rate, "as_of": as_of},
         "methodology": methodology,
         "methodology_note": (

@@ -100,9 +100,104 @@ BIOMES: dict[str, dict] = {
         "biodiversity_premium_usd_ha_yr": 120.0,
         "soil_nutrient_value_usd_ha_yr": 200.0,
     },
+    # --- "ordinary" and smaller resources (de Groot et al. 2012 ESVD groups:
+    # boreal/woodland forest, cropland, lakes & rivers, urban green). Regulating
+    # + supporting services only — provisioning (e.g. crop yield, drinking-water
+    # supply revenue) is deliberately excluded, so these reflect the value that is
+    # *lost* when the land is sealed/converted, not its market output. ---
+    "boreal_forest": {
+        "label": "Boreal Forest (Taiga)",
+        "sequestration_tco2_ha_yr": 1.2,   # slower growth, vast soil/peat carbon store
+        "climate_regulation_usd_ha_yr": 180.0,
+        "water_filtration_usd_ha_yr": 120.0,
+        "biodiversity_premium_usd_ha_yr": 150.0,
+        "soil_nutrient_value_usd_ha_yr": 150.0,
+    },
+    "cropland": {
+        "label": "Cropland & Agriculture",
+        "sequestration_tco2_ha_yr": 0.3,   # managed soils; modest net regulating sink
+        "climate_regulation_usd_ha_yr": 60.0,
+        "water_filtration_usd_ha_yr": 40.0,
+        "biodiversity_premium_usd_ha_yr": 50.0,
+        "soil_nutrient_value_usd_ha_yr": 180.0,  # the soil itself is farmland's key asset
+    },
+    "freshwater": {
+        "label": "Freshwater (Lakes & Rivers)",
+        "sequestration_tco2_ha_yr": 0.0,   # open water: negligible net sequestration
+        "climate_regulation_usd_ha_yr": 300.0,
+        "water_filtration_usd_ha_yr": 3500.0,  # ESVD: water supply + purification dominate
+        "biodiversity_premium_usd_ha_yr": 600.0,
+        "soil_nutrient_value_usd_ha_yr": 0.0,    # no soil column
+    },
+    "peri_urban": {
+        "label": "Peri-urban / Managed Open Land",
+        "sequestration_tco2_ha_yr": 0.6,
+        "climate_regulation_usd_ha_yr": 150.0,  # local cooling near built-up areas
+        "water_filtration_usd_ha_yr": 120.0,    # stormwater infiltration
+        "biodiversity_premium_usd_ha_yr": 90.0,
+        "soil_nutrient_value_usd_ha_yr": 120.0,
+    },
+    # Cold and arid natural biomes — low per-hectare yields, but they cover vast
+    # areas and store large soil/permafrost carbon. Added so the real RESOLVE
+    # ecoregion mapping (Tundra, Deserts & Xeric Shrublands) is faithful rather
+    # than folded into grassland and over-valued.
+    "tundra": {
+        "label": "Tundra",
+        "sequestration_tco2_ha_yr": 0.3,   # slow, but permafrost soils hold huge stores
+        "climate_regulation_usd_ha_yr": 40.0,
+        "water_filtration_usd_ha_yr": 30.0,
+        "biodiversity_premium_usd_ha_yr": 60.0,
+        "soil_nutrient_value_usd_ha_yr": 80.0,
+    },
+    "desert": {
+        "label": "Desert & Xeric Shrubland",
+        "sequestration_tco2_ha_yr": 0.1,
+        "climate_regulation_usd_ha_yr": 20.0,
+        "water_filtration_usd_ha_yr": 10.0,
+        "biodiversity_premium_usd_ha_yr": 40.0,
+        "soil_nutrient_value_usd_ha_yr": 20.0,
+    },
 }
 
 DEFAULT_BIOME = "tropical_rainforest"
+
+# ---------------------------------------------------------------------------
+# Capitalisation discount rate.
+#
+# Ecosystem services are a perpetual annual flow; capitalising them into a
+# present-value "standing natural asset" lets a hectare of intact land sit on a
+# balance sheet next to its development/sale price. asset_value = annual / rate.
+# 3% sits between Stern (~1.4%) and Nordhaus (~4-5%) social-discount estimates
+# and matches common natural-capital accounting practice. Phase 4 may expose it.
+# ---------------------------------------------------------------------------
+DEFAULT_DISCOUNT_RATE = 0.03
+
+# ---------------------------------------------------------------------------
+# Default land-cover intactness by biome — the fraction of the reference yield a
+# typical parcel of this biome still delivers, used until real per-polygon
+# land-cover sampling (``landcover.py``) is wired in. Wild biomes are high but
+# not pristine at scale; managed/converted land is substantially lower. A region
+# may override this with an explicit ``intactness`` property.
+# ---------------------------------------------------------------------------
+BIOME_DEFAULT_INTACTNESS: dict[str, float] = {
+    "tropical_rainforest": 0.85,
+    "temperate_forest": 0.80,
+    "boreal_forest": 0.90,
+    "mangrove": 0.85,
+    "wetland": 0.85,
+    "freshwater": 0.95,
+    "temperate_grassland": 0.80,
+    "cropland": 0.45,
+    "peri_urban": 0.50,
+    "tundra": 0.95,
+    "desert": 0.90,
+}
+
+
+def biome_default_intactness(biome_key: str) -> float:
+    """Default intactness for a biome (1.0 if unknown)."""
+    return BIOME_DEFAULT_INTACTNESS.get(biome_key, 1.0)
+
 
 # Order in which yield categories are reported (matches the product spec).
 YIELD_CATEGORIES = (
