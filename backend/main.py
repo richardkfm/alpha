@@ -14,6 +14,8 @@ API-first FastAPI service.
 - ``GET /api/v1/datasets`` — the data catalogue: every data domain's source,
   citation, status and "as-of" date, plus the "data we still need" roadmap, for
   the GUI Data Hub.
+- ``GET /api/v1/market`` — current carbon price + FX inputs with provenance and
+  live/static flags (Phase 4 live market data; see ``live_data.py``).
 - ``POST /api/v1/classify`` — Phase 3 data ingestion: classify a GeoJSON polygon
   into a valuation biome using ingested WWF boundary data.
 - ``POST /api/v1/extract-esv`` — Phase 3 LLM-assisted extraction of structured ESV
@@ -33,6 +35,7 @@ from pydantic import BaseModel, Field
 from biome_classifier import boundary_source, classify_geometry
 from datasets import data_catalog
 from esv_extraction import extract_esv_records
+from live_data import get_carbon_price, get_fx_rates, market_snapshot
 from reference_data import (
     BIOMES,
     CURRENCIES,
@@ -93,12 +96,45 @@ def health() -> Dict[str, str]:
     return {"status": "ok", "service": "alpha-backend"}
 
 
+def _market_for(currency: str) -> Dict[str, Any]:
+    """Resolve the carbon price + FX rate for ``currency`` (live or static).
+
+    Returns the numbers to inject into ``compute_valuation`` plus a ``market``
+    provenance block (source / as-of / live) to echo back to the client.
+    """
+    carbon_price, carbon_meta = get_carbon_price()
+    rates, fx_meta = get_fx_rates()
+    return {
+        "carbon_price": carbon_price,
+        "fx_rate": rates.get(currency, 1.0),
+        "fx_as_of": fx_meta.get("as_of") or None,
+        "provenance": {
+            "carbon": {"price_usd_per_tco2": round(carbon_price, 4), **carbon_meta},
+            "fx": {"base": "USD", "rate_per_usd": round(rates.get(currency, 1.0), 6), **fx_meta},
+        },
+    }
+
+
+@app.get("/api/v1/market")
+def market() -> Dict[str, Any]:
+    """Current market inputs (carbon price + FX) with provenance and live flags.
+
+    Phase 4 live-data surface: lets the Data Hub show whether valuations are
+    running on live feeds or the documented static references.
+    """
+    return market_snapshot()
+
+
 @app.get("/api/v1/reference")
 def reference() -> Dict[str, Any]:
     """Supported biomes and currencies plus their per-sqm reference yields.
 
     Lets the frontend populate biome/currency selectors without hardcoding.
+    Reference yields and FX reflect the live market snapshot when Phase 4 live
+    data is enabled, falling back to the documented static references otherwise.
     """
+    carbon_price, _ = get_carbon_price()
+    rates, _ = get_fx_rates()
     return {
         "default_biome": DEFAULT_BIOME,
         "default_currency": DEFAULT_CURRENCY,
@@ -107,15 +143,21 @@ def reference() -> Dict[str, Any]:
             key: {
                 "label": b["label"],
                 "yields_per_sqm_usd_year": {
-                    c: round(v, 6) for c, v in biome_per_sqm_usd(key).items()
+                    c: round(v, 6)
+                    for c, v in biome_per_sqm_usd(key, carbon_price=carbon_price).items()
                 },
             }
             for key, b in BIOMES.items()
         },
         "currencies": {
-            code: {"label": c["label"], "symbol": c["symbol"], "rate_per_usd": c["rate_per_usd"]}
+            code: {
+                "label": c["label"],
+                "symbol": c["symbol"],
+                "rate_per_usd": round(rates.get(code, c["rate_per_usd"]), 6),
+            }
             for code, c in CURRENCIES.items()
         },
+        "market": market_snapshot(),
     }
 
 
@@ -130,10 +172,17 @@ def regions(currency: Optional[str] = Query(default=None)) -> Dict[str, Any]:
     chosen_currency = (currency or DEFAULT_CURRENCY).upper()
     if chosen_currency not in CURRENCIES:
         chosen_currency = DEFAULT_CURRENCY
+    mkt = _market_for(chosen_currency)
     return {
         "currency": chosen_currency,
-        "regions": list_regions(chosen_currency),
+        "regions": list_regions(
+            chosen_currency,
+            carbon_price=mkt["carbon_price"],
+            fx_rate=mkt["fx_rate"],
+            fx_as_of=mkt["fx_as_of"],
+        ),
         "dataset": dataset_provenance(),
+        "market": mkt["provenance"],
     }
 
 
@@ -191,7 +240,18 @@ def valuation(
         classification = classify_geometry(geometry)
         chosen_biome = classification["biome_key"]
 
-    result = compute_valuation(geometry, biome=chosen_biome, currency=chosen_currency)
+    norm_currency = str(chosen_currency or DEFAULT_CURRENCY).upper()
+    if norm_currency not in CURRENCIES:
+        norm_currency = DEFAULT_CURRENCY
+    mkt = _market_for(norm_currency)
+    result = compute_valuation(
+        geometry,
+        biome=chosen_biome,
+        currency=chosen_currency,
+        carbon_price=mkt["carbon_price"],
+        fx_rate=mkt["fx_rate"],
+        fx_as_of=mkt["fx_as_of"],
+    )
 
     if result["area"]["sqm"] <= 0:
         raise HTTPException(
@@ -199,6 +259,7 @@ def valuation(
             detail="Geometry has zero area — expected a Polygon or MultiPolygon with valid rings.",
         )
     result["classification"] = classification
+    result["market"] = mkt["provenance"]
     return result
 
 

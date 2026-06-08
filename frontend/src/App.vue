@@ -3,6 +3,7 @@ import { ref, onMounted, defineAsyncComponent } from 'vue'
 import WorldMap from './components/WorldMap.vue'
 import SidePanel from './components/SidePanel.vue'
 import LayerControl from './components/LayerControl.vue'
+import SearchBar from './components/SearchBar.vue'
 import { useRegions } from './data/useRegions.js'
 
 // The MapLibre globe (and its ~heavy bundle) loads only when 3D mode is active;
@@ -255,6 +256,8 @@ function closePanel() {
             @toggle="toggleLayer"
             @set-style="displayStyle = $event"
           />
+
+          <SearchBar @search="onRegionSelect" />
 
           <transition name="hint">
             <div v-if="!selectedRegion" class="hint" aria-hidden="true">

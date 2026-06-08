@@ -93,6 +93,9 @@ def compute_valuation(
     geometry: dict[str, Any],
     biome: str = DEFAULT_BIOME,
     currency: str = DEFAULT_CURRENCY,
+    carbon_price: float | None = None,
+    fx_rate: float | None = None,
+    fx_as_of: str | None = None,
 ) -> dict[str, Any]:
     """Compute the full TEV breakdown for a polygon.
 
@@ -101,17 +104,24 @@ def compute_valuation(
       2. per-sqm reference yields for the biome (USD), converted to `currency`.
       3. total annual yields = per-sqm * area_sqm.
       4. TEV = sum of the five categories (per sqm, and total for the area).
+
+    ``carbon_price``, ``fx_rate`` and ``fx_as_of`` default to the documented
+    static references; the API layer injects live values when Phase 4 market data
+    is enabled (see ``live_data.py``). Passing nothing reproduces the Phase 2
+    static behaviour exactly.
     """
     biome_key = biome if biome in BIOMES else DEFAULT_BIOME
     currency = currency.upper()
     if currency not in CURRENCIES:
         currency = DEFAULT_CURRENCY
     fx = CURRENCIES[currency]
-    rate = fx["rate_per_usd"]
+    rate = fx["rate_per_usd"] if fx_rate is None else fx_rate
+    as_of = FX_AS_OF if fx_as_of is None else fx_as_of
+    carbon_price = CARBON_PRICE_USD_PER_TCO2 if carbon_price is None else carbon_price
 
     area_sqm = geodesic_area_sqm(geometry)
 
-    base_usd = biome_per_sqm_usd(biome_key)  # USD per sqm per year
+    base_usd = biome_per_sqm_usd(biome_key, carbon_price=carbon_price)  # USD per sqm per year
     b = BIOMES[biome_key]
 
     yields_per_sqm: dict[str, float] = {}
@@ -128,7 +138,7 @@ def compute_valuation(
         "carbon_capture": {
             "formula": "sequestration (tCO2/ha/yr) x carbon price (USD/tCO2) / 10000",
             "sequestration_tco2_ha_yr": b["sequestration_tco2_ha_yr"],
-            "carbon_price_usd_per_tco2": CARBON_PRICE_USD_PER_TCO2,
+            "carbon_price_usd_per_tco2": round(carbon_price, 4),
             "citation": "Pan et al. 2011; IPCC AR6 WGIII (2022)",
         },
         "climate_regulation": {
@@ -166,7 +176,7 @@ def compute_valuation(
         "yields_total_year": yields_total,
         "total_ecosystem_value_per_sqm_year": _round_per_sqm(tev_per_sqm),
         "total_ecosystem_value_per_year": _round_money(tev_total),
-        "fx": {"base": "USD", "rate_per_usd": rate, "as_of": FX_AS_OF},
+        "fx": {"base": "USD", "rate_per_usd": rate, "as_of": as_of},
         "methodology": methodology,
         "methodology_note": (
             "Phase 2 valuation engine. Per-biome reference values from the ESVD "

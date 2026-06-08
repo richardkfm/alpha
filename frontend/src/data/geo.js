@@ -58,3 +58,63 @@ export function centroid(geometry) {
 function toLngLat({ lng, lat }) {
   return [lng, lat]
 }
+
+// Build a small square polygon (~`half`° per side) around a [lng, lat] point so a
+// single coordinate still has an area to value.
+function squareAround(lng, lat, half = 0.05) {
+  return {
+    type: 'Polygon',
+    coordinates: [[
+      [lng - half, lat - half],
+      [lng + half, lat - half],
+      [lng + half, lat + half],
+      [lng - half, lat + half],
+      [lng - half, lat - half],
+    ]],
+  }
+}
+
+// Parse free-text search input into a GeoJSON geometry + a human label.
+// Accepts: a GeoJSON geometry / Feature / FeatureCollection (JSON), a
+// "lat, lng" point, or a "west, south, east, north" bounding box.
+// Throws an Error with a user-facing message on bad input.
+export function parseAreaInput(raw) {
+  const text = (raw || '').trim()
+  if (!text) throw new Error('Enter coordinates or paste a GeoJSON polygon.')
+
+  if (text[0] === '{') {
+    let obj
+    try {
+      obj = JSON.parse(text)
+    } catch (e) {
+      throw new Error('That looks like JSON but could not be parsed.')
+    }
+    let geom = obj
+    if (obj.type === 'Feature') geom = obj.geometry
+    else if (obj.type === 'FeatureCollection') geom = obj.features?.[0]?.geometry
+    if (geom && (geom.type === 'Polygon' || geom.type === 'MultiPolygon') && geom.coordinates) {
+      return { geometry: geom, label: 'Custom polygon' }
+    }
+    throw new Error('Paste a GeoJSON Polygon or MultiPolygon (or a Feature wrapping one).')
+  }
+
+  const nums = text.split(/[\s,]+/).map(Number).filter((n) => !Number.isNaN(n))
+  if (nums.length === 2) {
+    const [lat, lng] = nums // geographic convention: latitude first
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      throw new Error('Point out of range — expected "lat, lng".')
+    }
+    return { geometry: squareAround(lng, lat), label: `Point ${lat}, ${lng}` }
+  }
+  if (nums.length === 4) {
+    const [w, s, e, n] = nums
+    return {
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]],
+      },
+      label: 'Bounding box',
+    }
+  }
+  throw new Error('Enter "lat, lng", a "w, s, e, n" box, or paste a GeoJSON polygon.')
+}

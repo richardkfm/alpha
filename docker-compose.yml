@@ -23,6 +23,10 @@ services:
     container_name: alpha-backend
     environment:
       DATABASE_URL: postgresql://alpha:alpha@db:5432/alpha
+      # Phase 4 live market data: live FX (ECB via Frankfurter) out of the box,
+      # with graceful fallback to static references if the feed is unreachable.
+      # Plug a carbon feed in via CARBON_PRICE_URL (or CARBON_PRICE_USD_PER_TCO2).
+      ALPHA_LIVE_DATA: "1"
     ports:
       - "8000:8000"
     depends_on:
