@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 
 // ----- catalogue -----------------------------------------------------------
 const catalog = ref(null)
+const market = ref(null)
 const loading = ref(false)
 const error = ref('')
 
@@ -19,9 +20,15 @@ async function loadCatalog() {
   loading.value = true
   error.value = ''
   try {
-    const res = await fetch('/api/v1/datasets')
-    if (!res.ok) throw new Error(`datasets HTTP ${res.status}`)
-    catalog.value = await res.json()
+    const [cat, mkt] = await Promise.all([
+      fetch('/api/v1/datasets').then((r) => {
+        if (!r.ok) throw new Error(`datasets HTTP ${r.status}`)
+        return r.json()
+      }),
+      fetch('/api/v1/market').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ])
+    catalog.value = cat
+    market.value = mkt
   } catch (e) {
     error.value = 'Could not load the data catalogue from the alpha backend.'
   } finally {
@@ -102,6 +109,24 @@ onMounted(loadCatalog)
         <h2>Data Hub</h2>
         <p>Every input behind a valuation — where it comes from, how current it is, and what we still need.</p>
       </header>
+
+      <div v-if="market" class="market">
+        <div class="market-item">
+          <span class="market-k">Carbon price</span>
+          <span class="market-v">${{ market.carbon.price_usd_per_tco2 }}<em>/tCO₂e</em></span>
+          <span class="live-pill" :class="{ on: market.carbon.live }">{{ market.carbon.live ? 'LIVE' : 'static' }}</span>
+        </div>
+        <div class="market-item">
+          <span class="market-k">FX (per USD)</span>
+          <span class="market-v">
+            <template v-for="(v, code) in market.fx.rates_per_usd" :key="code">
+              <span v-if="code !== 'USD'" class="fx">{{ code }} {{ v }}</span>
+            </template>
+          </span>
+          <span class="live-pill" :class="{ on: market.fx.live }">{{ market.fx.live ? 'LIVE' : 'static' }}</span>
+        </div>
+        <span class="market-asof">as of {{ market.fx.as_of || '—' }}</span>
+      </div>
 
       <div v-if="loading" class="hub-state">Loading data catalogue…</div>
       <div v-else-if="error" class="hub-state err">{{ error }}</div>
@@ -232,6 +257,68 @@ onMounted(loadCatalog)
   color: var(--text-muted);
   font-size: 0.86rem;
 }
+.market {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.market-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.market-k {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-faint);
+}
+.market-v {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Spline Sans Mono', ui-monospace, monospace;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.market-v em {
+  font-style: normal;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+.fx {
+  color: var(--text);
+}
+.live-pill {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-deep);
+}
+.live-pill.on {
+  color: #04120c;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.market-asof {
+  margin-left: auto;
+  font-size: 0.66rem;
+  color: var(--text-faint);
+}
+
 .hub-state {
   padding: 40px 0;
   color: var(--text-muted);

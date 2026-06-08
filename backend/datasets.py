@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from biome_classifier import boundary_source
+from live_data import get_carbon_price, get_fx_rates
 from reference_data import (
     CARBON_PRICE_USD_PER_TCO2,
     CURRENCIES,
@@ -33,6 +34,64 @@ _LC100_CITATION = (
     "Buchhorn, M. et al. (2020). Copernicus Global Land Service: Land Cover 100m, "
     "collection 3. Zenodo. https://doi.org/10.5281/zenodo.3939050"
 )
+
+
+def _carbon_domain() -> Dict[str, Any]:
+    price, meta = get_carbon_price()
+    live = meta.get("live", False)
+    return {
+        "id": "carbon_price",
+        "label": "Carbon price",
+        "category": "valuation",
+        "status": _AUTHORITATIVE if live else _PLACEHOLDER,
+        "sources": [
+            {
+                "citation": (
+                    f"Live feed — {meta.get('source')} (${price:.2f}/tCO2e)."
+                    if live
+                    else "IPCC AR6 WGIII (2022), Ch. 7 & Annex III — sub-2 °C mitigation "
+                    f"pathways. Reference price ${CARBON_PRICE_USD_PER_TCO2:.0f}/tCO2e."
+                ),
+            }
+        ],
+        "as_of": str(meta.get("as_of", "2022")),
+        "note": (
+            "Live carbon-market price."
+            if live
+            else "Single static reference price; configure CARBON_PRICE_URL / "
+            "CARBON_PRICE_USD_PER_TCO2 to go live."
+        ),
+        "exposed_via": ["GET /api/v1/market", "POST /api/v1/valuation (methodology.carbon_capture)"],
+    }
+
+
+def _fx_domain() -> Dict[str, Any]:
+    rates, meta = get_fx_rates()
+    live = meta.get("live", False)
+    return {
+        "id": "fx_rates",
+        "label": "Currency exchange rates",
+        "category": "finance",
+        "status": _AUTHORITATIVE if live else _PLACEHOLDER,
+        "sources": [
+            {
+                "citation": (
+                    f"Live feed — {meta.get('source')}: "
+                    if live
+                    else "Indicative reference rates: "
+                )
+                + ", ".join(f"{code} {rates.get(code, c['rate_per_usd'])}/USD" for code, c in CURRENCIES.items()),
+                "url": meta.get("url", ""),
+            }
+        ],
+        "as_of": str(meta.get("as_of", FX_AS_OF)),
+        "note": (
+            "Live FX rates from the European Central Bank."
+            if live
+            else "Static placeholder rates; enable ALPHA_LIVE_DATA for live FX."
+        ),
+        "exposed_via": ["GET /api/v1/market", "GET /api/v1/reference", "POST /api/v1/valuation (fx)"],
+    }
 
 
 def _domains() -> List[Dict[str, Any]]:
@@ -93,38 +152,8 @@ def _domains() -> List[Dict[str, Any]]:
             "note": "Per-biome USD/ha/yr reference yields; peer-reviewed but static.",
             "exposed_via": ["GET /api/v1/reference", "POST /api/v1/valuation"],
         },
-        {
-            "id": "carbon_price",
-            "label": "Carbon price",
-            "category": "valuation",
-            "status": _PLACEHOLDER,
-            "sources": [
-                {
-                    "citation": "IPCC AR6 WGIII (2022), Ch. 7 & Annex III — sub-2 °C mitigation "
-                    f"pathways. Reference price ${CARBON_PRICE_USD_PER_TCO2:.0f}/tCO2e.",
-                }
-            ],
-            "as_of": "2022",
-            "note": "Single static reference price; not a live market feed.",
-            "exposed_via": ["POST /api/v1/valuation (methodology.carbon_capture)"],
-        },
-        {
-            "id": "fx_rates",
-            "label": "Currency exchange rates",
-            "category": "finance",
-            "status": _PLACEHOLDER,
-            "sources": [
-                {
-                    "citation": "Indicative reference rates: "
-                    + ", ".join(
-                        f"{code} {c['rate_per_usd']}/USD" for code, c in CURRENCIES.items()
-                    ),
-                }
-            ],
-            "as_of": FX_AS_OF,
-            "note": "Static placeholder rates for the USD/EUR/BRL toggle.",
-            "exposed_via": ["GET /api/v1/reference", "POST /api/v1/valuation (fx)"],
-        },
+        _carbon_domain(),
+        _fx_domain(),
         {
             "id": "land_cover",
             "label": "Land-cover intactness",

@@ -42,12 +42,19 @@ def dataset_provenance() -> Dict[str, Any]:
     }
 
 
-def list_regions(currency: str) -> List[Dict[str, Any]]:
+def list_regions(
+    currency: str,
+    carbon_price: float | None = None,
+    fx_rate: float | None = None,
+    fx_as_of: str | None = None,
+) -> List[Dict[str, Any]]:
     """Value every catalogue region in ``currency`` and return flat summaries.
 
     Each region carries its geometry plus the fields the frontend needs to draw
     map overlays and the Compare breakdown, reusing ``compute_valuation`` so the
-    numbers match the ``/api/v1/valuation`` endpoint exactly.
+    numbers match the ``/api/v1/valuation`` endpoint exactly. ``carbon_price`` /
+    ``fx_rate`` / ``fx_as_of`` are resolved once by the endpoint (live or static)
+    and injected so the whole catalogue prices off one consistent snapshot.
     """
     regions: List[Dict[str, Any]] = []
     for feature in _load_catalogue().get("features", []):
@@ -57,7 +64,14 @@ def list_regions(currency: str) -> List[Dict[str, Any]]:
         if biome_key not in BIOMES:
             biome_key = DEFAULT_BIOME
 
-        valuation = compute_valuation(geometry, biome=biome_key, currency=currency)
+        valuation = compute_valuation(
+            geometry,
+            biome=biome_key,
+            currency=currency,
+            carbon_price=carbon_price,
+            fx_rate=fx_rate,
+            fx_as_of=fx_as_of,
+        )
         regions.append(
             {
                 "id": props.get("id"),

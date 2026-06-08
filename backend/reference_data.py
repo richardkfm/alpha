@@ -132,14 +132,17 @@ CURRENCIES: dict[str, dict] = {
 DEFAULT_CURRENCY = "USD"
 
 
-def biome_per_sqm_usd(biome_key: str) -> dict[str, float]:
+def biome_per_sqm_usd(biome_key: str, carbon_price: float | None = None) -> dict[str, float]:
     """Return the 5 reference yields for a biome, in USD per sqm per year.
 
-    Carbon is derived from the biome's sequestration rate and the reference
-    carbon price; the other four are converted from USD/ha/yr to USD/sqm/yr.
+    Carbon is derived from the biome's sequestration rate and a carbon price; the
+    other four are converted from USD/ha/yr to USD/sqm/yr. ``carbon_price``
+    defaults to the static reference (``CARBON_PRICE_USD_PER_TCO2``); the API layer
+    may inject a live market price (see ``live_data.py``).
     """
     b = BIOMES[biome_key]
-    carbon_usd_ha_yr = b["sequestration_tco2_ha_yr"] * CARBON_PRICE_USD_PER_TCO2
+    price = CARBON_PRICE_USD_PER_TCO2 if carbon_price is None else carbon_price
+    carbon_usd_ha_yr = b["sequestration_tco2_ha_yr"] * price
     return {
         "carbon_capture": carbon_usd_ha_yr / SQM_PER_HECTARE,
         "climate_regulation": b["climate_regulation_usd_ha_yr"] / SQM_PER_HECTARE,

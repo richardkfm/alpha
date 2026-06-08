@@ -133,7 +133,7 @@ function fmtInt(n) {
         <span class="v">{{ fmtTotal(valuation.total_ecosystem_value_per_year) }} {{ valuation.currency }}</span>
       </section>
 
-      <section class="callout">
+      <section v-if="region.gdpCallout" class="callout">
         <span class="callout-mark">“</span>{{ region.gdpCallout }}
       </section>
 

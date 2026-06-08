@@ -84,6 +84,23 @@ def test_regions_returns_valued_catalogue():
     assert body["dataset"]["count"] == len(regions)
 
 
+def test_market_endpoint_static_by_default():
+    res = client.get("/api/v1/market")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["carbon"]["live"] is False
+    assert body["fx"]["live"] is False
+    assert body["fx"]["rates_per_usd"]["USD"] == 1.0
+
+
+def test_valuation_echoes_market_provenance():
+    res = client.post("/api/v1/valuation", json=AMAZON)
+    assert res.status_code == 200
+    market = res.json()["market"]
+    assert "carbon" in market and "fx" in market
+    assert "live" in market["carbon"]
+
+
 def test_datasets_catalogue():
     res = client.get("/api/v1/datasets")
     assert res.status_code == 200
