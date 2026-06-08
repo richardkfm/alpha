@@ -1,0 +1,329 @@
+<script setup>
+import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
+import { layers as LAYER_DEFS } from '../data/layers.js'
+import { rainforests } from '../data/rainforests.js'
+
+const props = defineProps({
+  visibleLayers: { type: Object, required: true },
+  isDark: { type: Boolean, default: true },
+})
+const emit = defineEmits(['select'])
+
+const mapEl = ref(null)
+const spinning = ref(true)
+let map = null
+let rafId = null
+let lastTs = 0
+let interacting = false
+let resumeTimer = null
+
+const CARTO_ATTR =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+
+function tilesFor(dark) {
+  const set = dark ? 'dark_nolabels' : 'light_nolabels'
+  return ['a', 'b', 'c', 'd'].map(
+    (s) => `https://${s}.basemaps.cartocdn.com/${set}/{z}/{x}/{y}.png`,
+  )
+}
+
+function skyFor(dark) {
+  // Glowing atmosphere rim — cyan/blue leaning for a techie, not-natural feel.
+  return dark
+    ? {
+        'sky-color': '#0a1422',
+        'sky-horizon-blend': 0.5,
+        'horizon-color': '#163a5e',
+        'horizon-fog-blend': 0.6,
+        'fog-color': '#091523',
+        'fog-ground-blend': 0.4,
+      }
+    : {
+        'sky-color': '#cfe6f5',
+        'sky-horizon-blend': 0.5,
+        'horizon-color': '#9fc4dd',
+        'horizon-fog-blend': 0.6,
+        'fog-color': '#dbeaf2',
+        'fog-ground-blend': 0.4,
+      }
+}
+
+function buildStyle(dark) {
+  return {
+    version: 8,
+    projection: { type: 'globe' },
+    sources: {
+      basemap: {
+        type: 'raster',
+        tiles: tilesFor(dark),
+        tileSize: 256,
+        attribution: CARTO_ATTR,
+      },
+    },
+    layers: [
+      { id: 'space', type: 'background', paint: { 'background-color': dark ? '#05070d' : '#dfeaf0' } },
+      {
+        id: 'basemap',
+        type: 'raster',
+        source: 'basemap',
+        paint: { 'raster-opacity': dark ? 0.9 : 0.95, 'raster-fade-duration': 300 },
+      },
+    ],
+  }
+}
+
+function addThematicLayers() {
+  for (const l of LAYER_DEFS) {
+    const srcId = `layer-${l.id}`
+    if (!map.getSource(srcId)) {
+      map.addSource(srcId, { type: 'geojson', data: l.geojson, promoteId: 'regionId' })
+    }
+    // soft outer glow (under), translucent fill, crisp neon outline (over)
+    map.addLayer({
+      id: `${l.id}-glow`,
+      type: 'line',
+      source: srcId,
+      paint: { 'line-color': l.color, 'line-width': 7, 'line-blur': 7, 'line-opacity': 0.45 },
+    })
+    map.addLayer({
+      id: `${l.id}-fill`,
+      type: 'fill',
+      source: srcId,
+      paint: { 'fill-color': l.color, 'fill-opacity': 0.16 },
+    })
+    map.addLayer({
+      id: `${l.id}-line`,
+      type: 'line',
+      source: srcId,
+      paint: { 'line-color': l.color, 'line-width': 1.4, 'line-opacity': 0.9 },
+    })
+  }
+  applyVisibility()
+
+  // Only the real biome layer is clickable -> drives valuation.
+  map.on('click', 'rainforest-fill', (e) => {
+    const f = e.features && e.features[0]
+    if (!f) return
+    const region = rainforests.find((r) => r.id === f.properties.regionId)
+    if (region) emit('select', region)
+  })
+  map.on('mouseenter', 'rainforest-fill', () => {
+    map.getCanvas().style.cursor = 'pointer'
+  })
+  map.on('mouseleave', 'rainforest-fill', () => {
+    map.getCanvas().style.cursor = ''
+  })
+}
+
+function applyVisibility() {
+  if (!map) return
+  for (const l of LAYER_DEFS) {
+    const v = props.visibleLayers[l.id] ? 'visible' : 'none'
+    for (const suffix of ['-glow', '-fill', '-line']) {
+      const id = l.id + suffix
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v)
+    }
+  }
+}
+
+// ----- auto-spin -----------------------------------------------------------
+function frame(ts) {
+  if (map) {
+    const dt = lastTs ? (ts - lastTs) / 1000 : 0
+    lastTs = ts
+    if (spinning.value && !interacting && map.getZoom() < 3.6) {
+      const c = map.getCenter()
+      c.lng -= dt * 3.2 // ~deg/sec -> a full revolution in ~110s
+      map.jumpTo({ center: c })
+    }
+  }
+  rafId = requestAnimationFrame(frame)
+}
+
+function pauseSpinTemporarily() {
+  interacting = true
+  if (resumeTimer) clearTimeout(resumeTimer)
+  resumeTimer = setTimeout(() => {
+    interacting = false
+  }, 2800)
+}
+
+function toggleSpin() {
+  spinning.value = !spinning.value
+}
+
+function updateTheme() {
+  if (!map) return
+  const src = map.getSource('basemap')
+  if (src && src.setTiles) src.setTiles(tilesFor(props.isDark))
+  if (map.getLayer('space')) {
+    map.setPaintProperty('space', 'background-color', props.isDark ? '#05070d' : '#dfeaf0')
+  }
+  if (map.getLayer('basemap')) {
+    map.setPaintProperty('basemap', 'raster-opacity', props.isDark ? 0.9 : 0.95)
+  }
+  try {
+    map.setSky(skyFor(props.isDark))
+  } catch (_) {
+    /* setSky unsupported on this build — ignore */
+  }
+}
+
+onMounted(() => {
+  map = new maplibregl.Map({
+    container: mapEl.value,
+    style: buildStyle(props.isDark),
+    center: [-30, 12],
+    zoom: 1.6,
+    minZoom: 0.5,
+    maxZoom: 7,
+    attributionControl: { compact: true },
+    dragRotate: false,
+  })
+
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+
+  // Pause auto-spin while the user is interacting, resume after a short idle.
+  for (const ev of ['mousedown', 'touchstart', 'wheel', 'dragstart', 'zoomstart']) {
+    map.on(ev, pauseSpinTemporarily)
+  }
+
+  map.on('load', () => {
+    try {
+      map.setProjection({ type: 'globe' })
+    } catch (_) {
+      /* older builds read projection from the style */
+    }
+    try {
+      map.setSky(skyFor(props.isDark))
+    } catch (_) {
+      /* ignore */
+    }
+    addThematicLayers()
+  })
+
+  rafId = requestAnimationFrame(frame)
+})
+
+onBeforeUnmount(() => {
+  if (rafId) cancelAnimationFrame(rafId)
+  if (resumeTimer) clearTimeout(resumeTimer)
+  if (map) map.remove()
+})
+
+watch(() => props.visibleLayers, applyVisibility, { deep: true })
+watch(() => props.isDark, updateTheme)
+</script>
+
+<template>
+  <div class="globe-wrap">
+    <div ref="mapEl" class="globe"></div>
+    <button
+      class="spin-toggle"
+      :class="{ active: spinning }"
+      @click="toggleSpin"
+      :title="spinning ? 'Pause rotation' : 'Resume rotation'"
+    >
+      <span class="spin-dot"></span>
+      {{ spinning ? 'Spinning' : 'Paused' }}
+    </button>
+  </div>
+</template>
+
+<style scoped>
+.globe-wrap {
+  position: absolute;
+  inset: 0;
+}
+.globe {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  background: radial-gradient(circle at 50% 40%, #0a1424 0%, var(--space, #05070d) 70%);
+}
+
+.spin-toggle {
+  position: absolute;
+  left: 18px;
+  top: 74px;
+  z-index: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-soft);
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+.spin-toggle:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.spin-toggle.active {
+  color: var(--accent);
+}
+.spin-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+.spin-toggle.active .spin-dot {
+  animation: spin-pulse 1.6s infinite var(--ease);
+}
+@keyframes spin-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+</style>
+
+<!-- MapLibre renders controls/popups outside the scoped tree -> global theming. -->
+<style>
+.maplibregl-ctrl-group {
+  background: var(--bg-glass) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-soft) !important;
+  overflow: hidden;
+}
+.maplibregl-ctrl-group button {
+  background: transparent !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--border-soft) !important;
+}
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(0.85) hue-rotate(120deg);
+}
+.maplibregl-ctrl-attrib {
+  background: var(--bg-glass) !important;
+  color: var(--text-faint) !important;
+  border-radius: 8px 0 0 0;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--text-muted) !important;
+}
+.maplibregl-ctrl-attrib-button {
+  filter: invert(0.8);
+}
+</style>

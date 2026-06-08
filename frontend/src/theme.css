@@ -26,6 +26,13 @@
   --text-faint: #5f7a6c;
   --accent: var(--teal);
 
+  /* techie globe + thematic layer palette (multi-hue neon, not all-green) */
+  --space: #05070d;
+  --layer-water: #38bdf8;
+  --layer-soil: #f5b14e;
+  --layer-violet: #a78bfa;
+  --layer-magenta: #f472b6;
+
   /* depth + motion */
   --radius-sm: 8px;
   --radius: 14px;
@@ -57,6 +64,7 @@
   --text-faint: #7c9588;
   --accent: var(--teal-strong);
   --gold: #b8923a;
+  --space: #dfeaf0;
   --shadow-soft: 0 1px 2px rgba(20, 50, 38, 0.06), 0 10px 30px rgba(20, 50, 38, 0.1);
   --shadow-panel: -24px 0 60px rgba(20, 50, 38, 0.14);
   --shadow-glow: 0 0 0 1px rgba(20, 184, 166, 0.25), 0 0 24px rgba(20, 184, 166, 0.16);
