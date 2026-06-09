@@ -1,26 +1,56 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   // Biome layer definitions derived from the backend catalogue (useRegions.js).
   layers: { type: Array, default: () => [] },
   visibleLayers: { type: Object, required: true },
   // Active map display style: 'polygons' | 'bubbles' | 'outline'.
   displayStyle: { type: String, default: 'polygons' },
 })
-defineEmits(['toggle', 'set-style'])
+const emit = defineEmits(['toggle', 'set-all', 'set-style'])
 
 const STYLES = [
-  { id: 'polygons', label: 'Polygons', icon: '▦' },
-  { id: 'bubbles', label: 'Bubbles', icon: '⦿' },
-  { id: 'outline', label: 'Outline', icon: '□' },
+  { id: 'polygons', label: 'Fill', icon: '▦', hint: 'Filled biome polygons' },
+  { id: 'bubbles', label: 'Bubbles', icon: '⦿', hint: 'Bubble size = annual ecosystem value' },
+  { id: 'outline', label: 'Outline', icon: '□', hint: 'Detailed ecoregion borders, no fill' },
 ]
+
+const onCount = computed(
+  () => props.layers.filter((l) => props.visibleLayers[l.id]).length,
+)
+const allOn = computed(() => onCount.value === props.layers.length)
 </script>
 
 <template>
-  <aside class="layers" aria-label="Map layers">
+  <aside class="layers" aria-label="Biome layers">
     <header class="layers-head">
-      <span class="layers-title">Layers</span>
-      <span class="layers-hint">toggle data overlays</span>
+      <span class="layers-title">
+        Biomes
+        <span class="layers-count num">{{ onCount }}/{{ layers.length }}</span>
+      </span>
+      <button class="bulk-btn" @click="emit('set-all', !allOn)">
+        {{ allOn ? 'Hide all' : 'Show all' }}
+      </button>
     </header>
+
+    <div class="chips">
+      <button
+        v-for="l in layers"
+        :key="l.id"
+        class="chip"
+        :class="{ on: visibleLayers[l.id] }"
+        :style="{ '--c': l.color }"
+        role="switch"
+        :aria-checked="!!visibleLayers[l.id]"
+        :title="`${l.label} — ${l.sublabel} · ${l.count} region${l.count === 1 ? '' : 's'}`"
+        @click="emit('toggle', l.id)"
+      >
+        <span class="chip-dot"></span>
+        <span class="chip-label">{{ l.short || l.label }}</span>
+        <span class="chip-count num">{{ l.count }}</span>
+      </button>
+    </div>
 
     <div class="style-switch" role="group" aria-label="Display style">
       <button
@@ -28,36 +58,12 @@ const STYLES = [
         :key="s.id"
         class="style-btn"
         :class="{ on: displayStyle === s.id }"
-        @click="$emit('set-style', s.id)"
+        :title="s.hint"
+        @click="emit('set-style', s.id)"
       >
-        <span class="style-icon">{{ s.icon }}</span>{{ s.label }}
+        <span class="style-icon" aria-hidden="true">{{ s.icon }}</span>{{ s.label }}
       </button>
     </div>
-    <p v-if="displayStyle !== 'polygons'" class="style-note">
-      {{ displayStyle === 'bubbles' ? 'Bubble size = annual ecosystem value' : 'Bold borders, no fill' }}
-    </p>
-
-    <ul>
-      <li v-for="l in layers" :key="l.id">
-        <button
-          class="layer-row"
-          :class="{ on: visibleLayers[l.id] }"
-          role="switch"
-          :aria-checked="!!visibleLayers[l.id]"
-          @click="$emit('toggle', l.id)"
-        >
-          <span class="swatch" :style="{ '--c': l.color }"></span>
-          <span class="layer-text">
-            <span class="layer-label">
-              {{ l.label }}
-              <span v-if="l.kind === 'placeholder'" class="badge">sample</span>
-            </span>
-            <span class="layer-sub">{{ l.sublabel }}</span>
-          </span>
-          <span class="switch" :style="{ '--c': l.color }"><span class="knob"></span></span>
-        </button>
-      </li>
-    </ul>
   </aside>
 </template>
 
@@ -67,11 +73,11 @@ const STYLES = [
   left: 18px;
   bottom: 22px;
   z-index: 1000;
-  width: 248px;
+  width: 264px;
   max-width: calc(100vw - 36px);
   max-height: calc(100vh - 90px);
   overflow-y: auto;
-  padding: 14px;
+  padding: 13px 13px 11px;
   border-radius: var(--radius);
   background: var(--bg-glass);
   border: 1px solid var(--border);
@@ -82,27 +88,111 @@ const STYLES = [
 
 .layers-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
 }
 .layers-title {
-  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--text);
 }
-.layers-hint {
-  font-size: 0.66rem;
+.layers-count {
+  font-size: 0.68rem;
+  font-weight: 600;
   color: var(--text-faint);
+}
+.bulk-btn {
+  border: 1px solid var(--border-soft);
+  background: var(--bg-deep);
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+.bulk-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.chips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s var(--ease), background 0.18s var(--ease),
+    color 0.18s var(--ease), transform 0.12s var(--ease);
+}
+.chip:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--c) 45%, var(--border));
+}
+.chip:active {
+  transform: translateY(0);
+}
+.chip.on {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--c) 55%, transparent);
+  background: color-mix(in srgb, var(--c) 12%, var(--bg-deep));
+}
+
+.chip-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c);
+  opacity: 0.35;
+  transition: opacity 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+.chip.on .chip-dot {
+  opacity: 1;
+  box-shadow: 0 0 8px var(--c);
+}
+
+.chip-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.chip-count {
+  margin-left: auto;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+.chip.on .chip-count {
+  color: color-mix(in srgb, var(--c) 75%, var(--text));
 }
 
 .style-switch {
   display: flex;
   gap: 2px;
   padding: 3px;
-  margin-bottom: 8px;
+  margin-top: 10px;
   background: var(--bg-deep);
   border: 1px solid var(--border-soft);
   border-radius: 999px;
@@ -135,118 +225,5 @@ const STYLES = [
 .style-icon {
   font-size: 0.85rem;
   line-height: 1;
-}
-.style-note {
-  margin: 0 0 10px;
-  font-size: 0.66rem;
-  color: var(--text-faint);
-  text-align: center;
-}
-
-.layers ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.layer-row {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  padding: 9px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-deep);
-  border: 1px solid var(--border-soft);
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.18s var(--ease), background 0.18s var(--ease);
-}
-.layer-row:hover {
-  border-color: var(--border);
-}
-.layer-row.on {
-  border-color: color-mix(in srgb, var(--c, var(--accent)) 55%, transparent);
-  background: color-mix(in srgb, var(--c, var(--accent)) 9%, var(--bg-deep));
-}
-
-.swatch {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
-  background: var(--c);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
-  opacity: 0.4;
-  transition: opacity 0.18s var(--ease), box-shadow 0.18s var(--ease);
-}
-.layer-row.on .swatch {
-  opacity: 1;
-  box-shadow: 0 0 10px var(--c);
-}
-
-.layer-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-right: auto;
-  min-width: 0;
-}
-.layer-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.84rem;
-  font-weight: 600;
-}
-.layer-sub {
-  font-size: 0.66rem;
-  color: var(--text-faint);
-}
-.badge {
-  font-size: 0.56rem;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 1px 5px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-}
-
-.switch {
-  flex: none;
-  position: relative;
-  width: 34px;
-  height: 19px;
-  border-radius: 999px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
-}
-.layer-row.on .switch {
-  background: color-mix(in srgb, var(--c, var(--accent)) 75%, transparent);
-  border-color: var(--c, var(--accent));
-}
-.knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--text);
-  opacity: 0.7;
-  transition: transform 0.2s var(--ease), opacity 0.2s var(--ease);
-}
-.layer-row.on .knob {
-  transform: translateX(15px);
-  opacity: 1;
-  background: #05120e;
 }
 </style>

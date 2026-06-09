@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import WorldMap from './components/WorldMap.vue'
 import SidePanel from './components/SidePanel.vue'
 import LayerControl from './components/LayerControl.vue'
 import SearchBar from './components/SearchBar.vue'
+import BrandLogo from './components/BrandLogo.vue'
 import { useRegions } from './data/useRegions.js'
 
 // The MapLibre globe (and its ~heavy bundle) loads only when 3D mode is active;
@@ -66,6 +67,9 @@ function syncLayerVisibility() {
 function toggleLayer(id) {
   visibleLayers.value = { ...visibleLayers.value, [id]: !visibleLayers.value[id] }
 }
+function setAllLayers(on) {
+  visibleLayers.value = Object.fromEntries(biomeLayers.value.map((l) => [l.id, on]))
+}
 
 // Currency toggle (Phase 2). The backend converts USD reference values via FX.
 const CURRENCIES = ['USD', 'EUR', 'BRL']
@@ -87,11 +91,19 @@ function toggleTheme() {
   applyTheme()
 }
 
+// Esc dismisses the side panel — the panel itself never steals focus, so a
+// global listener keeps the map interactions uninterrupted.
+function onKeydown(e) {
+  if (e.key === 'Escape' && selectedRegion.value) closePanel()
+}
+
 onMounted(async () => {
   applyTheme()
+  window.addEventListener('keydown', onKeydown)
   await loadRegions(currency.value)
   syncLayerVisibility()
 })
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 // Fetch the Phase 2 TEV breakdown for a region's polygon in the chosen currency.
 // Catalogue regions carry an authoritative biome_key, so we pass it through to
@@ -175,48 +187,7 @@ function closePanel() {
     <header class="topbar">
       <div class="brand">
         <span class="brand-logo" aria-hidden="true">
-          <svg viewBox="0 0 32 32" width="30" height="30" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <clipPath id="logo-clip">
-                <circle cx="16" cy="16" r="14.5"/>
-              </clipPath>
-            </defs>
-            <!-- teal filled face (upper-left triangle) -->
-            <polygon
-              points="16,1.5 3,9 10,12.5"
-              fill="var(--teal)"
-              opacity="0.9"
-              clip-path="url(#logo-clip)"
-            />
-            <!-- wireframe mesh -->
-            <g
-              stroke="rgba(203,213,225,0.55)"
-              stroke-width="0.9"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              clip-path="url(#logo-clip)"
-            >
-              <polygon points="16,1.5 29,9 29,23 16,30.5 3,23 3,9"/>
-              <line x1="16" y1="1.5" x2="16" y2="9"/>
-              <line x1="29" y1="9" x2="22" y2="12.5"/>
-              <line x1="29" y1="23" x2="22" y2="19.5"/>
-              <line x1="16" y1="30.5" x2="16" y2="23"/>
-              <line x1="3" y1="23" x2="10" y2="19.5"/>
-              <line x1="3" y1="9" x2="10" y2="12.5"/>
-              <polygon points="16,9 22,12.5 22,19.5 16,23 10,19.5 10,12.5"/>
-              <line x1="16" y1="9" x2="16" y2="16"/>
-              <line x1="22" y1="12.5" x2="16" y2="16"/>
-              <line x1="22" y1="19.5" x2="16" y2="16"/>
-              <line x1="16" y1="23" x2="16" y2="16"/>
-              <line x1="10" y1="19.5" x2="16" y2="16"/>
-              <line x1="10" y1="12.5" x2="16" y2="16"/>
-            </g>
-            <!-- outer circle -->
-            <circle cx="16" cy="16" r="14.5" stroke="rgba(203,213,225,0.55)" stroke-width="0.9" fill="none"/>
-            <!-- teal equatorial line -->
-            <line x1="1.5" y1="16" x2="30.5" y2="16" stroke="var(--teal)" stroke-width="1.1" opacity="0.85"/>
-          </svg>
+          <BrandLogo :size="34" />
         </span>
         <span class="brand-text">
           <span class="brand-mark">alpha</span>
@@ -328,6 +299,7 @@ function closePanel() {
             :visible-layers="visibleLayers"
             :display-style="displayStyle"
             @toggle="toggleLayer"
+            @set-all="setAllLayers"
             @set-style="displayStyle = $event"
           />
 
@@ -398,10 +370,15 @@ function closePanel() {
 .brand-logo {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
+  color: var(--text); /* geodesic mesh strokes inherit this */
   background: radial-gradient(circle at 30% 25%, rgba(45, 212, 191, 0.22), transparent 70%);
+  transition: transform 0.5s var(--ease);
+}
+.brand:hover .brand-logo {
+  transform: rotate(14deg);
 }
 
 .brand-text {
