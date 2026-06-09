@@ -100,6 +100,22 @@ Then open:
 - **API health:** http://localhost:8000/health
 - **API docs (Swagger):** http://localhost:8000/docs
 
+### Ports already in use?
+
+The published ports (`3000`, `8000`, `5432`) are overridable — no need to edit
+`docker-compose.yml`. Copy the example env file and change whichever ones collide:
+
+```bash
+cp .env.example .env
+# then edit .env, e.g. ALPHA_WEB_PORT=3300, ALPHA_API_PORT=8800
+docker compose up --build
+```
+
+`docker compose` reads `.env` automatically. Only the **host** side of each
+mapping changes — the containers still talk to each other on `backend:8000` and
+`db:5432` internally, so nothing else needs touching. Just open the web app on
+whatever `ALPHA_WEB_PORT` you set (e.g. http://localhost:3300).
+
 ### Try the valuation endpoint
 
 The Phase 2 engine computes the polygon's geodesic area and returns a documented,

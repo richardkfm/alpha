@@ -1,5 +1,11 @@
 # alpha — root orchestration for the full stack.
 # Self-hosted / Proxmox-ready. Run with: docker compose up --build
+#
+# Published host ports are overridable so they don't collide with services you
+# already run. Copy .env.example to .env and set ALPHA_WEB_PORT / ALPHA_API_PORT /
+# ALPHA_DB_PORT — only the host side changes; container-internal ports and the
+# service-to-service URLs (db:5432, backend:8000) stay fixed, so nothing else
+# needs editing.
 services:
   db:
     image: postgis/postgis:15-3.4
@@ -9,7 +15,7 @@ services:
       POSTGRES_PASSWORD: alpha
       POSTGRES_DB: alpha
     ports:
-      - "5432:5432"
+      - "${ALPHA_DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +34,7 @@ services:
       # Plug a carbon feed in via CARBON_PRICE_URL (or CARBON_PRICE_USD_PER_TCO2).
       ALPHA_LIVE_DATA: "1"
     ports:
-      - "8000:8000"
+      - "${ALPHA_API_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -43,7 +49,7 @@ services:
       # so the browser can use same-origin relative paths.
       BACKEND_ORIGIN: "http://backend:8000"
     ports:
-      - "3000:3000"
+      - "${ALPHA_WEB_PORT:-3000}:3000"
     depends_on:
       - backend
     volumes:
