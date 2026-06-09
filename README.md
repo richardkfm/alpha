@@ -100,6 +100,38 @@ Then open:
 - **API health:** http://localhost:8000/health
 - **API docs (Swagger):** http://localhost:8000/docs
 
+### Ports already in use?
+
+The published ports (`3000`, `8000`, `5432`) are overridable — no need to edit
+`docker-compose.yml`. Copy the example env file and change whichever ones collide:
+
+```bash
+cp .env.example .env
+# then edit .env, e.g. ALPHA_WEB_PORT=3300, ALPHA_API_PORT=8800
+docker compose up --build
+```
+
+`docker compose` reads `.env` automatically. Only the **host** side of each
+mapping changes — the containers still talk to each other on `backend:8000` and
+`db:5432` internally, so nothing else needs touching. Just open the web app on
+whatever `ALPHA_WEB_PORT` you set (e.g. http://localhost:3300).
+
+### Behind a reverse proxy or tunnel
+
+The web tier is the Vite dev server, which rejects requests whose `Host` header
+it doesn't recognise — so serving it on a custom domain (Cloudflare Tunnel,
+Nginx, etc.) returns _"Blocked request. This host is not allowed."_ Add your
+domain(s) to `.env`:
+
+```bash
+ALPHA_ALLOWED_HOSTS=alpha.example.com      # comma-separate multiple; or "all"
+```
+
+Then recreate the frontend container so it picks up the new value
+(`docker compose up -d frontend`, or just `docker compose up` for the whole
+stack — a plain `restart` won't re-read `.env`). localhost access keeps working
+regardless.
+
 ### Try the valuation endpoint
 
 The Phase 2 engine computes the polygon's geodesic area and returns a documented,
