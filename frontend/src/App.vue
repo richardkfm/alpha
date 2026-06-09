@@ -161,22 +161,47 @@ function closePanel() {
     <header class="topbar">
       <div class="brand">
         <span class="brand-logo" aria-hidden="true">
-          <svg viewBox="0 0 32 32" width="30" height="30">
+          <svg viewBox="0 0 32 32" width="30" height="30" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <linearGradient id="leafGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="var(--teal)" />
-                <stop offset="1" stop-color="var(--forest-overlay)" />
-              </linearGradient>
+              <clipPath id="logo-clip">
+                <circle cx="16" cy="16" r="14.5"/>
+              </clipPath>
             </defs>
-            <path
-              d="M16 2C8.8 6 5 11.5 5 18.5 5 24.3 9.4 29 16 30c6.6-1 11-5.7 11-11.5C27 11.5 23.2 6 16 2Z"
-              fill="url(#leafGrad)"
-              opacity="0.18"
+            <!-- teal filled face (upper-left triangle) -->
+            <polygon
+              points="16,1.5 3,9 10,12.5"
+              fill="var(--teal)"
+              opacity="0.9"
+              clip-path="url(#logo-clip)"
             />
-            <path
-              d="M16 4.5c-5.8 3.4-9 8-9 14 0 4.2 2.7 7.7 7 9.1V11.2a1 1 0 0 1 2 0v16.6c.66.1 1.33.16 2 .2V8.4a1 1 0 0 1 2 0v19.4c4.3-1.4 7-4.9 7-9.1 0-6-3.2-10.6-9-14Z"
-              fill="url(#leafGrad)"
-            />
+            <!-- wireframe mesh -->
+            <g
+              stroke="rgba(203,213,225,0.55)"
+              stroke-width="0.9"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              clip-path="url(#logo-clip)"
+            >
+              <polygon points="16,1.5 29,9 29,23 16,30.5 3,23 3,9"/>
+              <line x1="16" y1="1.5" x2="16" y2="9"/>
+              <line x1="29" y1="9" x2="22" y2="12.5"/>
+              <line x1="29" y1="23" x2="22" y2="19.5"/>
+              <line x1="16" y1="30.5" x2="16" y2="23"/>
+              <line x1="3" y1="23" x2="10" y2="19.5"/>
+              <line x1="3" y1="9" x2="10" y2="12.5"/>
+              <polygon points="16,9 22,12.5 22,19.5 16,23 10,19.5 10,12.5"/>
+              <line x1="16" y1="9" x2="16" y2="16"/>
+              <line x1="22" y1="12.5" x2="16" y2="16"/>
+              <line x1="22" y1="19.5" x2="16" y2="16"/>
+              <line x1="16" y1="23" x2="16" y2="16"/>
+              <line x1="10" y1="19.5" x2="16" y2="16"/>
+              <line x1="10" y1="12.5" x2="16" y2="16"/>
+            </g>
+            <!-- outer circle -->
+            <circle cx="16" cy="16" r="14.5" stroke="rgba(203,213,225,0.55)" stroke-width="0.9" fill="none"/>
+            <!-- teal equatorial line -->
+            <line x1="1.5" y1="16" x2="30.5" y2="16" stroke="var(--teal)" stroke-width="1.1" opacity="0.85"/>
           </svg>
         </span>
         <span class="brand-text">
