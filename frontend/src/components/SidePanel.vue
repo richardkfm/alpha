@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 // Shared yield-category metadata, also used by the Compare dashboard.
 import { YIELD_ROWS } from '../data/yields.js'
+import { BIOME_META, biomeColor } from '../data/biomeMeta.js'
+import { useCountUp } from '../data/useCountUp.js'
 
 const props = defineProps({
   region: { type: Object, required: true },
@@ -19,17 +21,39 @@ const symbol = computed(() => props.valuation?.currency_symbol ?? '$')
 
 // Phase 3: the backend now detects the biome from ingested boundary data.
 const classification = computed(() => props.valuation?.classification ?? null)
+const biomeKey = computed(() => classification.value?.biome_key ?? props.region.biome_key)
+const biomeHue = computed(() => biomeColor(biomeKey.value))
+const biomeSublabel = computed(() => BIOME_META[biomeKey.value]?.sublabel ?? '')
+
+// Provenance compressed into a badge; the full sentence lives in its tooltip.
+const provenance = computed(() => {
+  const c = classification.value
+  if (!c) return null
+  if (c.confidence === 'matched') {
+    const from =
+      c.matched_region && c.matched_region !== 'N/A'
+        ? `classified from ${c.matched_region}`
+        : 'classified from ingested boundaries'
+    return { label: 'RESOLVE match', title: `${from} — RESOLVE Ecoregions 2017`, sure: true }
+  }
+  if (c.confidence === 'explicit') {
+    return { label: 'Catalogue', title: 'Biome supplied with the region catalogue', sure: true }
+  }
+  return { label: 'Default', title: 'No boundary match — fell back to the default biome', sure: false }
+})
 
 const yieldRows = computed(() => {
   if (!props.valuation) return []
   const values = YIELD_ROWS.map((r) => props.valuation.yields_per_sqm_year[r.key] ?? 0)
   const max = Math.max(...values, 0) || 1
+  const total = values.reduce((a, b) => a + b, 0) || 1
   return YIELD_ROWS.map(({ key, label, color }) => {
     const value = props.valuation.yields_per_sqm_year[key]
     return {
       label,
       color,
       value,
+      share: Math.round(((value ?? 0) / total) * 100),
       // bar width relative to the largest service; floor keeps tiny bars visible
       pct: Math.max(((value ?? 0) / max) * 100, 3),
     }
@@ -58,6 +82,13 @@ const intactness = computed(() => props.valuation?.intactness ?? null)
 const potentialAnnual = computed(
   () => props.valuation?.potential?.total_ecosystem_value_per_year ?? null,
 )
+
+// Headline figures ease toward their value instead of snapping.
+const tevAnim = useCountUp(
+  computed(() => props.valuation?.total_ecosystem_value_per_sqm_year ?? null),
+)
+const assetAnim = useCountUp(assetValue)
+const liabAnim = useCountUp(computed(() => liability.value?.present_value ?? null))
 
 function fmtPct(n) {
   return n == null ? '—' : `${Math.round(n * 100)}%`
@@ -90,12 +121,17 @@ function fmtHa(n) {
         <h2>{{ region.name }}</h2>
         <button class="close" @click="$emit('close')" aria-label="Close">×</button>
       </div>
-      <p class="region">{{ region.region }}</p>
-      <span class="conn" :class="{ ok: backendOnline, down: backendOnline === false }">
-        <template v-if="backendOnline">● backend online</template>
-        <template v-else-if="backendOnline === false">● backend offline</template>
-        <template v-else>● checking…</template>
-      </span>
+      <div class="subtitle-row">
+        <p class="region">{{ region.region }}</p>
+        <span
+          class="conn"
+          :class="{ ok: backendOnline, down: backendOnline === false }"
+          :title="backendOnline ? 'Connected to the alpha valuation engine' : backendOnline === false ? 'The alpha valuation engine is unreachable' : 'Checking the valuation engine…'"
+        >
+          <span class="conn-dot"></span>
+          {{ backendOnline ? 'live' : backendOnline === false ? 'offline' : '…' }}
+        </span>
+      </div>
     </header>
 
     <div v-if="loading" class="skeleton" aria-label="Calculating ecosystem value">
@@ -109,61 +145,53 @@ function fmtHa(n) {
     <div v-else-if="error" class="state err">{{ error }}</div>
 
     <template v-else-if="valuation">
-      <section class="area">
-        <div>
-          <span class="k">Polygon area</span>
-          <span class="v num">{{ fmtInt(valuation.area.sqm) }} <em>sqm</em></span>
-        </div>
-        <div>
-          <span class="k">&nbsp;</span>
-          <span class="v num">{{ fmtHa(valuation.area.hectares) }} <em>ha</em></span>
-        </div>
-      </section>
-
-      <section v-if="classification" class="biome">
-        <span class="k">Detected biome</span>
-        <span class="v">{{ classification.biome_label }}</span>
+      <section v-if="classification" class="biome" :style="{ '--biome': biomeHue }">
+        <span class="biome-dot" aria-hidden="true"></span>
+        <span class="biome-text">
+          <span class="biome-name">{{ classification.biome_label }}</span>
+          <span v-if="biomeSublabel" class="biome-sub">{{ biomeSublabel }}</span>
+        </span>
         <span
-          class="biome-src"
-          :class="{ inferred: classification.confidence === 'default' }"
-        >
-          <template v-if="classification.confidence === 'matched'">
-            <template v-if="classification.matched_region && classification.matched_region !== 'N/A'">
-              classified from {{ classification.matched_region }} · RESOLVE ecoregions
-            </template>
-            <template v-else>classified from ingested RESOLVE ecoregions</template>
-          </template>
-          <template v-else-if="classification.confidence === 'explicit'">
-            biome supplied by caller
-          </template>
-          <template v-else>no boundary match — default biome</template>
-        </span>
+          v-if="provenance"
+          class="biome-badge"
+          :class="{ inferred: !provenance.sure }"
+          :title="provenance.title"
+        >{{ provenance.label }}</span>
       </section>
 
-      <section v-if="intactness != null && intactness < 1" class="intactness">
-        <div class="intact-head">
-          <span class="k">Land-cover intactness</span>
-          <span class="intact-pct">{{ fmtPct(intactness) }}</span>
+      <section class="stats">
+        <div class="stat">
+          <span class="k">Area</span>
+          <span class="v num">{{ fmtHa(valuation.area.hectares) }} <em>ha</em></span>
+          <span class="stat-sub num">{{ fmtInt(valuation.area.sqm) }} m²</span>
         </div>
-        <div class="intact-track">
-          <div class="intact-bar" :style="{ width: fmtPct(intactness) }"></div>
+        <div v-if="intactness != null && intactness < 1" class="stat">
+          <span class="k">Intactness</span>
+          <span class="v num">{{ fmtPct(intactness) }}</span>
+          <span class="intact-track" aria-hidden="true">
+            <span class="intact-bar" :style="{ width: fmtPct(intactness) }"></span>
+          </span>
+          <span class="stat-sub" :title="`Delivering ${fmtPct(intactness)} of the value this land would yield fully intact`">
+            of {{ fmtTotal(potentialAnnual) }}/yr potential
+          </span>
         </div>
-        <span class="intact-note">
-          Delivering {{ fmtPct(intactness) }} of its intact potential of
-          {{ fmtTotal(potentialAnnual) }} {{ valuation.currency }}/yr.
-        </span>
       </section>
 
       <section class="yields">
         <h3>
-          Ecosystem service yields
-          <small>({{ valuation.currency }} / sqm / year)</small>
+          Service yields
+          <small>{{ valuation.currency }} / m² / yr</small>
         </h3>
         <ul>
-          <li v-for="row in yieldRows" :key="row.label">
+          <li
+            v-for="row in yieldRows"
+            :key="row.label"
+            :title="`${row.label} — ${row.share}% of total value`"
+          >
             <div class="yield-meta">
               <span class="yield-dot" :style="{ background: row.color }"></span>
               <span class="yield-label">{{ row.label }}</span>
+              <span class="yield-share num">{{ row.share }}%</span>
               <span class="num yield-num">{{ fmtPerSqm(row.value) }}</span>
             </div>
             <div class="yield-track">
@@ -178,18 +206,17 @@ function fmtHa(n) {
 
       <section class="tev">
         <span class="tev-label">Total Ecosystem Value</span>
-        <span class="tev-value">{{ fmtPerSqm(valuation.total_ecosystem_value_per_sqm_year) }}</span>
-        <span class="tev-unit">{{ valuation.currency }} / sqm / year</span>
-      </section>
-
-      <section class="tev-total">
-        <span class="k">Value of this area, per year</span>
-        <span class="v">{{ fmtTotal(valuation.total_ecosystem_value_per_year) }} {{ valuation.currency }}</span>
+        <span class="tev-value">{{ fmtPerSqm(tevAnim) }}</span>
+        <span class="tev-unit">{{ valuation.currency }} / m² / yr</span>
+        <div class="tev-annual">
+          <span class="tev-annual-v num">{{ fmtTotal(valuation.total_ecosystem_value_per_year) }}</span>
+          <span class="tev-annual-k">{{ valuation.currency }} / yr across this area</span>
+        </div>
       </section>
 
       <section class="asset">
         <div class="asset-head">
-          <span class="asset-label">Standing natural asset value</span>
+          <span class="asset-label">Standing asset value</span>
           <div class="asset-rates" role="group" aria-label="Discount rate">
             <button
               v-for="r in DISCOUNT_RATES"
@@ -199,16 +226,16 @@ function fmtHa(n) {
             >{{ Math.round(r * 100) }}%</button>
           </div>
         </div>
-        <span class="asset-value">{{ fmtTotal(assetValue) }} <em>{{ valuation.currency }}</em></span>
-        <span class="asset-sub">
-          capitalised perpetual value at {{ Math.round(discountRate * 100) }}% — what this
-          area is worth on the balance sheet, left standing
-        </span>
+        <span class="asset-value">{{ fmtTotal(assetAnim) }} <em>{{ valuation.currency }}</em></span>
+        <span
+          class="asset-sub"
+          title="The annual flow of ecosystem services capitalised as a perpetuity — the balance-sheet value of leaving this land standing"
+        >worth on the balance sheet, left standing — perpetual flow at {{ Math.round(discountRate * 100) }}%</span>
       </section>
 
       <section v-if="liability" class="conversion">
         <div class="conv-header">
-          <h3>If this land were converted</h3>
+          <h3>If converted</h3>
           <div class="conv-modes" role="group" aria-label="Conversion analysis modes">
             <button :class="{ on: showLiability }" @click="emit('update:showLiability', !showLiability)" title="Liability framing">Liability</button>
             <button :class="{ on: showSystemic }" @click="emit('update:showSystemic', !showSystemic)" title="Systemic premium & carbon debt">Systemic</button>
@@ -219,33 +246,34 @@ function fmtHa(n) {
         <template v-if="showLiability">
           <div class="liab">
             <span class="liab-label">Perpetual liability</span>
-            <span class="liab-value">{{ fmtTotal(liability.present_value) }} <em>{{ valuation.currency }}</em></span>
-            <span class="liab-sub">
+            <span class="liab-value">{{ fmtTotal(liabAnim) }} <em>{{ valuation.currency }}</em></span>
+            <span class="liab-sub" :title="liability.note">
               ~{{ fmtTotal(liability.annual_loss) }}/yr of lost services, owed in perpetuity —
               {{ liability.incidence }}
             </span>
           </div>
-          <p class="conv-note">{{ liability.note }}</p>
         </template>
 
         <div v-if="systemicMult > 1.05 && showSystemic" class="systemic-tag">
-          <strong>×{{ systemicMult }} systemic.</strong> Rare, intact land is load-bearing for the
-          wider system — fragmenting it costs more than the parcel alone.
+          <strong>×{{ systemicMult }} systemic</strong> — rare, intact land is load-bearing
+          beyond the parcel itself.
         </div>
 
         <div v-if="liability.carbon_debt_onetime > 0 && showSystemic" class="carbon-debt">
-          Clearing also releases ~{{ fmtTotal(liability.carbon_debt_onetime) }} of stored carbon —
-          once, and largely irreversibly.
+          + ~{{ fmtTotal(liability.carbon_debt_onetime) }} stored carbon released — once,
+          largely irreversibly.
         </div>
 
         <div v-if="redLines.length && showRedLines" class="redlines">
-          <span class="rl-head">⛔ Cannot be replaced at any price</span>
+          <span
+            class="rl-head"
+            title="Red lines, not line items — deliberately left out of the figures above"
+          >⛔ Cannot be replaced at any price</span>
           <ul>
             <li v-for="rl in redLines" :key="rl.label">
               <strong>{{ rl.label }}</strong> — {{ rl.reason }}
             </li>
           </ul>
-          <span class="rl-foot">Red lines, not line items — deliberately left out of the figures above.</span>
         </div>
       </section>
 
@@ -253,7 +281,10 @@ function fmtHa(n) {
         <span class="callout-mark">“</span>{{ region.gdpCallout }}
       </section>
 
-      <p class="method">{{ valuation.methodology_note }}</p>
+      <details class="method">
+        <summary>Methodology</summary>
+        <p>{{ valuation.methodology_note }}</p>
+      </details>
     </template>
   </aside>
 </template>
@@ -271,6 +302,25 @@ function fmtHa(n) {
   background: linear-gradient(180deg, var(--bg-panel), var(--bg-deep));
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-panel);
+}
+
+/* Sections cascade in as the valuation lands. */
+.panel section,
+.panel .method {
+  animation: rise 0.45s var(--ease) both;
+}
+.panel section:nth-of-type(2) { animation-delay: 0.04s; }
+.panel section:nth-of-type(3) { animation-delay: 0.08s; }
+.panel section:nth-of-type(4) { animation-delay: 0.12s; }
+.panel section:nth-of-type(5) { animation-delay: 0.16s; }
+.panel section:nth-of-type(6) { animation-delay: 0.2s; }
+.panel section:nth-of-type(7) { animation-delay: 0.24s; }
+.panel .method { animation-delay: 0.28s; }
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .title-row {
@@ -307,91 +357,159 @@ function fmtHa(n) {
   letter-spacing: -0.2px;
   color: var(--text);
 }
+.subtitle-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 5px 0 14px;
+}
 .region {
-  margin: 5px 0 10px;
+  margin: 0;
   color: var(--text-muted);
   font-size: 0.84rem;
   line-height: 1.4;
 }
 .conn {
+  flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  color: var(--text-muted);
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-soft);
+  gap: 5px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  cursor: default;
+}
+.conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
 }
 .conn.ok {
   color: var(--teal);
 }
+.conn.ok .conn-dot {
+  background: var(--teal);
+  box-shadow: 0 0 6px var(--teal);
+}
 .conn.down {
   color: #f87171;
 }
-
-.area {
-  display: flex;
-  gap: 12px;
-  margin: 18px 0;
+.conn.down .conn-dot {
+  background: #f87171;
 }
-.area > div {
-  flex: 1;
+
+/* Biome identity card, keyed to the biome's map colour. */
+.biome {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--biome) 8%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--biome) 35%, transparent);
+}
+.biome-dot {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--biome);
+  box-shadow: 0 0 10px var(--biome);
+}
+.biome-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  margin-right: auto;
+}
+.biome-name {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.biome-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.biome-badge {
+  flex: none;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--biome) 80%, var(--text));
+  border: 1px solid color-mix(in srgb, var(--biome) 40%, transparent);
+  background: color-mix(in srgb, var(--biome) 10%, transparent);
+  cursor: help;
+}
+.biome-badge.inferred {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: var(--bg-deep);
+}
+
+/* Compact stat cards: area + intactness side by side. */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+.stat:only-child {
+  grid-column: 1 / -1;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   border: 1px solid var(--border-soft);
 }
-.area .k {
-  display: block;
+.stat .k {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text-faint);
-  margin-bottom: 4px;
 }
-.area .v {
+.stat .v {
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--text);
 }
-.area .v em {
+.stat .v em {
   font-style: normal;
   font-size: 0.72rem;
   font-weight: 500;
   color: var(--text-muted);
 }
-
-.biome {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin: 0 0 18px;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-soft);
-}
-.biome .k {
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-faint);
-}
-.biome .v {
-  font-size: 1.02rem;
-  font-weight: 700;
-  color: var(--text);
-}
-.biome-src {
-  font-size: 0.72rem;
-  color: var(--teal);
-}
-.biome-src.inferred {
+.stat-sub {
+  font-size: 0.68rem;
   color: var(--text-muted);
+}
+.intact-track {
+  display: block;
+  height: 5px;
+  margin: 3px 0 1px;
+  border-radius: 999px;
+  background: var(--bg-deep);
+  overflow: hidden;
+}
+.intact-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--forest-overlay));
+  box-shadow: 0 0 10px -2px var(--accent);
 }
 
 .state {
@@ -453,6 +571,9 @@ function fmtHa(n) {
   margin-top: 22px;
 }
 .yields h3 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -489,8 +610,13 @@ function fmtHa(n) {
 .yield-label {
   color: var(--text);
 }
-.yield-num {
+.yield-share {
   margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+.yield-num {
   color: var(--text-muted);
   font-weight: 600;
   font-size: 0.82rem;
@@ -520,7 +646,7 @@ function fmtHa(n) {
   flex-direction: column;
   align-items: flex-start;
   margin: 24px 0 14px;
-  padding: 18px 18px 16px;
+  padding: 18px 18px 14px;
   border-radius: var(--radius);
   background: radial-gradient(
       120% 140% at 0% 0%,
@@ -563,73 +689,23 @@ function fmtHa(n) {
   font-size: 0.76rem;
   color: var(--text-muted);
 }
-
-.tev-total {
+.tev-annual {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 0 0 16px;
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px dashed color-mix(in srgb, var(--accent) 30%, transparent);
+  width: 100%;
 }
-.tev-total .k {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-}
-.tev-total .v {
-  font-size: 1.05rem;
+.tev-annual-v {
+  font-size: 1.02rem;
   font-weight: 700;
   color: var(--gold);
 }
-
-.intactness {
-  margin: 0 0 18px;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-soft);
-}
-.intact-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.intact-head .k {
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-faint);
-}
-.intact-pct {
-  font-family: 'Spline Sans Mono', ui-monospace, monospace;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--accent);
-}
-.intact-track {
-  height: 7px;
-  border-radius: 999px;
-  background: var(--bg-deep);
-  overflow: hidden;
-}
-.intact-bar {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent), var(--forest-overlay));
-  box-shadow: 0 0 10px -2px var(--accent);
-}
-.intact-note {
-  display: block;
-  margin-top: 8px;
-  font-size: 0.72rem;
+.tev-annual-k {
+  font-size: 0.7rem;
   color: var(--text-muted);
-  line-height: 1.4;
 }
 
 .asset {
@@ -695,6 +771,7 @@ function fmtHa(n) {
   font-size: 0.72rem;
   color: var(--text-muted);
   line-height: 1.4;
+  cursor: help;
 }
 
 .conversion {
@@ -798,6 +875,7 @@ function fmtHa(n) {
   letter-spacing: 0.2px;
   color: #f8a8a8;
   margin-bottom: 7px;
+  cursor: help;
 }
 .redlines ul {
   list-style: none;
@@ -814,20 +892,6 @@ function fmtHa(n) {
 }
 .redlines li strong {
   color: #f8a8a8;
-}
-.rl-foot {
-  display: block;
-  margin-top: 9px;
-  font-size: 0.68rem;
-  font-style: italic;
-  color: var(--text-faint);
-}
-.conv-note {
-  margin: 12px 0 0;
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.45;
 }
 
 .callout {
@@ -851,12 +915,28 @@ function fmtHa(n) {
 }
 
 .method {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.method summary {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-faint);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.18s var(--ease);
+}
+.method summary:hover {
+  color: var(--text-muted);
+}
+.method p {
+  margin: 8px 0 0;
   font-size: 0.72rem;
   color: var(--text-faint);
   font-style: italic;
   line-height: 1.5;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-soft);
 }
 </style>

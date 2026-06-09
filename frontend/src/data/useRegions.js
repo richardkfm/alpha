@@ -70,6 +70,7 @@ export function useRegions() {
     return BIOME_ORDER.filter((key) => byBiome[key]?.length).map((key) => ({
       id: key,
       label: BIOME_META[key].label,
+      short: BIOME_META[key].short,
       sublabel: BIOME_META[key].sublabel,
       kind: 'real',
       color: biomeColor(key),
