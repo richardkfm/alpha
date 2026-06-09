@@ -134,16 +134,16 @@ function addThematicLayers() {
     source: 'region-points',
     paint: {
       'heatmap-weight': ['get', 'wt'],
-      'heatmap-intensity': 1.1,
-      'heatmap-radius': 38,
-      'heatmap-opacity': 0.75,
+      'heatmap-intensity': 2.0,
+      'heatmap-radius': 48,
+      'heatmap-opacity': 0.92,
       'heatmap-color': [
         'interpolate', ['linear'], ['heatmap-density'],
         0, 'rgba(5,7,13,0)',
-        0.2, 'rgba(56,189,248,0.45)',
-        0.45, 'rgba(45,212,191,0.7)',
-        0.7, 'rgba(163,230,53,0.85)',
-        1, 'rgba(245,177,78,0.95)',
+        0.1, 'rgba(56,189,248,0.7)',
+        0.35, 'rgba(45,212,191,0.85)',
+        0.6, 'rgba(163,230,53,0.95)',
+        1, 'rgba(245,177,78,1)',
       ],
     },
   })
