@@ -19,7 +19,8 @@ roadmap.
 Clicking a rainforest region confirms backend connectivity and opens a side panel
 with its full Total Ecosystem Value breakdown:
 
-![alpha — clicking the Amazon Basin shows the ecosystem value side panel](./docs/screenshot.png)
+<img width="2544" height="1261" alt="early version spinning earth" src="https://github.com/user-attachments/assets/9509769f-c946-4c47-b7d8-ca92c4068994" />
+
 
 ---
 
