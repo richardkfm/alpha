@@ -69,6 +69,8 @@ const STYLES = [
   z-index: 1000;
   width: 248px;
   max-width: calc(100vw - 36px);
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
   padding: 14px;
   border-radius: var(--radius);
   background: var(--bg-glass);
