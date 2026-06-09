@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import WorldMap from './components/WorldMap.vue'
 import SidePanel from './components/SidePanel.vue'
 import LayerControl from './components/LayerControl.vue'
@@ -34,12 +34,26 @@ const displayStyle = ref('polygons') // 'polygons' | 'bubbles' | 'outline'
 const {
   regions,
   biomeLayers,
+  ecoLayers,
   pointFeatures,
   loading: regionsLoading,
   error: regionsError,
   loaded: regionsLoaded,
   load: loadRegions,
+  ecoLoading,
+  ecoLoaded,
+  loadEcoregions,
 } = useRegions()
+
+// When Outline mode is active use the detailed ecoregion geometry (lazy-loaded
+// on first use). All other modes use the lightweight catalogue geometry.
+const activeLayers = computed(() =>
+  displayStyle.value === 'outline' ? ecoLayers.value : biomeLayers.value
+)
+
+watch(displayStyle, (style) => {
+  if (style === 'outline') loadEcoregions()
+})
 
 // Thematic layer visibility, shared by both the 2D map and the 3D globe. Every
 // biome layer defaults on so the full dataset is visible immediately.
@@ -291,7 +305,7 @@ function closePanel() {
         <template v-else>
           <GlobeMap
             v-if="viewMode === '3d'"
-            :layers="biomeLayers"
+            :layers="activeLayers"
             :regions="regions"
             :points="pointFeatures"
             :display-style="displayStyle"
@@ -301,7 +315,7 @@ function closePanel() {
           />
           <WorldMap
             v-else
-            :layers="biomeLayers"
+            :layers="activeLayers"
             :regions="regions"
             :points="pointFeatures"
             :display-style="displayStyle"

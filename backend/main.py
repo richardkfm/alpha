@@ -34,6 +34,8 @@ from pydantic import BaseModel, Field
 
 from biome_classifier import boundary_source, classify_geometry
 from datasets import data_catalog
+import json as _json
+import os as _os
 from esv_extraction import extract_esv_records
 from live_data import get_carbon_price, get_fx_rates, market_snapshot
 from reference_data import (
@@ -183,6 +185,29 @@ def regions(currency: Optional[str] = Query(default=None)) -> Dict[str, Any]:
         ),
         "dataset": dataset_provenance(),
         "market": mkt["provenance"],
+    }
+
+
+@app.get("/api/v1/ecoregions")
+def ecoregions() -> Dict[str, Any]:
+    """Return detailed ecoregion boundaries grouped by biome_key.
+
+    Each key maps to a GeoJSON FeatureCollection of the full RESOLVE 2017
+    ecoregion polygons for that biome.  Only loaded by the frontend when the
+    user activates Outline mode, so the 6 MB payload is not fetched on every
+    page load.
+    """
+    path = _os.path.join(_os.path.dirname(__file__), "data", "ecoregions.geojson")
+    with open(path) as f:
+        data = _json.load(f)
+    by_biome: Dict[str, list] = {}
+    for feature in data.get("features", []):
+        key = feature.get("properties", {}).get("biome_key")
+        if key:
+            by_biome.setdefault(key, []).append(feature)
+    return {
+        biome: {"type": "FeatureCollection", "features": features}
+        for biome, features in by_biome.items()
     }
 
 
