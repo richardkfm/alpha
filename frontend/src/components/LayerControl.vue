@@ -3,7 +3,7 @@ defineProps({
   // Biome layer definitions derived from the backend catalogue (useRegions.js).
   layers: { type: Array, default: () => [] },
   visibleLayers: { type: Object, required: true },
-  // Active map display style: 'polygons' | 'bubbles' | 'heat'.
+  // Active map display style: 'polygons' | 'bubbles' | 'outline'.
   displayStyle: { type: String, default: 'polygons' },
 })
 defineEmits(['toggle', 'set-style'])
@@ -11,7 +11,7 @@ defineEmits(['toggle', 'set-style'])
 const STYLES = [
   { id: 'polygons', label: 'Polygons', icon: '▦' },
   { id: 'bubbles', label: 'Bubbles', icon: '⦿' },
-  { id: 'heat', label: 'Heat', icon: '◍' },
+  { id: 'outline', label: 'Outline', icon: '□' },
 ]
 </script>
 
@@ -34,7 +34,7 @@ const STYLES = [
       </button>
     </div>
     <p v-if="displayStyle !== 'polygons'" class="style-note">
-      {{ displayStyle === 'bubbles' ? 'Bubble size' : 'Heat' }} = annual ecosystem value
+      {{ displayStyle === 'bubbles' ? 'Bubble size = annual ecosystem value' : 'Bold borders, no fill' }}
     </p>
 
     <ul>
