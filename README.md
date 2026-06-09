@@ -127,8 +127,9 @@ domain(s) to `.env`:
 ALPHA_ALLOWED_HOSTS=alpha.example.com      # comma-separate multiple; or "all"
 ```
 
-Then `docker compose up --build` (a rebuild isn't required — restarting the
-`frontend` service picks up the new env). localhost access keeps working
+Then recreate the frontend container so it picks up the new value
+(`docker compose up -d frontend`, or just `docker compose up` for the whole
+stack — a plain `restart` won't re-read `.env`). localhost access keeps working
 regardless.
 
 ### Try the valuation endpoint
