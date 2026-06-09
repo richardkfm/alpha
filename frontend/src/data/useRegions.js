@@ -15,6 +15,11 @@ export function useRegions() {
   const error = ref('')
   const loaded = ref(false)
 
+  // Detailed ecoregion boundaries — only fetched when Outline mode is activated.
+  const ecoByBiome = ref(null) // { biome_key: FeatureCollection } | null
+  const ecoLoading = ref(false)
+  const ecoLoaded = ref(false)
+
   // Fetch (or re-price) the catalogue. Called on mount and when the currency
   // changes so the map, picker and Compare numbers all reflect one currency.
   async function load(currency = 'USD') {
@@ -36,6 +41,21 @@ export function useRegions() {
       error.value = 'Could not load region data from the alpha backend. Is it running on :8000?'
     } finally {
       loading.value = false
+    }
+  }
+
+  async function loadEcoregions() {
+    if (ecoLoaded.value || ecoLoading.value) return
+    ecoLoading.value = true
+    try {
+      const res = await fetch('/api/v1/ecoregions')
+      if (!res.ok) throw new Error(`ecoregions HTTP ${res.status}`)
+      ecoByBiome.value = await res.json()
+      ecoLoaded.value = true
+    } catch {
+      // silently fall back to coarse geometry
+    } finally {
+      ecoLoading.value = false
     }
   }
 
@@ -63,6 +83,17 @@ export function useRegions() {
         })),
       },
     }))
+  })
+
+  // Mirror of biomeLayers using the full RESOLVE ecoregion geometry.
+  // Only populated after loadEcoregions() completes.
+  const ecoLayers = computed(() => {
+    if (!ecoByBiome.value) return biomeLayers.value
+    return biomeLayers.value.map((layer) => {
+      const fc = ecoByBiome.value[layer.id]
+      if (!fc) return layer
+      return { ...layer, geojson: fc }
+    })
   })
 
   // Value "bubble" / heat points: one Point per region at its centroid, carrying
@@ -99,5 +130,9 @@ export function useRegions() {
     return { type: 'FeatureCollection', features }
   })
 
-  return { regions, biomeLayers, pointFeatures, loading, error, loaded, load }
+  return {
+    regions, biomeLayers, ecoLayers, pointFeatures,
+    loading, error, loaded, load,
+    ecoLoading, ecoLoaded, loadEcoregions,
+  }
 }
