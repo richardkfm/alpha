@@ -116,6 +116,21 @@ mapping changes — the containers still talk to each other on `backend:8000` an
 `db:5432` internally, so nothing else needs touching. Just open the web app on
 whatever `ALPHA_WEB_PORT` you set (e.g. http://localhost:3300).
 
+### Behind a reverse proxy or tunnel
+
+The web tier is the Vite dev server, which rejects requests whose `Host` header
+it doesn't recognise — so serving it on a custom domain (Cloudflare Tunnel,
+Nginx, etc.) returns _"Blocked request. This host is not allowed."_ Add your
+domain(s) to `.env`:
+
+```bash
+ALPHA_ALLOWED_HOSTS=alpha.example.com      # comma-separate multiple; or "all"
+```
+
+Then `docker compose up --build` (a rebuild isn't required — restarting the
+`frontend` service picks up the new env). localhost access keeps working
+regardless.
+
 ### Try the valuation endpoint
 
 The Phase 2 engine computes the polygon's geodesic area and returns a documented,

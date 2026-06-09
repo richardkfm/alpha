@@ -48,6 +48,10 @@ services:
       # The Vite dev server proxies /api and /health to this origin (server-side),
       # so the browser can use same-origin relative paths.
       BACKEND_ORIGIN: "http://backend:8000"
+      # Extra hostnames allowed to reach the app behind a reverse proxy / tunnel
+      # (e.g. a Cloudflare Tunnel domain). Comma-separated, or "all". Empty =
+      # localhost only. See .env.example.
+      ALPHA_ALLOWED_HOSTS: "${ALPHA_ALLOWED_HOSTS:-}"
     ports:
       - "${ALPHA_WEB_PORT:-3000}:3000"
     depends_on:
