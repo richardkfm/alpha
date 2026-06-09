@@ -26,8 +26,8 @@ const appMode = ref('map') // 'map' | 'compare' | 'data'
 // 2D Leaflet map vs 3D MapLibre globe. The globe is the hero view by default.
 const viewMode = ref('3d')
 
-// How the areas are drawn on the map: filled polygons, value bubbles, or heat.
-const displayStyle = ref('polygons') // 'polygons' | 'bubbles' | 'heat'
+// How the areas are drawn on the map: filled polygons, value bubbles, or outline-only.
+const displayStyle = ref('polygons') // 'polygons' | 'bubbles' | 'outline'
 
 // Region catalogue (all biomes, pre-valued) fetched from the backend; drives
 // both maps, the layer control, the Compare dashboard, and the value bubbles.

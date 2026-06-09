@@ -2,16 +2,15 @@
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import 'leaflet.heat' // adds L.heatLayer
 
 const props = defineProps({
   // Biome layer definitions and the region catalogue, both fetched from the
   // backend by the parent (see data/useRegions.js).
   layers: { type: Array, default: () => [] },
   regions: { type: Array, default: () => [] },
-  // Value-bubble / heat points (FeatureCollection of Point).
+  // Value-bubble points (FeatureCollection of Point).
   points: { type: Object, default: () => ({ type: 'FeatureCollection', features: [] }) },
-  // 'polygons' | 'bubbles' | 'heat'
+  // 'polygons' | 'bubbles' | 'outline'
   displayStyle: { type: String, default: 'polygons' },
   visibleLayers: { type: Object, default: () => ({}) },
 })
@@ -20,7 +19,6 @@ const mapEl = ref(null)
 let map = null
 const leafletLayers = {} // id -> L.GeoJSON
 let bubbleLayer = null // L.LayerGroup of circle markers
-let heatLayer = null // L.HeatLayer
 
 onMounted(() => {
   map = L.map(mapEl.value, {
@@ -86,7 +84,7 @@ onMounted(() => {
   applyStyle()
 })
 
-// Points filtered to the currently-visible biomes (drives bubbles + heat).
+// Points filtered to the currently-visible biomes (drives bubbles).
 function visiblePoints() {
   return (props.points.features || []).filter(
     (f) => props.visibleLayers[f.properties.biome_key],
@@ -119,39 +117,27 @@ function rebuildBubbles() {
   bubbleLayer = L.layerGroup(markers)
 }
 
-function rebuildHeat() {
-  if (heatLayer) {
-    map.removeLayer(heatLayer)
-    heatLayer = null
-  }
-  const pts = visiblePoints().map((f) => {
-    const [lng, lat] = f.geometry.coordinates
-    return [lat, lng, Math.max(f.properties.wt, 0.06)]
-  })
-  heatLayer = L.heatLayer(pts, {
-    radius: 40,
-    blur: 20,
-    minOpacity: 0.55,
-    gradient: { 0.1: '#38bdf8', 0.35: '#2dd4bf', 0.6: '#a3e635', 1: '#f5b14e' },
-  })
-}
-
-// Reconcile all three styles: polygons honour the per-biome toggles; bubbles and
-// heat are rebuilt from the visible points and added only when their style is on.
+// Reconcile all three styles: polygons and outline honour per-biome toggles;
+// bubbles are rebuilt from visible points and added only when their style is on.
 function applyStyle() {
   if (!map) return
-  const polysOn = props.displayStyle === 'polygons'
+  const style = props.displayStyle
   for (const def of props.layers) {
     const lyr = leafletLayers[def.id]
     if (!lyr) continue
-    const show = polysOn && !!props.visibleLayers[def.id]
+    const show = (style === 'polygons' || style === 'outline') && !!props.visibleLayers[def.id]
     if (show && !map.hasLayer(lyr)) lyr.addTo(map)
     else if (!show && map.hasLayer(lyr)) map.removeLayer(lyr)
+    if (show) {
+      if (style === 'outline') {
+        lyr.setStyle({ fillOpacity: 0, weight: 2.8, opacity: 1 })
+      } else {
+        lyr.setStyle({ fillOpacity: 0.22, weight: 1.5, opacity: 0.9 })
+      }
+    }
   }
   rebuildBubbles()
-  if (props.displayStyle === 'bubbles') bubbleLayer.addTo(map)
-  rebuildHeat()
-  if (props.displayStyle === 'heat') heatLayer.addTo(map)
+  if (style === 'bubbles') bubbleLayer.addTo(map)
 }
 
 watch(() => props.visibleLayers, applyStyle, { deep: true })

@@ -8,10 +8,9 @@ const props = defineProps({
   // backend by the parent (see data/useRegions.js).
   layers: { type: Array, default: () => [] },
   regions: { type: Array, default: () => [] },
-  // Value-bubble / heat points (FeatureCollection of Point) for the non-polygon
-  // display styles.
+  // Value-bubble points (FeatureCollection of Point) for the bubbles display style.
   points: { type: Object, default: () => ({ type: 'FeatureCollection', features: [] }) },
-  // 'polygons' | 'bubbles' | 'heat'
+  // 'polygons' | 'bubbles' | 'outline'
   displayStyle: { type: String, default: 'polygons' },
   visibleLayers: { type: Object, required: true },
   isDark: { type: Boolean, default: true },
@@ -124,29 +123,10 @@ function addThematicLayers() {
       })
     }
   }
-  // Value bubbles + heat share a single points source (one Point per region).
+  // Value bubbles use a single points source (one Point per region).
   if (!map.getSource('region-points')) {
     map.addSource('region-points', { type: 'geojson', data: visiblePointData(), promoteId: 'regionId' })
   }
-  map.addLayer({
-    id: 'region-heat',
-    type: 'heatmap',
-    source: 'region-points',
-    paint: {
-      'heatmap-weight': ['get', 'wt'],
-      'heatmap-intensity': 2.0,
-      'heatmap-radius': 48,
-      'heatmap-opacity': 0.92,
-      'heatmap-color': [
-        'interpolate', ['linear'], ['heatmap-density'],
-        0, 'rgba(5,7,13,0)',
-        0.1, 'rgba(56,189,248,0.7)',
-        0.35, 'rgba(45,212,191,0.85)',
-        0.6, 'rgba(163,230,53,0.95)',
-        1, 'rgba(245,177,78,1)',
-      ],
-    },
-  })
   map.addLayer({
     id: 'region-bubbles',
     type: 'circle',
@@ -176,7 +156,7 @@ function addThematicLayers() {
   applyVisibility()
 }
 
-// Points filtered to the currently-visible biomes (drives bubbles + heat).
+// Points filtered to the currently-visible biomes (drives bubbles).
 function visiblePointData() {
   return {
     type: 'FeatureCollection',
@@ -191,23 +171,26 @@ function updatePoints() {
   if (src) src.setData(visiblePointData())
 }
 
-// Visibility is the product of the active display style and the per-biome
-// toggles: polygons honour both; bubbles/heat are filtered via the source data.
+// Visibility is the product of the active display style and the per-biome toggles.
 function applyVisibility() {
   if (!map) return
-  const polysOn = props.displayStyle === 'polygons'
+  const style = props.displayStyle
   for (const l of props.layers) {
-    const v = polysOn && props.visibleLayers[l.id] ? 'visible' : 'none'
-    for (const suffix of ['-glow', '-fill', '-line']) {
-      const id = l.id + suffix
-      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v)
+    const show = (style === 'polygons' || style === 'outline') && props.visibleLayers[l.id]
+    const v = show ? 'visible' : 'none'
+    if (map.getLayer(`${l.id}-glow`)) map.setLayoutProperty(`${l.id}-glow`, 'visibility', v)
+    if (map.getLayer(`${l.id}-line`)) {
+      map.setLayoutProperty(`${l.id}-line`, 'visibility', v)
+      map.setPaintProperty(`${l.id}-line`, 'line-width', style === 'outline' ? 2.5 : 1.4)
+      map.setPaintProperty(`${l.id}-line`, 'line-opacity', style === 'outline' ? 1.0 : 0.9)
+    }
+    if (map.getLayer(`${l.id}-fill`)) {
+      map.setLayoutProperty(`${l.id}-fill`, 'visibility', v)
+      map.setPaintProperty(`${l.id}-fill`, 'fill-opacity', style === 'outline' ? 0 : 0.16)
     }
   }
   if (map.getLayer('region-bubbles')) {
-    map.setLayoutProperty('region-bubbles', 'visibility', props.displayStyle === 'bubbles' ? 'visible' : 'none')
-  }
-  if (map.getLayer('region-heat')) {
-    map.setLayoutProperty('region-heat', 'visibility', props.displayStyle === 'heat' ? 'visible' : 'none')
+    map.setLayoutProperty('region-bubbles', 'visibility', style === 'bubbles' ? 'visible' : 'none')
   }
   updatePoints()
 }
