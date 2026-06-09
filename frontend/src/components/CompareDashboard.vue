@@ -7,6 +7,8 @@ const props = defineProps({
   // Pre-valued region catalogue from the backend (data/useRegions.js). Reading
   // live means a currency re-price flows straight through to the comparison.
   regions: { type: Array, default: () => [] },
+  showLiability: { type: Boolean, default: true },
+  showRedLines: { type: Boolean, default: true },
 })
 
 const MAX_COMPARE = 5
@@ -215,16 +217,20 @@ onMounted(() => {
           </div>
 
           <!-- conversion liability (the perpetual debt of building over it) -->
-          <div class="cell rowlabel">Conversion liability</div>
-          <div v-for="r in selected" :key="'cl-' + r.id" class="cell num-cell liab">
-            {{ fmtTotal(r.conversion_liability && r.conversion_liability.present_value) }}
-          </div>
+          <template v-if="showLiability">
+            <div class="cell rowlabel">Conversion liability</div>
+            <div v-for="r in selected" :key="'cl-' + r.id" class="cell num-cell liab">
+              {{ fmtTotal(r.conversion_liability && r.conversion_liability.present_value) }}
+            </div>
+          </template>
 
           <!-- irreversible / un-nettable losses -->
-          <div class="cell rowlabel">Red lines</div>
-          <div v-for="r in selected" :key="'rl-' + r.id" class="cell num-cell muted">
-            {{ r.red_lines ? r.red_lines.length : 0 }} irreversible
-          </div>
+          <template v-if="showRedLines">
+            <div class="cell rowlabel">Red lines</div>
+            <div v-for="r in selected" :key="'rl-' + r.id" class="cell num-cell muted">
+              {{ r.red_lines ? r.red_lines.length : 0 }} irreversible
+            </div>
+          </template>
 
           <!-- area -->
           <div class="cell rowlabel">Area</div>

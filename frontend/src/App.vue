@@ -59,6 +59,12 @@ const currency = ref('USD')
 
 // Dark is the default theme.
 const isDark = ref(true)
+
+// Conversion analysis mode toggles — let users opt out of modes they find too
+// radical without losing the core ESV numbers.
+const showLiability = ref(true)
+const showSystemic = ref(true)
+const showRedLines = ref(true)
 function applyTheme() {
   document.documentElement.classList.toggle('light', !isDark.value)
 }
@@ -242,7 +248,12 @@ function closePanel() {
     </header>
 
     <main class="stage">
-      <CompareDashboard v-if="appMode === 'compare'" :regions="regions" />
+      <CompareDashboard
+        v-if="appMode === 'compare'"
+        :regions="regions"
+        :show-liability="showLiability"
+        :show-red-lines="showRedLines"
+      />
       <DataHub v-else-if="appMode === 'data'" />
 
       <template v-else>
@@ -298,6 +309,9 @@ function closePanel() {
               :loading="loading"
               :backend-online="backendOnline"
               :error="errorMsg"
+              v-model:show-liability="showLiability"
+              v-model:show-systemic="showSystemic"
+              v-model:show-red-lines="showRedLines"
               @close="closePanel"
             />
           </transition>

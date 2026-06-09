@@ -9,8 +9,11 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   backendOnline: { type: Boolean, default: null },
   error: { type: String, default: '' },
+  showLiability: { type: Boolean, default: true },
+  showSystemic: { type: Boolean, default: true },
+  showRedLines: { type: Boolean, default: true },
 })
-defineEmits(['close'])
+const emit = defineEmits(['close', 'update:showLiability', 'update:showSystemic', 'update:showRedLines'])
 
 const symbol = computed(() => props.valuation?.currency_symbol ?? '$')
 
@@ -204,27 +207,38 @@ function fmtHa(n) {
       </section>
 
       <section v-if="liability" class="conversion">
-        <h3>If this land were converted</h3>
-        <div class="liab">
-          <span class="liab-label">Perpetual liability</span>
-          <span class="liab-value">{{ fmtTotal(liability.present_value) }} <em>{{ valuation.currency }}</em></span>
-          <span class="liab-sub">
-            ~{{ fmtTotal(liability.annual_loss) }}/yr of lost services, owed in perpetuity —
-            {{ liability.incidence }}
-          </span>
+        <div class="conv-header">
+          <h3>If this land were converted</h3>
+          <div class="conv-modes" role="group" aria-label="Conversion analysis modes">
+            <button :class="{ on: showLiability }" @click="emit('update:showLiability', !showLiability)" title="Liability framing">Liability</button>
+            <button :class="{ on: showSystemic }" @click="emit('update:showSystemic', !showSystemic)" title="Systemic premium & carbon debt">Systemic</button>
+            <button :class="{ on: showRedLines }" @click="emit('update:showRedLines', !showRedLines)" title="Red lines — irreversible losses">Red lines</button>
+          </div>
         </div>
 
-        <div v-if="systemicMult > 1.05" class="systemic-tag">
+        <template v-if="showLiability">
+          <div class="liab">
+            <span class="liab-label">Perpetual liability</span>
+            <span class="liab-value">{{ fmtTotal(liability.present_value) }} <em>{{ valuation.currency }}</em></span>
+            <span class="liab-sub">
+              ~{{ fmtTotal(liability.annual_loss) }}/yr of lost services, owed in perpetuity —
+              {{ liability.incidence }}
+            </span>
+          </div>
+          <p class="conv-note">{{ liability.note }}</p>
+        </template>
+
+        <div v-if="systemicMult > 1.05 && showSystemic" class="systemic-tag">
           <strong>×{{ systemicMult }} systemic.</strong> Rare, intact land is load-bearing for the
           wider system — fragmenting it costs more than the parcel alone.
         </div>
 
-        <div v-if="liability.carbon_debt_onetime > 0" class="carbon-debt">
+        <div v-if="liability.carbon_debt_onetime > 0 && showSystemic" class="carbon-debt">
           Clearing also releases ~{{ fmtTotal(liability.carbon_debt_onetime) }} of stored carbon —
           once, and largely irreversibly.
         </div>
 
-        <div v-if="redLines.length" class="redlines">
+        <div v-if="redLines.length && showRedLines" class="redlines">
           <span class="rl-head">⛔ Cannot be replaced at any price</span>
           <ul>
             <li v-for="rl in redLines" :key="rl.label">
@@ -233,8 +247,6 @@ function fmtHa(n) {
           </ul>
           <span class="rl-foot">Red lines, not line items — deliberately left out of the figures above.</span>
         </div>
-
-        <p class="conv-note">{{ liability.note }}</p>
       </section>
 
       <section v-if="region.gdpCallout" class="callout">
@@ -693,11 +705,39 @@ function fmtHa(n) {
     var(--bg-elevated);
   border: 1px solid rgba(248, 113, 113, 0.32);
 }
+.conv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
 .conversion h3 {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.3px;
+  color: #f8a8a8;
+}
+.conv-modes {
+  display: flex;
+  gap: 4px;
+}
+.conv-modes button {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s var(--ease), background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.conv-modes button.on {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.6);
   color: #f8a8a8;
 }
 .liab {
