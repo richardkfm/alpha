@@ -129,10 +129,10 @@ function rebuildHeat() {
     return [lat, lng, Math.max(f.properties.wt, 0.06)]
   })
   heatLayer = L.heatLayer(pts, {
-    radius: 32,
-    blur: 22,
-    minOpacity: 0.25,
-    gradient: { 0.2: '#38bdf8', 0.45: '#2dd4bf', 0.7: '#a3e635', 1: '#f5b14e' },
+    radius: 40,
+    blur: 20,
+    minOpacity: 0.55,
+    gradient: { 0.1: '#38bdf8', 0.35: '#2dd4bf', 0.6: '#a3e635', 1: '#f5b14e' },
   })
 }
 
