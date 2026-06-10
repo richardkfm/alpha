@@ -19,7 +19,7 @@ roadmap.
 Clicking a rainforest region confirms backend connectivity and opens a side panel
 with its full Total Ecosystem Value breakdown:
 
-<img width="2544" height="1261" alt="early version spinning earth" src="https://github.com/user-attachments/assets/9509769f-c946-4c47-b7d8-ca92c4068994" />
+https://github.com/user-attachments/assets/1c6a9012-97ff-424b-af78-628ee2a45e40
 
 
 ---
