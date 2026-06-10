@@ -65,6 +65,112 @@ function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v
 }
 
+// ----- living surface for the raised column --------------------------------
+// The single highlighted column gets a procedurally-animated surface keyed to
+// its biome: water ripples with foam, sand drifts in the wind, forest canopy
+// dapples, grass gusts, tundra twinkles, peri-urban scans. Generated as one
+// shared StyleImage that MapLibre re-uploads each frame — no image assets, and
+// only ever one object animates at a time (only the selected column uses it).
+const TEXTURE_FAMILY = {
+  tropical_rainforest: 'forest',
+  temperate_forest: 'forest',
+  boreal_forest: 'forest',
+  mangrove: 'water',
+  wetland: 'water',
+  freshwater: 'water',
+  temperate_grassland: 'grass',
+  cropland: 'grass',
+  desert: 'sand',
+  tundra: 'ice',
+  peri_urban: 'urban',
+}
+const TEX_ID = 'living-column-tex'
+const TEX_W = 96
+const TEX_H = 96
+let texActive = false
+let texSupported = false
+let texLastTs = 0
+
+function hexToRgb(hex) {
+  const h = (hex || '#2dd4bf').replace('#', '')
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+}
+
+// Paint one frame of the biome surface into an RGBA buffer. `m` modulates the
+// biome colour's brightness (the moving relief); `hi` blends toward white for
+// crests / sparkles.
+function paintTexture(data, W, H, t, family, rgb) {
+  const [r, g, b] = rgb
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4
+      const u = x / W
+      const v = y / H
+      let m = 1
+      let hi = 0
+      switch (family) {
+        case 'water': {
+          const wave = (Math.sin(u * 18 + t * 1.7) + Math.sin(v * 12 - t * 1.1 + u * 4)) * 0.5
+          m = 0.72 + 0.3 * wave
+          hi = Math.max(0, wave - 0.72) * 1.8 // foam crests
+          break
+        }
+        case 'sand': {
+          const p = (u * 9 + v * 4) * Math.PI + t * 0.6
+          m = 0.82 + 0.16 * (Math.sin(p) + 0.35 * Math.sin(p * 2.3 + t * 0.4)) // dunes drift
+          break
+        }
+        case 'forest': {
+          const dapple = Math.sin(u * 13 + t * 0.5) * Math.sin(v * 11 - t * 0.4)
+          m = 0.74 + 0.22 * dapple + 0.08 * Math.sin(u * 5 - v * 3 - t * 0.25)
+          break
+        }
+        case 'grass': {
+          const gust = Math.sin(u * 7 - t * 1.6) // wind sweeping across the field
+          m = 0.78 + 0.1 * Math.sin(u * 40) * (0.5 + 0.5 * gust) + 0.12 * gust
+          break
+        }
+        case 'ice': {
+          m = 0.84 + 0.12 * Math.sin(u * 16 + t * 0.5) * Math.sin(v * 16 - t * 0.4)
+          hi = Math.max(0, Math.sin((x * 7 + y * 13) * 1.3 + t * 3) - 0.95) * 6 // twinkles
+          break
+        }
+        case 'urban': {
+          const grid = x % 14 < 1 || y % 14 < 1 ? 0.25 : 0
+          m = 0.7 + grid + 0.08 * Math.sin(v * 10 - t * 1.4) // scan line
+          break
+        }
+      }
+      m = clamp(m, 0.25, 1.25)
+      const f = hi > 0 ? Math.min(1, hi) : 0
+      data[i] = Math.min(255, r * m + (255 - r * m) * f)
+      data[i + 1] = Math.min(255, g * m + (255 - g * m) * f)
+      data[i + 2] = Math.min(255, b * m + (255 - b * m) * f)
+      data[i + 3] = 255
+    }
+  }
+}
+
+// One shared animated image. MapLibre calls render() each map frame; returning
+// true re-uploads the texture. We throttle to ~30fps and idle (false) whenever
+// no column is raised, so an unselected globe does no texture work.
+const livingTex = {
+  width: TEX_W,
+  height: TEX_H,
+  data: new Uint8Array(TEX_W * TEX_H * 4),
+  family: 'forest',
+  rgb: [45, 212, 191],
+  start: 0,
+  render() {
+    if (!texActive) return false
+    const now = performance.now()
+    if (now - texLastTs < 33) return false
+    texLastTs = now
+    paintTexture(this.data, TEX_W, TEX_H, (now - this.start) / 1000, this.family, this.rgb)
+    return true
+  },
+}
+
 const CARTO_ATTR =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
 
@@ -206,6 +312,17 @@ function addSelectionLayers() {
   if (!map.getSource('selected-src')) {
     map.addSource('selected-src', { type: 'geojson', data: EMPTY_FC })
   }
+  // Register the shared animated surface once. If unsupported, the column simply
+  // falls back to its flat biome colour.
+  try {
+    if (!(map.hasImage && map.hasImage(TEX_ID))) {
+      livingTex.start = performance.now()
+      map.addImage(TEX_ID, livingTex)
+    }
+    texSupported = true
+  } catch (_) {
+    texSupported = false
+  }
   try {
     map.addLayer({
       id: 'selected-extrusion',
@@ -215,7 +332,7 @@ function addSelectionLayers() {
         'fill-extrusion-color': column.color,
         'fill-extrusion-height': 0,
         'fill-extrusion-base': 0,
-        'fill-extrusion-opacity': 0.55,
+        'fill-extrusion-opacity': 0.66,
         'fill-extrusion-vertical-gradient': true,
       },
     })
@@ -265,6 +382,15 @@ function updateSelection(region) {
   column.color = biomeColor(region.biome_key)
   if (map.getLayer('selected-extrusion')) {
     map.setPaintProperty('selected-extrusion', 'fill-extrusion-color', column.color)
+    // Wrap the raised column in its biome's living surface (only this one object
+    // animates). Colour is baked into the texture, so it tints to the biome.
+    if (texSupported) {
+      livingTex.family = TEXTURE_FAMILY[region.biome_key] ?? 'forest'
+      livingTex.rgb = hexToRgb(column.color)
+      livingTex.start = performance.now()
+      texActive = true
+      map.setPaintProperty('selected-extrusion', 'fill-extrusion-pattern', TEX_ID)
+    }
   }
   map.setPaintProperty('selected-ring', 'line-color', column.color)
   map.getSource('selected-src').setData({
@@ -296,11 +422,16 @@ function tweenColumn(dt) {
   if (!map.getLayer('selected-extrusion')) return
   const k = Math.min(1, dt * 5.5)
   const next = column.h + (column.target - column.h) * k
-  // Snap-and-clear once a lowering column has effectively bottomed out.
+  // Snap-and-clear once a lowering column has effectively bottomed out — the
+  // living surface keeps moving during the descent, then idles here.
   if (column.target === 0 && next < 200) {
     if (column.h !== 0) {
       column.h = 0
       map.setPaintProperty('selected-extrusion', 'fill-extrusion-height', 0)
+      if (texActive) {
+        texActive = false
+        map.setPaintProperty('selected-extrusion', 'fill-extrusion-pattern', undefined)
+      }
       const src = map.getSource('selected-src')
       if (src) src.setData(EMPTY_FC)
     }
