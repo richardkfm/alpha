@@ -85,8 +85,10 @@ const TEXTURE_FAMILY = {
   peri_urban: 'urban',
 }
 const TEX_ID = 'living-column-tex'
-const TEX_W = 96
-const TEX_H = 96
+// Must be a power of two: other sizes blur in the sprite atlas and make the
+// pattern reset at every map-tile boundary, drawing seam lines on the column.
+const TEX_SIZE = 256
+const TAU = Math.PI * 2
 let texActive = false
 let texSupported = false
 let texLastTs = 0
@@ -96,52 +98,136 @@ function hexToRgb(hex) {
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
 }
 
+// Deterministic integer hash → [0,1), so the noise lattice below wraps cleanly.
+function hash2(x, y, seed) {
+  let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 1440662683)) | 0
+  h = Math.imul(h ^ (h >>> 13), 1274126177)
+  h ^= h >>> 16
+  return (h >>> 0) / 4294967296
+}
+
+// Multi-octave value noise whose every octave lattice wraps at the texture
+// border, so the field tiles seamlessly. Built once (lazily, on first use);
+// the per-frame animation *scrolls* this static field, which preserves the
+// tiling for free instead of recomputing noise per pixel.
+let noiseField = null
+function buildNoiseField(size) {
+  const field = new Float32Array(size * size)
+  let amp = 1
+  let total = 0
+  for (let oct = 0; oct < 4; oct++) {
+    const period = 4 << oct // 4, 8, 16, 32 lattice cells across the tile
+    for (let y = 0; y < size; y++) {
+      const fy = (y * period) / size
+      const y0 = fy | 0
+      const y1 = (y0 + 1) % period
+      const ty = fy - y0
+      const sy = ty * ty * (3 - 2 * ty)
+      for (let x = 0; x < size; x++) {
+        const fx = (x * period) / size
+        const x0 = fx | 0
+        const x1 = (x0 + 1) % period
+        const tx = fx - x0
+        const sx = tx * tx * (3 - 2 * tx)
+        const top = hash2(x0, y0, oct) * (1 - sx) + hash2(x1, y0, oct) * sx
+        const bot = hash2(x0, y1, oct) * (1 - sx) + hash2(x1, y1, oct) * sx
+        field[y * size + x] += (top + (bot - top) * sy) * amp
+      }
+    }
+    total += amp
+    amp *= 0.55
+  }
+  for (let i = 0; i < field.length; i++) field[i] /= total
+  return field
+}
+
+// Bilinear sample of the noise field at (u, v) in tile units, wrapping both
+// axes — so callers may scroll/scale freely (integer scales stay seamless).
+function noise(u, v) {
+  const size = TEX_SIZE
+  const x = (u - Math.floor(u)) * size
+  const y = (v - Math.floor(v)) * size
+  const x0 = x | 0
+  const y0 = y | 0
+  const x1 = (x0 + 1) % size
+  const y1 = (y0 + 1) % size
+  const tx = x - x0
+  const ty = y - y0
+  const f = noiseField
+  const top = f[y0 * size + x0] * (1 - tx) + f[y0 * size + x1] * tx
+  const bot = f[y1 * size + x0] * (1 - tx) + f[y1 * size + x1] * tx
+  return top + (bot - top) * ty
+}
+
 // Paint one frame of the biome surface into an RGBA buffer. `m` modulates the
 // biome colour's brightness (the moving relief); `hi` blends toward white for
-// crests / sparkles.
-function paintTexture(data, W, H, t, family, rgb) {
+// crests / glints / sparkles. Every spatial wave runs an integer number of
+// cycles per tile (TAU * k * u) and every noise lookup wraps, so the image
+// repeats with no visible border.
+function paintTexture(data, size, t, family, rgb) {
   const [r, g, b] = rgb
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4
-      const u = x / W
-      const v = y / H
+  for (let y = 0; y < size; y++) {
+    const v = y / size
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4
+      const u = x / size
       let m = 1
       let hi = 0
       switch (family) {
         case 'water': {
-          const wave = (Math.sin(u * 18 + t * 1.7) + Math.sin(v * 12 - t * 1.1 + u * 4)) * 0.5
-          m = 0.72 + 0.3 * wave
-          hi = Math.max(0, wave - 0.72) * 1.8 // foam crests
+          // Two crossing wave trains, bent by a slowly drifting swell.
+          const swell = noise(u * 2 + t * 0.02, v * 2 - t * 0.012)
+          const w1 = Math.sin(TAU * (3 * u + v) + t * 1.1 + swell * 4)
+          const w2 = Math.sin(TAU * (u - 2 * v) - t * 0.8 + swell * 3)
+          const wave = (w1 + 0.7 * w2) / 1.7
+          m = 0.6 + 0.26 * wave + 0.3 * (swell - 0.5)
+          hi = Math.max(0, wave - 0.72) * 1.6 + Math.max(0, swell - 0.78) * 1.5 // foam
           break
         }
         case 'sand': {
-          const p = (u * 9 + v * 4) * Math.PI + t * 0.6
-          m = 0.82 + 0.16 * (Math.sin(p) + 0.35 * Math.sin(p * 2.3 + t * 0.4)) // dunes drift
+          // Sharp ripple crests (1-|sin|) over broad dune light, drifting slowly.
+          const warp = noise(u + t * 0.015, v)
+          const dune = noise(u * 2 - t * 0.05, v * 2)
+          const ridge = 1 - Math.abs(Math.sin(TAU * (5 * u + 2 * v) + warp * 5 + t * 0.4))
+          m = 0.7 + 0.34 * (dune - 0.5) + 0.24 * (ridge - 0.45)
           break
         }
         case 'forest': {
-          const dapple = Math.sin(u * 13 + t * 0.5) * Math.sin(v * 11 - t * 0.4)
-          m = 0.74 + 0.22 * dapple + 0.08 * Math.sin(u * 5 - v * 3 - t * 0.25)
+          // Clumpy canopy (noise²) with independent light patches sliding over it.
+          const canopy = noise(u * 2 + t * 0.025, v * 2 - t * 0.014)
+          const light = noise(u * 3 - t * 0.035, v * 3 + t * 0.02)
+          m = 0.5 + 0.62 * canopy * canopy + 0.28 * (light - 0.5)
+          hi = Math.max(0, canopy * light - 0.52) * 0.9 // sun through the leaves
           break
         }
         case 'grass': {
-          const gust = Math.sin(u * 7 - t * 1.6) // wind sweeping across the field
-          m = 0.78 + 0.1 * Math.sin(u * 40) * (0.5 + 0.5 * gust) + 0.12 * gust
+          // Fine streaky tufts; a noise-bent gust front sweeps across them.
+          const tuft = noise(u * 6, v * 2 + t * 0.01)
+          const bend = noise(u, v)
+          const gust = Math.sin(TAU * (2 * u + v) - t * 1.4 + bend * 2.5)
+          m = 0.66 + 0.2 * (tuft - 0.5) * (1.3 + gust) + 0.14 * gust
           break
         }
         case 'ice': {
-          m = 0.84 + 0.12 * Math.sin(u * 16 + t * 0.5) * Math.sin(v * 16 - t * 0.4)
-          hi = Math.max(0, Math.sin((x * 7 + y * 13) * 1.3 + t * 3) - 0.95) * 6 // twinkles
+          const sheet = noise(u * 2 + t * 0.008, v * 2)
+          m = 0.82 + 0.24 * (sheet - 0.5)
+          const sp = hash2(x, y, 97)
+          if (sp > 0.985) hi = Math.max(0, Math.sin(t * 2.5 + sp * 700) - 0.55) * 1.4 // twinkles
           break
         }
         case 'urban': {
-          const grid = x % 14 < 1 || y % 14 < 1 ? 0.25 : 0
-          m = 0.7 + grid + 0.08 * Math.sin(v * 10 - t * 1.4) // scan line
+          const cell = size >> 4 // 16 blocks per tile edge — divides evenly, no seam
+          const gx = x % cell
+          const gy = y % cell
+          const lit = hash2((x / cell) | 0, (y / cell) | 0, 11 + ((t * 0.5) | 0))
+          m = 0.6
+          if (gx < 1 || gy < 1) m += 0.22 // street grid
+          else if (gx > 3 && gx < cell - 3 && gy > 3 && gy < cell - 3 && lit > 0.72) m += 0.16 // lit blocks
+          m += 0.08 * Math.sin(TAU * 2 * v - t * 1.3) // scan line
           break
         }
       }
-      m = clamp(m, 0.25, 1.25)
+      m = clamp(m, 0.22, 1.4)
       const f = hi > 0 ? Math.min(1, hi) : 0
       data[i] = Math.min(255, r * m + (255 - r * m) * f)
       data[i + 1] = Math.min(255, g * m + (255 - g * m) * f)
@@ -155,9 +241,9 @@ function paintTexture(data, W, H, t, family, rgb) {
 // true re-uploads the texture. We throttle to ~30fps and idle (false) whenever
 // no column is raised, so an unselected globe does no texture work.
 const livingTex = {
-  width: TEX_W,
-  height: TEX_H,
-  data: new Uint8Array(TEX_W * TEX_H * 4),
+  width: TEX_SIZE,
+  height: TEX_SIZE,
+  data: new Uint8Array(TEX_SIZE * TEX_SIZE * 4),
   family: 'forest',
   rgb: [45, 212, 191],
   start: 0,
@@ -166,7 +252,8 @@ const livingTex = {
     const now = performance.now()
     if (now - texLastTs < 33) return false
     texLastTs = now
-    paintTexture(this.data, TEX_W, TEX_H, (now - this.start) / 1000, this.family, this.rgb)
+    if (!noiseField) noiseField = buildNoiseField(TEX_SIZE)
+    paintTexture(this.data, TEX_SIZE, (now - this.start) / 1000, this.family, this.rgb)
     return true
   },
 }
@@ -332,7 +419,9 @@ function addSelectionLayers() {
         'fill-extrusion-color': column.color,
         'fill-extrusion-height': 0,
         'fill-extrusion-base': 0,
-        'fill-extrusion-opacity': 0.66,
+        // Near-solid: lower opacity lets the far wall's pattern bleed through
+        // the near one, which reads as moiré on the textured column.
+        'fill-extrusion-opacity': 0.85,
         'fill-extrusion-vertical-gradient': true,
       },
     })
