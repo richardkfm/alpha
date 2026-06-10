@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 // Shared yield-category metadata, also used by the Compare dashboard.
 import { YIELD_ROWS } from '../data/yields.js'
+// Cross-biome bar scale, shared with the Compare dashboard.
+import { barPct } from '../data/yieldScale.js'
 import { BIOME_META, biomeColor } from '../data/biomeMeta.js'
 import { useCountUp } from '../data/useCountUp.js'
 
@@ -14,6 +16,9 @@ const props = defineProps({
   showLiability: { type: Boolean, default: true },
   showSystemic: { type: Boolean, default: true },
   showRedLines: { type: Boolean, default: true },
+  // Per-service cross-biome ceilings (max across the catalogue) so each bar
+  // shows magnitude vs the strongest biome, not just composition within this one.
+  ceilings: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['close', 'update:showLiability', 'update:showSystemic', 'update:showRedLines'])
 
@@ -45,7 +50,6 @@ const provenance = computed(() => {
 const yieldRows = computed(() => {
   if (!props.valuation) return []
   const values = YIELD_ROWS.map((r) => props.valuation.yields_per_sqm_year[r.key] ?? 0)
-  const max = Math.max(...values, 0) || 1
   const total = values.reduce((a, b) => a + b, 0) || 1
   return YIELD_ROWS.map(({ key, label, color }) => {
     const value = props.valuation.yields_per_sqm_year[key]
@@ -53,9 +57,10 @@ const yieldRows = computed(() => {
       label,
       color,
       value,
+      // share = composition within this region; bar = magnitude vs the
+      // strongest biome for this service, so a desert reads as low, not maxed.
       share: Math.round(((value ?? 0) / total) * 100),
-      // bar width relative to the largest service; floor keeps tiny bars visible
-      pct: Math.max(((value ?? 0) / max) * 100, 3),
+      pct: barPct(value, props.ceilings[key]),
     }
   })
 })
@@ -182,11 +187,12 @@ function fmtHa(n) {
           Service yields
           <small>{{ valuation.currency }} / m² / yr</small>
         </h3>
+        <p class="yields-scale">Bar length = value vs the strongest biome for that service</p>
         <ul>
           <li
             v-for="row in yieldRows"
             :key="row.label"
-            :title="`${row.label} — ${row.share}% of total value`"
+            :title="`${row.label} — ${row.share}% of this region's value`"
           >
             <div class="yield-meta">
               <span class="yield-dot" :style="{ background: row.color }"></span>
@@ -585,6 +591,12 @@ function fmtHa(n) {
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
+}
+.yields-scale {
+  margin: -8px 0 14px;
+  font-size: 0.68rem;
+  font-style: italic;
+  color: var(--text-faint);
 }
 .yields ul {
   list-style: none;

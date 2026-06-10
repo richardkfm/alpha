@@ -6,6 +6,7 @@ import LayerControl from './components/LayerControl.vue'
 import SearchBar from './components/SearchBar.vue'
 import BrandLogo from './components/BrandLogo.vue'
 import { useRegions } from './data/useRegions.js'
+import { serviceCeilings } from './data/yieldScale.js'
 
 // The MapLibre globe (and its ~heavy bundle) loads only when 3D mode is active;
 // the Compare dashboard and Data hub load only when their mode is opened.
@@ -45,6 +46,12 @@ const {
   ecoLoaded,
   loadEcoregions,
 } = useRegions()
+
+// Per-service cross-biome ceilings (max across the catalogue), so yield bars in
+// the side panel and Compare dashboard show magnitude vs the strongest biome
+// rather than maxing out the dominant service of every region. Re-priced
+// catalogue ⇒ ceilings track the active currency, matching the values they scale.
+const serviceMax = computed(() => serviceCeilings(regions.value))
 
 // When Outline mode is active use the detailed ecoregion geometry (lazy-loaded
 // on first use). All other modes use the lightweight catalogue geometry.
@@ -261,6 +268,7 @@ function closePanel() {
       <CompareDashboard
         v-if="appMode === 'compare'"
         :regions="regions"
+        :ceilings="serviceMax"
         :show-liability="showLiability"
         :show-red-lines="showRedLines"
       />
@@ -317,6 +325,7 @@ function closePanel() {
               v-if="selectedRegion"
               :region="selectedRegion"
               :valuation="valuation"
+              :ceilings="serviceMax"
               :loading="loading"
               :backend-online="backendOnline"
               :error="errorMsg"
