@@ -1,12 +1,17 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { YIELD_ROWS } from '../data/yields.js'
+import { barPct as barPctScale } from '../data/yieldScale.js'
 import { BIOME_META, BIOME_ORDER, biomeColor, biomeLabel } from '../data/biomeMeta.js'
 
 const props = defineProps({
   // Pre-valued region catalogue from the backend (data/useRegions.js). Reading
   // live means a currency re-price flows straight through to the comparison.
   regions: { type: Array, default: () => [] },
+  // Per-service cross-biome ceilings (max across the whole catalogue), so bars
+  // mean the same thing here as in the side panel: magnitude vs the strongest
+  // biome, not just relative to the handful of regions currently selected.
+  ceilings: { type: Object, default: () => ({}) },
   showLiability: { type: Boolean, default: true },
   showRedLines: { type: Boolean, default: true },
 })
@@ -75,21 +80,11 @@ const selected = computed(() =>
     .filter(Boolean),
 )
 
-// Per-category max across the selected regions, so each yield row's bars are
-// normalised against each other (taller bar = higher value for that service).
-const categoryMax = computed(() => {
-  const max = {}
-  for (const { key } of YIELD_ROWS) {
-    max[key] = Math.max(
-      ...selected.value.map((r) => r.yields_per_sqm_year[key] ?? 0),
-      0,
-    ) || 1
-  }
-  return max
-})
-
+// Bars scale against the fixed cross-biome ceiling (max across the whole
+// catalogue), so a taller bar means a genuinely higher value for that service —
+// comparable across biomes, not just within the current selection.
 function barPct(region, key) {
-  return Math.max(((region.yields_per_sqm_year[key] ?? 0) / categoryMax.value[key]) * 100, 3)
+  return barPctScale(region.yields_per_sqm_year[key], props.ceilings[key])
 }
 
 const gridCols = computed(
