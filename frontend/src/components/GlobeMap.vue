@@ -87,7 +87,10 @@ const TEXTURE_FAMILY = {
 const TEX_ID = 'living-column-tex'
 // Must be a power of two: other sizes blur in the sprite atlas and make the
 // pattern reset at every map-tile boundary, drawing seam lines on the column.
-const TEX_SIZE = 256
+// Registered at pixelRatio 2, so it displays at 256 CSS px but carries 512 px
+// of real detail — crisp on the big top face instead of smeared.
+const TEX_SIZE = 512
+const TEX_PIXEL_RATIO = 2
 const TAU = Math.PI * 2
 let texActive = false
 let texSupported = false
@@ -106,11 +109,37 @@ function hash2(x, y, seed) {
   return (h >>> 0) / 4294967296
 }
 
+// Interpolated sine LUT: paintTexture evaluates several hundred thousand sines
+// per frame, where Math.sin alone would blow the frame budget.
+const SIN_N = 4096
+const SIN_LUT = new Float32Array(SIN_N)
+for (let i = 0; i < SIN_N; i++) SIN_LUT[i] = Math.sin((i / SIN_N) * TAU)
+function fsin(x) {
+  let p = x * (SIN_N / TAU)
+  p -= Math.floor(p / SIN_N) * SIN_N
+  const i0 = p | 0
+  const fr = p - i0
+  const a = SIN_LUT[i0 & (SIN_N - 1)]
+  return a + (SIN_LUT[(i0 + 1) & (SIN_N - 1)] - a) * fr
+}
+
 // Multi-octave value noise whose every octave lattice wraps at the texture
 // border, so the field tiles seamlessly. Built once (lazily, on first use);
 // the per-frame animation *scrolls* this static field, which preserves the
 // tiling for free instead of recomputing noise per pixel.
 let noiseField = null
+// Static per-pixel speckle (sand grain, grass flecks, ice sparkle phases) —
+// hashed once here instead of per pixel per frame.
+let grainField = null
+function ensureTexFields() {
+  if (noiseField) return
+  noiseField = buildNoiseField(TEX_SIZE)
+  grainField = new Float32Array(TEX_SIZE * TEX_SIZE)
+  let i = 0
+  for (let y = 0; y < TEX_SIZE; y++) {
+    for (let x = 0; x < TEX_SIZE; x++, i++) grainField[i] = hash2(x, y, 5) - 0.5
+  }
+}
 function buildNoiseField(size) {
   const field = new Float32Array(size * size)
   let amp = 1
@@ -163,10 +192,11 @@ function noise(u, v) {
 // biome colour's brightness (the moving relief); `hi` blends toward white for
 // crests / glints / sparkles. Every spatial wave runs an integer number of
 // cycles per tile (TAU * k * u) and every noise lookup wraps, so the image
-// repeats with no visible border.
-function paintTexture(data, size, t, family, rgb) {
+// repeats with no visible border. `phase`/`step` allow painting only every
+// step-th row, so the caller can interlace updates across ticks.
+function paintTexture(data, size, t, family, rgb, phase = 0, step = 1) {
   const [r, g, b] = rgb
-  for (let y = 0; y < size; y++) {
+  for (let y = phase; y < size; y += step) {
     const v = y / size
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4
@@ -175,55 +205,74 @@ function paintTexture(data, size, t, family, rgb) {
       let hi = 0
       switch (family) {
         case 'water': {
-          // Two crossing wave trains, bent by a slowly drifting swell.
+          // Two crossing wave trains, bent by a slowly drifting swell, with
+          // foam on the crests and fine glints riding the swell.
           const swell = noise(u * 2 + t * 0.02, v * 2 - t * 0.012)
-          const w1 = Math.sin(TAU * (3 * u + v) + t * 1.1 + swell * 4)
-          const w2 = Math.sin(TAU * (u - 2 * v) - t * 0.8 + swell * 3)
+          const w1 = fsin(TAU * (3 * u + v) + t * 1.1 + swell * 4)
+          const w2 = fsin(TAU * (u - 2 * v) - t * 0.8 + swell * 3)
           const wave = (w1 + 0.7 * w2) / 1.7
           m = 0.6 + 0.26 * wave + 0.3 * (swell - 0.5)
-          hi = Math.max(0, wave - 0.72) * 1.6 + Math.max(0, swell - 0.78) * 1.5 // foam
+          hi = Math.max(0, wave - 0.72) * 1.6 + Math.max(0, swell - 0.78) * 1.5
+          hi += Math.max(0, fsin(TAU * (8 * u + 6 * v) + t * 2.1 + swell * 6) - 0.93) * 0.9
           break
         }
         case 'sand': {
-          // Sharp ripple crests (1-|sin|) over broad dune light, drifting slowly.
+          // Sharp ripple crests (1-|sin|) at two scales over broad dune light,
+          // drifting slowly, plus a static grain speckle.
           const warp = noise(u + t * 0.015, v)
           const dune = noise(u * 2 - t * 0.05, v * 2)
-          const ridge = 1 - Math.abs(Math.sin(TAU * (5 * u + 2 * v) + warp * 5 + t * 0.4))
-          m = 0.7 + 0.34 * (dune - 0.5) + 0.24 * (ridge - 0.45)
+          const ridge = 1 - Math.abs(fsin(TAU * (5 * u + 2 * v) + warp * 5 + t * 0.4))
+          const fine = 1 - Math.abs(fsin(TAU * (13 * u + 4 * v) + warp * 7 - t * 0.25))
+          m =
+            0.7 +
+            0.32 * (dune - 0.5) +
+            0.2 * (ridge - 0.45) +
+            0.1 * (fine - 0.5) +
+            grainField[i >> 2] * 0.05
           break
         }
         case 'forest': {
-          // Clumpy canopy (noise²) with independent light patches sliding over it.
+          // Clumpy canopy (noise²) with light patches sliding over it and
+          // leaf-scale detail (the swapped axes decorrelate the third sample).
           const canopy = noise(u * 2 + t * 0.025, v * 2 - t * 0.014)
           const light = noise(u * 3 - t * 0.035, v * 3 + t * 0.02)
-          m = 0.5 + 0.62 * canopy * canopy + 0.28 * (light - 0.5)
+          const leaf = noise(v * 5, u * 5 + t * 0.01)
+          m = 0.5 + 0.55 * canopy * canopy + 0.26 * (light - 0.5) + 0.18 * (leaf - 0.5)
           hi = Math.max(0, canopy * light - 0.52) * 0.9 // sun through the leaves
           break
         }
         case 'grass': {
-          // Fine streaky tufts; a noise-bent gust front sweeps across them.
+          // Fine streaky tufts plus blade-scale flecks; a noise-bent gust
+          // front sweeps across them.
           const tuft = noise(u * 6, v * 2 + t * 0.01)
           const bend = noise(u, v)
-          const gust = Math.sin(TAU * (2 * u + v) - t * 1.4 + bend * 2.5)
-          m = 0.66 + 0.2 * (tuft - 0.5) * (1.3 + gust) + 0.14 * gust
+          const gust = fsin(TAU * (2 * u + v) - t * 1.4 + bend * 2.5)
+          m =
+            0.66 +
+            0.2 * (tuft - 0.5) * (1.3 + gust) +
+            0.14 * gust +
+            grainField[(y >> 3) * size + (x >> 1)] * 0.08
           break
         }
         case 'ice': {
           const sheet = noise(u * 2 + t * 0.008, v * 2)
-          m = 0.82 + 0.24 * (sheet - 0.5)
-          const sp = hash2(x, y, 97)
-          if (sp > 0.985) hi = Math.max(0, Math.sin(t * 2.5 + sp * 700) - 0.55) * 1.4 // twinkles
+          const vein = noise(u * 4, v * 4 - t * 0.006)
+          m = 0.8 + 0.22 * (sheet - 0.5) + 0.12 * (vein - 0.5)
+          const sp = grainField[(y >> 1) * size + (x >> 1)] + 0.5
+          if (sp > 0.985) hi = Math.max(0, fsin(t * 2.5 + sp * 700) - 0.55) * 1.4 // twinkles
           break
         }
         case 'urban': {
           const cell = size >> 4 // 16 blocks per tile edge — divides evenly, no seam
+          const pad = cell >> 2
           const gx = x % cell
           const gy = y % cell
           const lit = hash2((x / cell) | 0, (y / cell) | 0, 11 + ((t * 0.5) | 0))
           m = 0.6
-          if (gx < 1 || gy < 1) m += 0.22 // street grid
-          else if (gx > 3 && gx < cell - 3 && gy > 3 && gy < cell - 3 && lit > 0.72) m += 0.16 // lit blocks
-          m += 0.08 * Math.sin(TAU * 2 * v - t * 1.3) // scan line
+          if (gx < 2 || gy < 2) m += 0.22 // street grid
+          else if (gx >= pad && gx < cell - pad && gy >= pad && gy < cell - pad && lit > 0.72)
+            m += 0.16 // lit blocks
+          m += 0.08 * fsin(TAU * 2 * v - t * 1.3) // scan line
           break
         }
       }
@@ -238,8 +287,9 @@ function paintTexture(data, size, t, family, rgb) {
 }
 
 // One shared animated image. MapLibre calls render() each map frame; returning
-// true re-uploads the texture. We throttle to ~30fps and idle (false) whenever
-// no column is raised, so an unselected globe does no texture work.
+// true re-uploads the texture. We throttle to ~22fps (plenty for these slow
+// drifts at 512px) and idle (false) whenever no column is raised, so an
+// unselected globe does no texture work.
 const livingTex = {
   width: TEX_SIZE,
   height: TEX_SIZE,
@@ -247,13 +297,25 @@ const livingTex = {
   family: 'forest',
   rgb: [45, 212, 191],
   start: 0,
+  dirty: true,
+  frame: 0,
   render() {
     if (!texActive) return false
     const now = performance.now()
-    if (now - texLastTs < 33) return false
+    if (now - texLastTs < 45) return false
     texLastTs = now
-    if (!noiseField) noiseField = buildNoiseField(TEX_SIZE)
-    paintTexture(this.data, TEX_SIZE, (now - this.start) / 1000, this.family, this.rgb)
+    ensureTexFields()
+    const t = (now - this.start) / 1000
+    if (this.dirty) {
+      // Full repaint when the selection's family/colour changes.
+      paintTexture(this.data, TEX_SIZE, t, this.family, this.rgb)
+      this.dirty = false
+    } else {
+      // Interlace: repaint alternating rows. The drifts are slow enough that
+      // half-tick row staleness is invisible, and it halves the paint cost.
+      this.frame ^= 1
+      paintTexture(this.data, TEX_SIZE, t, this.family, this.rgb, this.frame, 2)
+    }
     return true
   },
 }
@@ -397,14 +459,18 @@ function addThematicLayers() {
 // footprint ring keeps the selection legible even where extrusions aren't drawn.
 function addSelectionLayers() {
   if (!map.getSource('selected-src')) {
-    map.addSource('selected-src', { type: 'geojson', data: EMPTY_FC })
+    // maxzoom 0 keeps this one feature in a single (overzoomed) tile. Tiled
+    // geometry restarts the wall texture coordinate at every tile split and
+    // draws ghost interior walls through the translucent volume — both read
+    // as vertical border lines on the column.
+    map.addSource('selected-src', { type: 'geojson', data: EMPTY_FC, maxzoom: 0 })
   }
   // Register the shared animated surface once. If unsupported, the column simply
   // falls back to its flat biome colour.
   try {
     if (!(map.hasImage && map.hasImage(TEX_ID))) {
       livingTex.start = performance.now()
-      map.addImage(TEX_ID, livingTex)
+      map.addImage(TEX_ID, livingTex, { pixelRatio: TEX_PIXEL_RATIO })
     }
     texSupported = true
   } catch (_) {
@@ -471,12 +537,16 @@ function updateSelection(region) {
   column.color = biomeColor(region.biome_key)
   if (map.getLayer('selected-extrusion')) {
     map.setPaintProperty('selected-extrusion', 'fill-extrusion-color', column.color)
+    // The ground ring shows through the translucent top face as a stray inner
+    // border while the column is up — keep it only for the no-extrusion fallback.
+    map.setPaintProperty('selected-ring', 'line-opacity', 0)
     // Wrap the raised column in its biome's living surface (only this one object
     // animates). Colour is baked into the texture, so it tints to the biome.
     if (texSupported) {
       livingTex.family = TEXTURE_FAMILY[region.biome_key] ?? 'forest'
       livingTex.rgb = hexToRgb(column.color)
       livingTex.start = performance.now()
+      livingTex.dirty = true
       texActive = true
       map.setPaintProperty('selected-extrusion', 'fill-extrusion-pattern', TEX_ID)
     }
@@ -520,6 +590,9 @@ function tweenColumn(dt) {
       if (texActive) {
         texActive = false
         map.setPaintProperty('selected-extrusion', 'fill-extrusion-pattern', undefined)
+      }
+      if (map.getLayer('selected-ring')) {
+        map.setPaintProperty('selected-ring', 'line-opacity', 0.95)
       }
       const src = map.getSource('selected-src')
       if (src) src.setData(EMPTY_FC)
