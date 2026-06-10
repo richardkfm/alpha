@@ -16,7 +16,7 @@ roadmap.
 
 ## Preview
 
-Clicking a rainforest region confirms backend connectivity and opens a side panel
+Clicking a biome confirms backend connectivity and opens a side panel
 with its full Total Ecosystem Value breakdown:
 
 https://github.com/user-attachments/assets/1c6a9012-97ff-424b-af78-628ee2a45e40
