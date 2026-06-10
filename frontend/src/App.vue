@@ -290,6 +290,7 @@ function closePanel() {
             :display-style="displayStyle"
             :visible-layers="visibleLayers"
             :is-dark="isDark"
+            :selected="selectedRegion"
             @select="onRegionSelect"
           />
           <WorldMap

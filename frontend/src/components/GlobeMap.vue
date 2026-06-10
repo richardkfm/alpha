@@ -2,6 +2,8 @@
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { centroid } from '../data/geo.js'
+import { biomeColor } from '../data/biomeMeta.js'
 
 const props = defineProps({
   // Biome layer definitions and the region catalogue, both fetched from the
@@ -14,16 +16,54 @@ const props = defineProps({
   displayStyle: { type: String, default: 'polygons' },
   visibleLayers: { type: Object, required: true },
   isDark: { type: Boolean, default: true },
+  // The region currently open in the side panel (or null). Drives the 3D
+  // "value column" that rises off the globe when an ecosystem is selected.
+  selected: { type: Object, default: null },
 })
 const emit = defineEmits(['select'])
 
 const mapEl = ref(null)
 const spinning = ref(true)
+// Mirrors whether a value column is currently raised — gates the caption + spin.
+const selectionActive = ref(false)
 let map = null
 let rafId = null
 let lastTs = 0
 let interacting = false
 let resumeTimer = null
+let hasSelection = false
+
+// ----- 3D value column + living textures -----------------------------------
+const EMPTY_FC = { type: 'FeatureCollection', features: [] }
+// Height range (metres) the selected region rises to, scaled by its annual TEV.
+// Tuned to read clearly against the globe at the focus zoom without skewering it.
+const COLUMN_MIN_H = 70000
+const COLUMN_MAX_H = 540000
+// Eased height tween: `h` chases `target` every frame so the column rises and
+// settles smoothly rather than popping in.
+const column = { h: 0, target: 0, color: '#2dd4bf' }
+
+// How much each biome's overlay "breathes" — lush, wet biomes pulse a little
+// more; arid and frozen ones are nearly still. Deliberately subtle throughout.
+const BIOME_VITALITY = {
+  tropical_rainforest: 1.0,
+  mangrove: 0.85,
+  wetland: 0.8,
+  freshwater: 0.9,
+  temperate_forest: 0.7,
+  boreal_forest: 0.55,
+  temperate_grassland: 0.6,
+  cropland: 0.5,
+  peri_urban: 0.35,
+  tundra: 0.3,
+  desert: 0.25,
+}
+const WATER_BIOMES = new Set(['mangrove', 'wetland', 'freshwater'])
+let lastLifeTs = 0
+
+function clamp(v, lo, hi) {
+  return v < lo ? lo : v > hi ? hi : v
+}
 
 const CARTO_ATTR =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -153,7 +193,155 @@ function addThematicLayers() {
     map.getCanvas().style.cursor = ''
   })
 
+  addSelectionLayers()
   applyVisibility()
+  // If a region was already selected before the style finished loading, raise it.
+  if (props.selected) updateSelection(props.selected)
+}
+
+// The selected region becomes a luminous 3D column — its height encodes the
+// Total Ecosystem Value, making the balance-sheet metaphor literal. A bright
+// footprint ring keeps the selection legible even where extrusions aren't drawn.
+function addSelectionLayers() {
+  if (!map.getSource('selected-src')) {
+    map.addSource('selected-src', { type: 'geojson', data: EMPTY_FC })
+  }
+  try {
+    map.addLayer({
+      id: 'selected-extrusion',
+      type: 'fill-extrusion',
+      source: 'selected-src',
+      paint: {
+        'fill-extrusion-color': column.color,
+        'fill-extrusion-height': 0,
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': 0.55,
+        'fill-extrusion-vertical-gradient': true,
+      },
+    })
+  } catch (_) {
+    /* fill-extrusion unsupported on this build — the ring still marks it */
+  }
+  map.addLayer({
+    id: 'selected-ring',
+    type: 'line',
+    source: 'selected-src',
+    paint: {
+      'line-color': column.color,
+      'line-width': 2.4,
+      'line-opacity': 0.95,
+      'line-blur': 0.4,
+    },
+  })
+}
+
+// 0..1 prominence for a region's column, from its annual TEV vs the catalogue
+// max (sqrt-compressed so mid-value regions still read). Custom search areas
+// carry no pre-computed value, so they rise to a neutral mid height.
+function valueWeight(region) {
+  const v = region?.total_ecosystem_value_per_year
+  if (v == null) return 0.5
+  const max = Math.max(...props.regions.map((r) => r.total_ecosystem_value_per_year || 0), 1)
+  return clamp(Math.sqrt(v) / Math.sqrt(max), 0, 1)
+}
+
+// Raise (or lower) the value column to match the selected region, and tilt the
+// camera so the column reads as 3D. Passing null lowers and clears it.
+function updateSelection(region) {
+  if (!map || !map.getSource('selected-src')) return
+  const geom = region && (region.geojson || region.geometry)
+  if (!geom) {
+    hasSelection = false
+    selectionActive.value = false
+    column.target = 0 // tween down; the source clears once it bottoms out
+    try {
+      map.easeTo({ pitch: 0, duration: 900, essential: true })
+    } catch (_) {
+      /* ignore */
+    }
+    return
+  }
+
+  column.color = biomeColor(region.biome_key)
+  if (map.getLayer('selected-extrusion')) {
+    map.setPaintProperty('selected-extrusion', 'fill-extrusion-color', column.color)
+  }
+  map.setPaintProperty('selected-ring', 'line-color', column.color)
+  map.getSource('selected-src').setData({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', properties: {}, geometry: geom }],
+  })
+  column.target = COLUMN_MIN_H + valueWeight(region) * (COLUMN_MAX_H - COLUMN_MIN_H)
+
+  hasSelection = true
+  selectionActive.value = true
+  const c = centroid(geom)
+  if (c) {
+    try {
+      map.easeTo({
+        center: c,
+        zoom: Math.max(map.getZoom(), 2.7),
+        pitch: 52,
+        duration: 1300,
+        essential: true,
+      })
+    } catch (_) {
+      /* ignore */
+    }
+  }
+}
+
+// Frame-rate-independent easing of the column height toward its target.
+function tweenColumn(dt) {
+  if (!map.getLayer('selected-extrusion')) return
+  const k = Math.min(1, dt * 5.5)
+  const next = column.h + (column.target - column.h) * k
+  // Snap-and-clear once a lowering column has effectively bottomed out.
+  if (column.target === 0 && next < 200) {
+    if (column.h !== 0) {
+      column.h = 0
+      map.setPaintProperty('selected-extrusion', 'fill-extrusion-height', 0)
+      const src = map.getSource('selected-src')
+      if (src) src.setData(EMPTY_FC)
+    }
+    return
+  }
+  if (Math.abs(next - column.h) >= 1) {
+    column.h = next
+    map.setPaintProperty('selected-extrusion', 'fill-extrusion-height', Math.max(0, next))
+  }
+}
+
+// Subtle "life": breathe each visible biome overlay on a slow sine, offset per
+// biome so they shimmer out of phase (alive, not a synchronised global flash).
+// Wet biomes get a faint faster harmonic suggesting moving water. Throttled to
+// ~18fps so the paint-property churn stays cheap.
+function updateBiomeLife(ts) {
+  if (props.displayStyle === 'bubbles') return
+  if (ts - lastLifeTs < 55) return
+  lastLifeTs = ts
+  const t = ts / 1000
+  const fill = props.displayStyle === 'polygons'
+  let i = 0
+  for (const l of props.layers) {
+    if (!props.visibleLayers[l.id]) {
+      i++
+      continue
+    }
+    const vit = BIOME_VITALITY[l.id] ?? 0.5
+    const phase = i * 0.7
+    const breath = Math.sin(t * 0.5 + phase)
+    const shimmer = WATER_BIOMES.has(l.id) ? Math.sin(t * 1.7 + phase) : 0
+    if (map.getLayer(`${l.id}-glow`)) {
+      const o = 0.45 + vit * 0.1 * breath + 0.04 * shimmer
+      map.setPaintProperty(`${l.id}-glow`, 'line-opacity', clamp(o, 0.2, 0.7))
+    }
+    if (fill && map.getLayer(`${l.id}-fill`)) {
+      const o = 0.16 * (1 + vit * 0.22 * breath + 0.1 * shimmer)
+      map.setPaintProperty(`${l.id}-fill`, 'fill-opacity', clamp(o, 0.07, 0.26))
+    }
+    i++
+  }
 }
 
 // Points filtered to the currently-visible biomes (drives bubbles).
@@ -200,11 +388,14 @@ function frame(ts) {
   if (map) {
     const dt = lastTs ? (ts - lastTs) / 1000 : 0
     lastTs = ts
-    if (spinning.value && !interacting && map.getZoom() < 3.6) {
+    // Auto-spin idles while the user interacts or a region is focused in 3D.
+    if (spinning.value && !interacting && !hasSelection && map.getZoom() < 3.6) {
       const c = map.getCenter()
       c.lng -= dt * 3.2 // ~deg/sec -> a full revolution in ~110s
       map.jumpTo({ center: c })
     }
+    tweenColumn(dt)
+    updateBiomeLife(ts)
   }
   rafId = requestAnimationFrame(frame)
 }
@@ -284,6 +475,7 @@ watch(() => props.visibleLayers, applyVisibility, { deep: true })
 watch(() => props.displayStyle, applyVisibility)
 watch(() => props.points, updatePoints)
 watch(() => props.isDark, updateTheme)
+watch(() => props.selected, (region) => updateSelection(region))
 </script>
 
 <template>
@@ -298,6 +490,12 @@ watch(() => props.isDark, updateTheme)
       <span class="spin-dot"></span>
       {{ spinning ? 'Spinning' : 'Paused' }}
     </button>
+    <transition name="cap">
+      <div v-if="selectionActive" class="column-cap" aria-hidden="true">
+        <span class="column-cap-bar"></span>
+        Column height = annual ecosystem value
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -361,6 +559,45 @@ watch(() => props.isDark, updateTheme)
   50% {
     opacity: 0.35;
   }
+}
+
+/* Explains the 3D column metaphor while a region is raised. */
+.column-cap {
+  position: absolute;
+  left: 18px;
+  bottom: 30px;
+  z-index: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-soft);
+  pointer-events: none;
+}
+.column-cap-bar {
+  width: 8px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), transparent);
+  box-shadow: 0 0 8px var(--accent);
+}
+.cap-enter-active,
+.cap-leave-active {
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+}
+.cap-enter-from,
+.cap-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 </style>
 
