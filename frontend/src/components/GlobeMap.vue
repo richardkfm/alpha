@@ -131,85 +131,41 @@ let noiseField = null
 // Static per-pixel speckle (sand grain, grass flecks, ice sparkle phases) —
 // hashed once here instead of per pixel per frame.
 let grainField = null
-// Baked rainforest canopy: dome height, pre-lit brightness and per-crown hue
-// lean for every pixel. Built once; the per-frame forest pass just reads it.
-let canopyHeight = null
-let canopyShade = null
-let canopyTint = null
+// Ridged turbulence whose octave weights *grow* with frequency — bright lacy
+// creases at leaf-cluster scale that survive heavy zoom (the smooth field
+// above turns to fog up close). The forest canopy reads from this one.
+let leafField = null
 function ensureTexFields() {
   if (noiseField) return
-  noiseField = buildNoiseField(TEX_SIZE)
+  noiseField = buildField(TEX_SIZE, [
+    [4, 1, 0],
+    [8, 0.55, 1],
+    [16, 0.3025, 2],
+    [32, 0.166, 3],
+  ])
+  leafField = buildField(
+    TEX_SIZE,
+    [
+      [8, 0.45, 6],
+      [16, 0.7, 7],
+      [32, 1, 8],
+      [64, 0.45, 9],
+    ],
+    true,
+  )
   grainField = new Float32Array(TEX_SIZE * TEX_SIZE)
   let i = 0
   for (let y = 0; y < TEX_SIZE; y++) {
     for (let x = 0; x < TEX_SIZE; x++, i++) grainField[i] = hash2(x, y, 5) - 0.5
   }
-  buildCanopy(TEX_SIZE)
 }
-
-// Stamp jittered, overlapping tree-crown domes — big emergents and a denser
-// mid-storey, max-combined so they interleave like a real canopy — then ride
-// small leaf-cluster bumps on top and bake directional sun + crevice shadow
-// into a shade map. Discs crossing the tile edge wrap, so the canopy tiles.
-function buildCanopy(size) {
-  const h = new Float32Array(size * size)
-  canopyTint = new Float32Array(size * size)
-  const stamp = (grid, hMin, hVar, seed, bump) => {
-    const cell = size / grid
-    for (let cy = 0; cy < grid; cy++) {
-      for (let cx = 0; cx < grid; cx++) {
-        // Full-range jitter: anything narrower biases crowns away from the
-        // cell borders, which shows up as a faint dark grid over the canopy.
-        const px = (cx + hash2(cx, cy, seed)) * cell
-        const py = (cy + hash2(cx, cy, seed + 1)) * cell
-        const rad = (0.42 + 0.3 * hash2(cx, cy, seed + 2)) * cell
-        const top = hMin + hVar * hash2(cx, cy, seed + 3)
-        const tint = hash2(cx, cy, seed + 4) - 0.5
-        const r2 = rad * rad
-        for (let y = Math.floor(py - rad); y <= py + rad; y++) {
-          const row = (((y % size) + size) % size) * size
-          const dy2 = (y - py) * (y - py)
-          for (let x = Math.floor(px - rad); x <= px + rad; x++) {
-            const d2 = (x - px) * (x - px) + dy2
-            if (d2 >= r2) continue
-            const wi = row + (((x % size) + size) % size)
-            const dome = top * Math.sqrt(1 - d2 / r2)
-            if (bump) {
-              h[wi] += dome
-            } else if (dome > h[wi]) {
-              h[wi] = dome
-              canopyTint[wi] = tint
-            }
-          }
-        }
-      }
-    }
-  }
-  stamp(8, 0.55, 0.45, 21, false) // big emergent crowns
-  stamp(16, 0.45, 0.35, 31, false) // mid-storey fills the gaps between them
-  stamp(32, 0, 0.18, 41, true) // leaf-cluster bobbles on every crown
-  canopyHeight = h
-  canopyShade = new Float32Array(size * size)
-  for (let y = 0; y < size; y++) {
-    const yu = ((y - 2 + size) % size) * size
-    const yd = ((y + 2) % size) * size
-    const row = y * size
-    for (let x = 0; x < size; x++) {
-      const xu = (x - 2 + size) % size
-      const xd = (x + 2) % size
-      const hv = h[row + x]
-      // sun from the north-west, crevices in shadow, leaf-grain speckle
-      canopyShade[row + x] =
-        (h[yu + xu] - h[yd + xd]) * 0.9 + (hv - 0.62) * 0.5 + grainField[row + x] * 0.1 * (0.35 + hv)
-    }
-  }
-}
-function buildNoiseField(size) {
+// Sum smoothstep-bilinear value-noise octaves; every lattice wraps at the
+// tile border so the field tiles seamlessly. `ridged` folds each octave into
+// a crease (|2n-1|) before summing — turbulence instead of smooth blobs.
+function buildField(size, octaves, ridged) {
   const field = new Float32Array(size * size)
-  let amp = 1
   let total = 0
-  for (let oct = 0; oct < 4; oct++) {
-    const period = 4 << oct // 4, 8, 16, 32 lattice cells across the tile
+  for (const [period, amp, seed] of octaves) {
     for (let y = 0; y < size; y++) {
       const fy = (y * period) / size
       const y0 = fy | 0
@@ -222,13 +178,13 @@ function buildNoiseField(size) {
         const x1 = (x0 + 1) % period
         const tx = fx - x0
         const sx = tx * tx * (3 - 2 * tx)
-        const top = hash2(x0, y0, oct) * (1 - sx) + hash2(x1, y0, oct) * sx
-        const bot = hash2(x0, y1, oct) * (1 - sx) + hash2(x1, y1, oct) * sx
-        field[y * size + x] += (top + (bot - top) * sy) * amp
+        const top = hash2(x0, y0, seed) * (1 - sx) + hash2(x1, y0, seed) * sx
+        const bot = hash2(x0, y1, seed) * (1 - sx) + hash2(x1, y1, seed) * sx
+        const val = top + (bot - top) * sy
+        field[y * size + x] += (ridged ? Math.abs(2 * val - 1) : val) * amp
       }
     }
     total += amp
-    amp *= 0.55
   }
   for (let i = 0; i < field.length; i++) field[i] /= total
   return field
@@ -236,7 +192,7 @@ function buildNoiseField(size) {
 
 // Bilinear sample of the noise field at (u, v) in tile units, wrapping both
 // axes — so callers may scroll/scale freely (integer scales stay seamless).
-function noise(u, v) {
+function sampleField(f, u, v) {
   const size = TEX_SIZE
   const x = (u - Math.floor(u)) * size
   const y = (v - Math.floor(v)) * size
@@ -246,16 +202,21 @@ function noise(u, v) {
   const y1 = (y0 + 1) % size
   const tx = x - x0
   const ty = y - y0
-  const f = noiseField
   const top = f[y0 * size + x0] * (1 - tx) + f[y0 * size + x1] * tx
   const bot = f[y1 * size + x0] * (1 - tx) + f[y1 * size + x1] * tx
   return top + (bot - top) * ty
 }
+function noise(u, v) {
+  return sampleField(noiseField, u, v)
+}
+function leafNoise(u, v) {
+  return sampleField(leafField, u, v)
+}
 
 // Paint one frame of the biome surface into an RGBA buffer. `m` modulates the
 // biome colour's brightness (the moving relief); `hi` blends toward white for
-// crests / glints / sparkles; `tint` shifts the hue (per tree crown in the
-// forest). Every spatial wave runs an integer number of
+// crests / glints / sparkles; `tint` shifts the hue (denser foliage leans
+// greener in the forest). Every spatial wave runs an integer number of
 // cycles per tile (TAU * k * u) and every noise lookup wraps, so the image
 // repeats with no visible border. `phase`/`step` allow painting only every
 // step-th row, so the caller can interlace updates across ticks.
@@ -298,15 +259,23 @@ function paintTexture(data, size, t, family, rgb, phase = 0, step = 1) {
           break
         }
         case 'forest': {
-          // Canopy of baked, individually lit tree crowns; per frame only a
-          // slow cloud-dapple drifts over them (tall crowns catch most of it)
-          // and sun glints flicker on the highest tops.
-          const p = i >> 2
-          const ch = canopyHeight[p]
-          const dapple = noise(u * 2 + t * 0.03, v * 2 - t * 0.018)
-          m = 0.72 + canopyShade[p] + (dapple - 0.5) * (0.15 + 0.55 * ch)
-          tint = canopyTint[p]
-          hi = Math.max(0, ch - 0.86) * Math.max(0, dapple - 0.55) * 4
+          // Windswept canopy: ridged leafy clumps (creases, not round blobs)
+          // with two gust fronts sweeping across them — the same moving-wave
+          // feel as water and sand, but green, grainy and a touch slower.
+          const clump = noise(u * 3, v * 3 + t * 0.012)
+          // Clump-warped sample bends the leaf lattice so no grid axis shows.
+          const leaf = 1 - leafNoise(u * 2 + clump * 0.09, v * 2 - clump * 0.06 + t * 0.004)
+          const gust = fsin(TAU * (2 * u + 3 * v) - t * 1.5 + clump * 5)
+          const sway = fsin(TAU * (u - 2 * v) - t + leaf * 3)
+          const wind = (gust + 0.6 * sway) / 1.6
+          m =
+            0.55 +
+            0.28 * (clump - 0.5) +
+            0.55 * (leaf - 0.55) +
+            (0.08 + 0.12 * leaf) * wind +
+            grainField[i >> 2] * 0.08
+          tint = (clump - 0.5) * 0.7
+          hi = Math.max(0, wind * leaf - 0.55) * 0.7 // leaves flash on the crests
           break
         }
         case 'grass': {
@@ -346,8 +315,8 @@ function paintTexture(data, size, t, family, rgb, phase = 0, step = 1) {
       }
       m = clamp(m, 0.22, 1.4)
       const f = hi > 0 ? Math.min(1, hi) : 0
-      // tint trades red against green per tree crown, so neighbouring crowns
-      // lean deeper-green or olive instead of all sharing one flat hue.
+      // tint trades red against green, so foliage patches lean deeper-green
+      // or olive instead of the whole canopy sharing one flat hue.
       const mr = m * (1 - tint * 0.35)
       const mg = m * (1 + tint * 0.3)
       data[i] = Math.min(255, r * mr + (255 - r * mr) * f)
