@@ -131,6 +131,11 @@ let noiseField = null
 // Static per-pixel speckle (sand grain, grass flecks, ice sparkle phases) —
 // hashed once here instead of per pixel per frame.
 let grainField = null
+// Baked rainforest canopy: dome height, pre-lit brightness and per-crown hue
+// lean for every pixel. Built once; the per-frame forest pass just reads it.
+let canopyHeight = null
+let canopyShade = null
+let canopyTint = null
 function ensureTexFields() {
   if (noiseField) return
   noiseField = buildNoiseField(TEX_SIZE)
@@ -138,6 +143,65 @@ function ensureTexFields() {
   let i = 0
   for (let y = 0; y < TEX_SIZE; y++) {
     for (let x = 0; x < TEX_SIZE; x++, i++) grainField[i] = hash2(x, y, 5) - 0.5
+  }
+  buildCanopy(TEX_SIZE)
+}
+
+// Stamp jittered, overlapping tree-crown domes — big emergents and a denser
+// mid-storey, max-combined so they interleave like a real canopy — then ride
+// small leaf-cluster bumps on top and bake directional sun + crevice shadow
+// into a shade map. Discs crossing the tile edge wrap, so the canopy tiles.
+function buildCanopy(size) {
+  const h = new Float32Array(size * size)
+  canopyTint = new Float32Array(size * size)
+  const stamp = (grid, hMin, hVar, seed, bump) => {
+    const cell = size / grid
+    for (let cy = 0; cy < grid; cy++) {
+      for (let cx = 0; cx < grid; cx++) {
+        // Full-range jitter: anything narrower biases crowns away from the
+        // cell borders, which shows up as a faint dark grid over the canopy.
+        const px = (cx + hash2(cx, cy, seed)) * cell
+        const py = (cy + hash2(cx, cy, seed + 1)) * cell
+        const rad = (0.42 + 0.3 * hash2(cx, cy, seed + 2)) * cell
+        const top = hMin + hVar * hash2(cx, cy, seed + 3)
+        const tint = hash2(cx, cy, seed + 4) - 0.5
+        const r2 = rad * rad
+        for (let y = Math.floor(py - rad); y <= py + rad; y++) {
+          const row = (((y % size) + size) % size) * size
+          const dy2 = (y - py) * (y - py)
+          for (let x = Math.floor(px - rad); x <= px + rad; x++) {
+            const d2 = (x - px) * (x - px) + dy2
+            if (d2 >= r2) continue
+            const wi = row + (((x % size) + size) % size)
+            const dome = top * Math.sqrt(1 - d2 / r2)
+            if (bump) {
+              h[wi] += dome
+            } else if (dome > h[wi]) {
+              h[wi] = dome
+              canopyTint[wi] = tint
+            }
+          }
+        }
+      }
+    }
+  }
+  stamp(8, 0.55, 0.45, 21, false) // big emergent crowns
+  stamp(16, 0.45, 0.35, 31, false) // mid-storey fills the gaps between them
+  stamp(32, 0, 0.18, 41, true) // leaf-cluster bobbles on every crown
+  canopyHeight = h
+  canopyShade = new Float32Array(size * size)
+  for (let y = 0; y < size; y++) {
+    const yu = ((y - 2 + size) % size) * size
+    const yd = ((y + 2) % size) * size
+    const row = y * size
+    for (let x = 0; x < size; x++) {
+      const xu = (x - 2 + size) % size
+      const xd = (x + 2) % size
+      const hv = h[row + x]
+      // sun from the north-west, crevices in shadow, leaf-grain speckle
+      canopyShade[row + x] =
+        (h[yu + xu] - h[yd + xd]) * 0.9 + (hv - 0.62) * 0.5 + grainField[row + x] * 0.1 * (0.35 + hv)
+    }
   }
 }
 function buildNoiseField(size) {
@@ -190,7 +254,8 @@ function noise(u, v) {
 
 // Paint one frame of the biome surface into an RGBA buffer. `m` modulates the
 // biome colour's brightness (the moving relief); `hi` blends toward white for
-// crests / glints / sparkles. Every spatial wave runs an integer number of
+// crests / glints / sparkles; `tint` shifts the hue (per tree crown in the
+// forest). Every spatial wave runs an integer number of
 // cycles per tile (TAU * k * u) and every noise lookup wraps, so the image
 // repeats with no visible border. `phase`/`step` allow painting only every
 // step-th row, so the caller can interlace updates across ticks.
@@ -203,6 +268,7 @@ function paintTexture(data, size, t, family, rgb, phase = 0, step = 1) {
       const u = x / size
       let m = 1
       let hi = 0
+      let tint = 0
       switch (family) {
         case 'water': {
           // Two crossing wave trains, bent by a slowly drifting swell, with
@@ -232,13 +298,15 @@ function paintTexture(data, size, t, family, rgb, phase = 0, step = 1) {
           break
         }
         case 'forest': {
-          // Clumpy canopy (noise²) with light patches sliding over it and
-          // leaf-scale detail (the swapped axes decorrelate the third sample).
-          const canopy = noise(u * 2 + t * 0.025, v * 2 - t * 0.014)
-          const light = noise(u * 3 - t * 0.035, v * 3 + t * 0.02)
-          const leaf = noise(v * 5, u * 5 + t * 0.01)
-          m = 0.5 + 0.55 * canopy * canopy + 0.26 * (light - 0.5) + 0.18 * (leaf - 0.5)
-          hi = Math.max(0, canopy * light - 0.52) * 0.9 // sun through the leaves
+          // Canopy of baked, individually lit tree crowns; per frame only a
+          // slow cloud-dapple drifts over them (tall crowns catch most of it)
+          // and sun glints flicker on the highest tops.
+          const p = i >> 2
+          const ch = canopyHeight[p]
+          const dapple = noise(u * 2 + t * 0.03, v * 2 - t * 0.018)
+          m = 0.72 + canopyShade[p] + (dapple - 0.5) * (0.15 + 0.55 * ch)
+          tint = canopyTint[p]
+          hi = Math.max(0, ch - 0.86) * Math.max(0, dapple - 0.55) * 4
           break
         }
         case 'grass': {
@@ -278,8 +346,12 @@ function paintTexture(data, size, t, family, rgb, phase = 0, step = 1) {
       }
       m = clamp(m, 0.22, 1.4)
       const f = hi > 0 ? Math.min(1, hi) : 0
-      data[i] = Math.min(255, r * m + (255 - r * m) * f)
-      data[i + 1] = Math.min(255, g * m + (255 - g * m) * f)
+      // tint trades red against green per tree crown, so neighbouring crowns
+      // lean deeper-green or olive instead of all sharing one flat hue.
+      const mr = m * (1 - tint * 0.35)
+      const mg = m * (1 + tint * 0.3)
+      data[i] = Math.min(255, r * mr + (255 - r * mr) * f)
+      data[i + 1] = Math.min(255, g * mg + (255 - g * mg) * f)
       data[i + 2] = Math.min(255, b * m + (255 - b * m) * f)
       data[i + 3] = 255
     }
@@ -355,6 +427,9 @@ function buildStyle(dark) {
   return {
     version: 8,
     projection: { type: 'globe' },
+    // Gentler than the default directional light, so adjacent wall facets of
+    // the extruded value column don't step in brightness at every vertex.
+    light: { anchor: 'viewport', color: '#ffffff', intensity: 0.3 },
     sources: {
       basemap: {
         type: 'raster',
@@ -485,9 +560,10 @@ function addSelectionLayers() {
         'fill-extrusion-color': column.color,
         'fill-extrusion-height': 0,
         'fill-extrusion-base': 0,
-        // Near-solid: lower opacity lets the far wall's pattern bleed through
-        // the near one, which reads as moiré on the textured column.
-        'fill-extrusion-opacity': 0.85,
+        // Fully opaque: any translucency lets the far walls and their top
+        // edges ghost through the near ones, which reads as stray diagonal
+        // streaks and extra borders on the column.
+        'fill-extrusion-opacity': 1,
         'fill-extrusion-vertical-gradient': true,
       },
     })
