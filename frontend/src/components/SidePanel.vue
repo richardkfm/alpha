@@ -117,6 +117,73 @@ function fmtHa(n) {
   const v = Number(n)
   return v.toLocaleString('en-US', { maximumFractionDigits: v < 100 ? 2 : 0 })
 }
+
+// --- Phase 4: export + embed -----------------------------------------------
+function slugify(s) {
+  return String(s || 'valuation')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'valuation'
+}
+
+// Download a CSV/PDF investor report. Posts the same geometry + params as the
+// valuation call (App.fetchValuation) so the report matches the panel exactly;
+// the backend renders it and we save the returned blob.
+const exporting = ref('')
+const exportError = ref('')
+async function downloadExport(format) {
+  if (!props.valuation || exporting.value) return
+  exporting.value = format
+  exportError.value = ''
+  try {
+    const params = new URLSearchParams({ format, currency: props.valuation.currency })
+    if (props.region.name) params.set('name', props.region.name)
+    if (props.region.biome_key) params.set('biome', props.region.biome_key)
+    if (props.region.intactness != null) params.set('intactness', props.region.intactness)
+    const res = await fetch(`/api/v1/valuation/export?${params}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(props.region.geojson),
+    })
+    if (!res.ok) throw new Error(`export HTTP ${res.status}`)
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `alpha-${slugify(props.region.name || props.region.biome_key)}.${format}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    exportError.value = 'Export failed — is the backend running?'
+  } finally {
+    exporting.value = ''
+  }
+}
+
+// Embeddable widget: a copy-paste <iframe> snippet for a catalogue region (only
+// those carry a stable id). The iframe loads /embed.html from this same origin,
+// so its API calls are same-origin — no CORS/host config needed by the embedder.
+const showEmbed = ref(false)
+const copied = ref(false)
+const embedSnippet = computed(() => {
+  if (!props.region?.id) return ''
+  const origin = window.location.origin
+  const cur = props.valuation?.currency || 'USD'
+  const theme = document.documentElement.classList.contains('light') ? 'light' : 'dark'
+  const src = `${origin}/embed.html?region=${encodeURIComponent(props.region.id)}&currency=${cur}&theme=${theme}`
+  return `<iframe src="${src}" width="340" height="240" style="border:0;border-radius:14px" loading="lazy" title="alpha — ${props.region.name} ecosystem value"></iframe>`
+})
+async function copyEmbed() {
+  try {
+    await navigator.clipboard.writeText(embedSnippet.value)
+    copied.value = true
+    setTimeout(() => (copied.value = false), 1600)
+  } catch {
+    copied.value = false
+  }
+}
 </script>
 
 <template>
@@ -136,6 +203,28 @@ function fmtHa(n) {
           <span class="conn-dot"></span>
           {{ backendOnline ? 'live' : backendOnline === false ? 'offline' : '…' }}
         </span>
+      </div>
+
+      <div v-if="valuation" class="panel-actions">
+        <button class="act" :disabled="!!exporting" @click="downloadExport('csv')">
+          {{ exporting === 'csv' ? '…' : '↓ CSV' }}
+        </button>
+        <button class="act" :disabled="!!exporting" @click="downloadExport('pdf')">
+          {{ exporting === 'pdf' ? '…' : '↓ PDF' }}
+        </button>
+        <button
+          v-if="region.id"
+          class="act"
+          :class="{ on: showEmbed }"
+          @click="showEmbed = !showEmbed"
+        >⧉ Embed</button>
+      </div>
+      <p v-if="exportError" class="act-err">{{ exportError }}</p>
+
+      <div v-if="showEmbed && region.id" class="embed-box">
+        <p class="embed-hint">Drop this into any page to show {{ region.name }}'s value:</p>
+        <code class="embed-code">{{ embedSnippet }}</code>
+        <button class="embed-copy" @click="copyEmbed">{{ copied ? 'Copied ✓' : 'Copy snippet' }}</button>
       </div>
     </header>
 
@@ -375,6 +464,83 @@ function fmtHa(n) {
   color: var(--text-muted);
   font-size: 0.84rem;
   line-height: 1.4;
+}
+
+/* Export + embed actions (Phase 4). */
+.panel-actions {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.act {
+  border: 1px solid var(--border-soft);
+  background: var(--bg-deep);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease),
+    background 0.15s var(--ease);
+}
+.act:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.act.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+.act:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+.act-err {
+  margin: -6px 0 12px;
+  color: #f87171;
+  font-size: 0.74rem;
+}
+.embed-box {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-deep);
+}
+.embed-hint {
+  margin: 0 0 7px;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+.embed-code {
+  display: block;
+  font-family: 'Spline Sans Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--text);
+  word-break: break-all;
+  line-height: 1.45;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  padding: 8px 9px;
+  margin-bottom: 8px;
+}
+.embed-copy {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.embed-copy:hover {
+  background: var(--accent);
+  color: #04120c;
 }
 .conn {
   flex: none;

@@ -116,10 +116,15 @@ sources (Copernicus satellite data, ESVD API, carbon market prices).
 
 ### Phase 4 — API & Export Layer
 
+- ✅ **PDF/CSV export for investor reports** — `POST /api/v1/valuation/export?format=csv|pdf`
+  renders the exact same TEV breakdown as `/api/v1/valuation` as a spreadsheet-ready
+  CSV or a one-page PDF brief (`backend/export.py`); the side panel offers ↓ CSV / ↓ PDF
+  buttons.
+- ✅ **Embeddable widget** — a lightweight iframe (`frontend/embed.html`, served from a
+  separate Vite entry so it skips the globe bundle) renders a single region's value from
+  `GET /api/v1/regions/{id}`; the side panel generates a copy-paste `<iframe>` snippet.
 - Harden the API with versioning, rate limiting, and API key authentication (for
-  commercial users under AGPL dual-licensing)
-- Add PDF/CSV export for investor reports
-- Add embeddable widget (iframe snippet) for third-party policy dashboards
+  commercial users under AGPL dual-licensing) — *still to do*
 
 ---
 

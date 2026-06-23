@@ -26,6 +26,10 @@ MapLibre globe and a 2D Leaflet map. Part of the
   pasted GeoJSON polygon.
 - **Currency toggle** (USD / EUR / BRL) re-prices everything via the backend.
 - **Dark/light theme toggle** — dark is default (deep greens, teal accents).
+- **Export & embed** (Phase 4): the side panel offers ↓ CSV / ↓ PDF investor
+  reports (`POST /api/v1/valuation/export`) and an **Embed** snippet. The
+  embeddable widget is a separate, lightweight Vite entry (`embed.html` →
+  `src/embed.js` → `EmbedCard.vue`) so the iframe skips the globe bundle.
 
 ## Run with Docker (recommended)
 
@@ -54,9 +58,11 @@ App: http://localhost:3000
 ```
 frontend/
 ├── index.html
-├── vite.config.js              # dev server + /api, /health proxy
+├── embed.html                  # lightweight embeddable-widget entry (Phase 4)
+├── vite.config.js              # dev server + /api, /health proxy; 2 build entries
 └── src/
     ├── main.js
+    ├── embed.js                # entry for embed.html — mounts EmbedCard only
     ├── theme.css               # dark-default palette + .light override
     ├── App.vue                 # topbar, modes, theme toggle, fetch orchestration
     ├── components/
@@ -64,7 +70,8 @@ frontend/
     │   ├── WorldMap.vue        # 2D Leaflet map overlays
     │   ├── LayerControl.vue    # biome toggles + display-style switch
     │   ├── SearchBar.vue       # value a custom coordinate / box / GeoJSON
-    │   ├── SidePanel.vue       # TEV breakdown + GDP callout
+    │   ├── SidePanel.vue       # TEV breakdown + GDP callout + export/embed
+    │   ├── EmbedCard.vue       # compact single-region widget (the iframe body)
     │   ├── CompareDashboard.vue# side-by-side TEV comparison
     │   └── DataHub.vue         # data catalogue + live tools
     └── data/

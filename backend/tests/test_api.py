@@ -89,6 +89,31 @@ def test_regions_returns_valued_catalogue():
     assert body["dataset"]["count"] == len(regions)
 
 
+def test_region_detail_matches_catalogue():
+    catalogue = client.get("/api/v1/regions").json()["regions"]
+    amazon_in_list = next(r for r in catalogue if r["id"] == "amazon")
+    res = client.get("/api/v1/regions/amazon")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["currency"] == "USD"
+    # The single-region lookup reuses list_regions, so figures match exactly.
+    assert (
+        body["region"]["total_ecosystem_value_per_year"]
+        == amazon_in_list["total_ecosystem_value_per_year"]
+    )
+
+
+def test_region_detail_respects_currency():
+    res = client.get("/api/v1/regions/amazon?currency=EUR")
+    assert res.status_code == 200
+    assert res.json()["region"]["currency"] == "EUR"
+
+
+def test_region_detail_unknown_id_404s():
+    res = client.get("/api/v1/regions/not-a-real-region")
+    assert res.status_code == 404
+
+
 def test_market_endpoint_static_by_default():
     res = client.get("/api/v1/market")
     assert res.status_code == 200
