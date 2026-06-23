@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { resolve } from 'path'
 import vue from '@vitejs/plugin-vue'
 
 // Inside Docker the backend is reachable at http://backend:8000; for local dev
@@ -22,6 +23,16 @@ const allowedHosts =
 
 export default defineConfig({
   plugins: [vue()],
+  // Two entry points: the full app (index.html) and the lightweight embeddable
+  // widget (embed.html), so the iframe build never includes the globe/map bundle.
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        embed: resolve(__dirname, 'embed.html'),
+      },
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,

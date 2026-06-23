@@ -161,6 +161,25 @@ curl -X POST http://localhost:8000/api/v1/classify \
   -d '{"type":"Polygon","coordinates":[[[-65,-5],[-60,-5],[-60,-2],[-65,-2],[-65,-5]]]}'
 ```
 
+### Phase 4 — export & embed
+
+Download an investor report (the same TEV figures as `/api/v1/valuation`) as a
+CSV data sheet or a one-page PDF, and embed a region's value anywhere via an
+`<iframe>`. The side panel exposes ↓ CSV / ↓ PDF and an **Embed** snippet, or hit
+the API directly:
+
+```bash
+# One-page PDF investor brief
+curl -X POST "http://localhost:8000/api/v1/valuation/export?format=pdf&name=Amazon" \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"Polygon","coordinates":[[[-65,-5],[-60,-5],[-60,-2],[-65,-2],[-65,-5]]]}' \
+  -o amazon.pdf
+
+# Embeddable widget for a catalogue region (served from this app's own origin)
+# <iframe src="http://localhost:3000/embed.html?region=amazon&currency=USD&theme=dark"
+#         width="340" height="240" style="border:0"></iframe>
+```
+
 ## Repository layout
 
 ```

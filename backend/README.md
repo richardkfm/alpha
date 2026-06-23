@@ -15,7 +15,9 @@ geographic area. Part of the [`alpha`](../README.md) monorepo.
 | --- | --- | --- |
 | `GET` | `/health` | Liveness probe → `{"status": "ok", "service": "alpha-backend"}` |
 | `POST` | `/api/v1/valuation` | GeoJSON polygon → full TEV breakdown (geodesic area, per-sqm + area totals, intactness, standing-asset & conversion-liability framing, currency). **Phase 3:** auto-detects the biome when none is supplied (`classification` in the response) |
+| `POST` | `/api/v1/valuation/export` | _(Phase 4)_ same breakdown as `/valuation`, rendered as a downloadable **CSV** data sheet or one-page **PDF** investor brief (`?format=csv\|pdf`, optional `name`) |
 | `GET` | `/api/v1/regions` | Pre-valued catalogue of named ecosystems across all biomes, powering the map overlays + Compare view |
+| `GET` | `/api/v1/regions/{id}` | _(Phase 4)_ a single catalogue region, valued in `?currency=` — backs the embeddable widget (`/embed.html`) |
 | `GET` | `/api/v1/reference` | Supported biomes & currencies + their per-sqm reference yields |
 | `GET` | `/api/v1/datasets` | Data catalogue + roadmap (source, citation, status, as-of per domain) for the Data Hub |
 | `GET` | `/api/v1/market` | Current carbon price + FX inputs with provenance and live/static flags |
@@ -72,6 +74,7 @@ Code layout:
   RESOLVE ecoregions (`data/ecoregions.geojson`) + curated seeds (`data/wwf_biomes.geojson`)
 - `landcover.py` — _(Phase 3)_ Copernicus CGLS-LC100 legend → biome hint + intactness
 - `esv_extraction.py` — _(Phase 3)_ LLM-assisted (Ollama-compatible) + regex ESV parser
+- `export.py` — _(Phase 4)_ CSV (stdlib) + PDF (reportlab) investor-report serialisers
 - `ingest.py` — _(Phase 3)_ ingestion CLI (`validate` / `classify` / `refresh`)
 - `tests/` — unit tests for the engine and the Phase 3 ingestion layer (`python -m pytest`)
 
@@ -106,6 +109,7 @@ python -m pytest
 **Phase 3 ✅** ingests real biome boundaries (RESOLVE Ecoregions 2017, with curated
 seeds for the land-use/freshwater types RESOLVE omits) to auto-detect the
 biome, adds the Copernicus land-cover intactness layer, and an LLM-assisted ESV
-extractor — see [`INGESTION.md`](./INGESTION.md). **Phase 4** connects carbon prices
-and FX rates to live feeds and hardens the API (versioning, auth, rate limiting,
-export).
+extractor — see [`INGESTION.md`](./INGESTION.md). **Phase 4** is underway: live FX
+feeds, CSV/PDF report export (`/api/v1/valuation/export`) and the embeddable widget
+(`/api/v1/regions/{id}` + `/embed.html`) are shipped; API hardening (versioning,
+auth, rate limiting) and a live carbon feed are still to do.

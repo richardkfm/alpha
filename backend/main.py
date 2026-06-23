@@ -11,6 +11,11 @@ API-first FastAPI service.
 - ``GET /api/v1/regions`` — the bundled catalogue of named ecosystems across all
   five biomes, each valued in the requested currency, powering the map overlays
   and the Compare view.
+- ``GET /api/v1/regions/{id}`` — a single catalogue region, valued in the
+  requested currency; backs the embeddable widget (``/embed.html``).
+- ``POST /api/v1/valuation/export`` — Phase 4 export layer: the same TEV
+  breakdown as ``/api/v1/valuation`` rendered as a downloadable CSV data sheet or
+  one-page PDF investor brief (``format=csv|pdf``; see ``export.py``).
 - ``GET /api/v1/datasets`` — the data catalogue: every data domain's source,
   citation, status and "as-of" date, plus the "data we still need" roadmap, for
   the GUI Data Hub.
@@ -28,12 +33,13 @@ The Phase 3 ingestion layer lives in ``biome_classifier.py``, ``landcover.py`` a
 """
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from biome_classifier import boundary_source, classify_geometry
 from datasets import data_catalog
+import export as export_report
 import json as _json
 import os as _os
 from esv_extraction import extract_esv_records
@@ -188,6 +194,31 @@ def regions(currency: Optional[str] = Query(default=None)) -> Dict[str, Any]:
     }
 
 
+@app.get("/api/v1/regions/{region_id}")
+def region_detail(
+    region_id: str, currency: Optional[str] = Query(default=None)
+) -> Dict[str, Any]:
+    """Return one catalogue region, valued in ``currency``.
+
+    Backs the embeddable widget (``/embed.html``): a lightweight single-region
+    lookup so the iframe needn't pull the whole catalogue. Reuses ``list_regions``
+    so the figures match ``GET /api/v1/regions`` and the valuation endpoint.
+    """
+    chosen_currency = (currency or DEFAULT_CURRENCY).upper()
+    if chosen_currency not in CURRENCIES:
+        chosen_currency = DEFAULT_CURRENCY
+    mkt = _market_for(chosen_currency)
+    for region in list_regions(
+        chosen_currency,
+        carbon_price=mkt["carbon_price"],
+        fx_rate=mkt["fx_rate"],
+        fx_as_of=mkt["fx_as_of"],
+    ):
+        if str(region.get("id")) == region_id:
+            return {"region": region, "currency": chosen_currency, "market": mkt["provenance"]}
+    raise HTTPException(status_code=404, detail=f"Unknown region '{region_id}'.")
+
+
 @app.get("/api/v1/ecoregions")
 def ecoregions() -> Dict[str, Any]:
     """Return detailed ecoregion boundaries grouped by biome_key.
@@ -224,36 +255,30 @@ def datasets() -> Dict[str, Any]:
     return data_catalog()
 
 
-@app.post("/api/v1/valuation")
-def valuation(
-    body: ValuationRequest,
-    biome: Optional[str] = Query(default=None),
-    currency: Optional[str] = Query(default=None),
-    intactness: Optional[float] = Query(default=None, ge=0.0, le=1.0),
-    discount_rate: Optional[float] = Query(default=None, gt=0.0),
+def build_valuation(
+    geometry: Dict[str, Any],
+    explicit_biome: Optional[str],
+    currency: Optional[str],
+    intactness: Optional[float],
+    discount_rate: Optional[float],
 ) -> Dict[str, Any]:
-    """Compute the Total Ecosystem Value (TEV) breakdown for a GeoJSON polygon.
+    """Classify (if needed), value, and attach provenance for a geometry.
 
-    The geodesic area of the polygon is computed and used to scale the biome's
-    reference yields; results are returned both per sqm/year and as an annual
-    total for the whole area, in the requested currency.
+    The single code path behind both ``POST /api/v1/valuation`` and the export
+    endpoint, so an exported report carries byte-for-byte the same numbers as the
+    API. Raises ``HTTPException(422)`` for empty or zero-area geometry.
 
-    **Phase 3:** when no biome is supplied (query or body), the biome is detected
-    from the geometry against ingested RESOLVE ecoregion boundaries (+ curated
-    seeds) (``biome_classifier.classify_geometry``) instead of silently defaulting. The
-    detection — including its source and confidence — is returned under
-    ``classification``. An explicit biome still wins and is echoed back as an
-    ``"explicit"`` classification.
+    **Phase 3:** when ``explicit_biome`` is falsy the biome is detected from the
+    geometry against ingested RESOLVE ecoregion boundaries (+ curated seeds) via
+    ``biome_classifier.classify_geometry`` instead of silently defaulting; the
+    detection (source + confidence) is returned under ``classification``. An
+    explicit biome wins and is echoed back as an ``"explicit"`` classification.
     """
-    geometry = body.to_geometry()
     if not geometry:
         raise HTTPException(
             status_code=422,
             detail="Provide a GeoJSON Polygon/MultiPolygon geometry (type+coordinates or a Feature).",
         )
-
-    explicit_biome = biome or body.biome
-    chosen_currency = currency or body.currency or DEFAULT_CURRENCY
 
     if explicit_biome:
         chosen_biome = explicit_biome
@@ -267,14 +292,14 @@ def valuation(
         classification = classify_geometry(geometry)
         chosen_biome = classification["biome_key"]
 
-    norm_currency = str(chosen_currency or DEFAULT_CURRENCY).upper()
+    norm_currency = str(currency or DEFAULT_CURRENCY).upper()
     if norm_currency not in CURRENCIES:
         norm_currency = DEFAULT_CURRENCY
     mkt = _market_for(norm_currency)
     result = compute_valuation(
         geometry,
         biome=chosen_biome,
-        currency=chosen_currency,
+        currency=norm_currency,
         carbon_price=mkt["carbon_price"],
         fx_rate=mkt["fx_rate"],
         fx_as_of=mkt["fx_as_of"],
@@ -290,6 +315,73 @@ def valuation(
     result["classification"] = classification
     result["market"] = mkt["provenance"]
     return result
+
+
+@app.post("/api/v1/valuation")
+def valuation(
+    body: ValuationRequest,
+    biome: Optional[str] = Query(default=None),
+    currency: Optional[str] = Query(default=None),
+    intactness: Optional[float] = Query(default=None, ge=0.0, le=1.0),
+    discount_rate: Optional[float] = Query(default=None, gt=0.0),
+) -> Dict[str, Any]:
+    """Compute the Total Ecosystem Value (TEV) breakdown for a GeoJSON polygon.
+
+    The geodesic area of the polygon is computed and used to scale the biome's
+    reference yields; results are returned both per sqm/year and as an annual
+    total for the whole area, in the requested currency. Biome and currency may
+    be supplied as query parameters or in the body (the query parameter wins).
+    See ``build_valuation`` for the classification/auto-detection behaviour.
+    """
+    return build_valuation(
+        body.to_geometry(),
+        explicit_biome=biome or body.biome,
+        currency=currency or body.currency,
+        intactness=intactness,
+        discount_rate=discount_rate,
+    )
+
+
+@app.post("/api/v1/valuation/export")
+def valuation_export(
+    body: ValuationRequest,
+    format: str = Query(default="csv", pattern="^(csv|pdf)$"),
+    name: Optional[str] = Query(default=None),
+    biome: Optional[str] = Query(default=None),
+    currency: Optional[str] = Query(default=None),
+    intactness: Optional[float] = Query(default=None, ge=0.0, le=1.0),
+    discount_rate: Optional[float] = Query(default=None, gt=0.0),
+) -> Response:
+    """Export a polygon's TEV breakdown as a downloadable CSV or PDF report.
+
+    Phase 4 export layer. Takes the same body/query parameters as
+    ``POST /api/v1/valuation`` (plus ``format`` and an optional display ``name``)
+    and runs them through the very same ``build_valuation`` path, so the report
+    carries identical figures to the API. CSV is a spreadsheet-ready data sheet;
+    PDF is a one-page investor brief (see ``export.py``).
+    """
+    result = build_valuation(
+        body.to_geometry(),
+        explicit_biome=biome or body.biome,
+        currency=currency or body.currency,
+        intactness=intactness,
+        discount_rate=discount_rate,
+    )
+    report_name = name or (body.properties or {}).get("name")
+    slug = export_report.filename_slug(result, report_name)
+    if format == "pdf":
+        content: Any = export_report.to_pdf(result, report_name)
+        media_type = "application/pdf"
+        ext = "pdf"
+    else:
+        content = export_report.to_csv(result, report_name)
+        media_type = "text/csv"
+        ext = "csv"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="alpha-{slug}.{ext}"'},
+    )
 
 
 @app.post("/api/v1/classify")
