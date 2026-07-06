@@ -29,6 +29,7 @@
   },
   "errors": {
     "backendUnreachable": "Das alpha-Backend ist nicht erreichbar. Läuft es auf :8000?",
+    "regionsUnreachable": "Regionsdaten konnten nicht vom alpha-Backend geladen werden. Läuft es auf :8000?",
     "valuationFailed": "Diese Fläche konnte nicht bewertet werden: {message}",
     "valuationFailedGeneric": "Diese Fläche konnte nicht bewertet werden.",
     "repriceFailed": "Neupreisung in {code} nicht möglich."
@@ -62,5 +63,103 @@
         "hint": "Detaillierte Ökoregionsgrenzen, ohne Füllung"
       }
     }
+  },
+  "biomes": {
+    "tropical_rainforest": { "label": "Tropischer Regenwald", "short": "Regenwald", "sublabel": "tropisch, feucht, laubwerfend" },
+    "mangrove": { "label": "Mangrove", "short": "Mangrove", "sublabel": "Blue-Carbon-Küstenzone" },
+    "wetland": { "label": "Binnenfeuchtgebiet", "short": "Feuchtgebiet", "sublabel": "Süßwasser & Überschwemmungsgebiete" },
+    "temperate_forest": { "label": "Gemäßigter Wald", "short": "Gemäßigt", "sublabel": "Laub- & Nadelwald" },
+    "temperate_grassland": { "label": "Gemäßigtes Grasland", "short": "Grasland", "sublabel": "Steppe & Prärie" },
+    "boreal_forest": { "label": "Borealer Wald", "short": "Boreal", "sublabel": "nördliche Taiga" },
+    "cropland": { "label": "Ackerland & Landwirtschaft", "short": "Ackerland", "sublabel": "Nutzflächen & bewirtschaftete Kulturen" },
+    "freshwater": { "label": "Süßwasser", "short": "Süßwasser", "sublabel": "Seen, Flüsse & Stauseen" },
+    "peri_urban": { "label": "Stadtrandgebiet", "short": "Stadtrand", "sublabel": "Stadtrand & bewirtschaftete Freifläche" },
+    "tundra": { "label": "Tundra", "short": "Tundra", "sublabel": "arktisch & alpin" },
+    "desert": { "label": "Wüste & Trockengebiet", "short": "Wüste", "sublabel": "Wüsten & Trockengebüsch" }
+  },
+  "yields": {
+    "carbon_capture": "Kohlenstoffbindung",
+    "climate_regulation": "Klimaregulierung",
+    "water_filtration": "Wasserfilterung",
+    "biodiversity_premium": "Biodiversitätsprämie",
+    "soil_nutrient_value": "Bodennährstoffwert"
+  },
+  "sidePanel": {
+    "close": "Schließen",
+    "connection": {
+      "live": "live",
+      "offline": "offline",
+      "checking": "…",
+      "titleOk": "Mit der alpha-Bewertungs-Engine verbunden",
+      "titleDown": "Die alpha-Bewertungs-Engine ist nicht erreichbar",
+      "titleChecking": "Bewertungs-Engine wird geprüft…"
+    },
+    "actions": {
+      "csv": "↓ CSV",
+      "pdf": "↓ PDF",
+      "embed": "⧉ Einbetten",
+      "working": "…",
+      "exportFailed": "Export fehlgeschlagen — läuft das Backend?"
+    },
+    "embed": {
+      "hint": "Füge dies in eine beliebige Seite ein, um den Wert von {name} anzuzeigen:",
+      "copy": "Snippet kopieren",
+      "copied": "Kopiert ✓"
+    },
+    "loading": {
+      "ariaLabel": "Ökosystemwert wird berechnet",
+      "note": "Ökosystemwert wird berechnet…"
+    },
+    "provenance": {
+      "resolveMatchLabel": "RESOLVE-Treffer",
+      "resolveMatchFrom": "klassifiziert aus {region}",
+      "resolveMatchFromBoundaries": "klassifiziert aus erfassten Grenzdaten",
+      "resolveMatchTitle": "{from} — RESOLVE Ecoregions 2017",
+      "catalogueLabel": "Katalog",
+      "catalogueTitle": "Biom mit dem Regionenkatalog geliefert",
+      "defaultLabel": "Standard",
+      "defaultTitle": "Keine Grenzübereinstimmung — auf das Standardbiom zurückgefallen"
+    },
+    "stats": {
+      "area": "Fläche",
+      "intactness": "Intaktheit",
+      "intactnessTitle": "Liefert {pct} des Werts, den dieses Land vollständig intakt erbringen würde",
+      "potentialSub": "von {value}/Jahr Potenzial"
+    },
+    "yields": {
+      "heading": "Leistungserträge",
+      "unit": "{currency} / m² / Jahr",
+      "scale": "Balkenlänge = Wert im Vergleich zum stärksten Biom für diese Leistung",
+      "rowTitle": "{label} — {share}% des Werts dieser Region"
+    },
+    "tev": {
+      "label": "Gesamter Ökosystemwert",
+      "unit": "{currency} / m² / Jahr",
+      "annualUnit": "{currency} / Jahr für diese Fläche"
+    },
+    "asset": {
+      "label": "Stehender Anlagewert",
+      "discountGroup": "Diskontsatz",
+      "sub": "Wert in der Bilanz, unberührt belassen — ewige Rendite bei {rate}%",
+      "subTitle": "Der jährliche Strom an Ökosystemleistungen, kapitalisiert als ewige Rente — der Bilanzwert, dieses Land unberührt zu lassen"
+    },
+    "conversion": {
+      "heading": "Bei Umwandlung",
+      "modesGroup": "Umwandlungsanalyse-Modi",
+      "liability": "Verbindlichkeit",
+      "liabilityTitle": "Verbindlichkeits-Rahmen",
+      "systemic": "Systemisch",
+      "systemicTitle": "Systemischer Aufschlag & Kohlenstoffschuld",
+      "redLines": "Rote Linien",
+      "redLinesTitle": "Rote Linien — unumkehrbare Verluste",
+      "perpetualLiability": "Ewige Verbindlichkeit",
+      "liabilitySub": "~{loss}/Jahr verlorener Leistungen, dauerhaft geschuldet — {incidence}",
+      "systemicTagBold": "×{mult} systemisch",
+      "systemicTagRest": "— seltenes, intaktes Land trägt über die Parzelle hinaus.",
+      "carbonDebt": "+ ~{amount} gespeicherter Kohlenstoff freigesetzt — einmalig, weitgehend unumkehrbar.",
+      "redLinesHead": "⛔ Zu keinem Preis ersetzbar",
+      "redLinesHeadTitle": "Rote Linien, keine Posten — bewusst aus den obigen Zahlen ausgeklammert"
+    },
+    "methodology": "Methodik"
   }
 }

@@ -29,6 +29,7 @@
   },
   "errors": {
     "backendUnreachable": "No se pudo conectar con el backend de alpha. ¿Está corriendo en :8000?",
+    "regionsUnreachable": "No se pudieron cargar los datos de regiones del backend de alpha. ¿Está corriendo en :8000?",
     "valuationFailed": "No se pudo valorar esta área: {message}",
     "valuationFailedGeneric": "No se pudo valorar esta área.",
     "repriceFailed": "No se pudo recalcular el precio en {code}."
@@ -62,5 +63,103 @@
         "hint": "Límites detallados de ecorregiones, sin relleno"
       }
     }
+  },
+  "biomes": {
+    "tropical_rainforest": { "label": "Selva Tropical", "short": "Selva", "sublabel": "bosque tropical húmedo latifoliado" },
+    "mangrove": { "label": "Manglar", "short": "Manglar", "sublabel": "costero de carbono azul" },
+    "wetland": { "label": "Humedal Continental", "short": "Humedal", "sublabel": "agua dulce e inundable" },
+    "temperate_forest": { "label": "Bosque Templado", "short": "Templado", "sublabel": "latifoliado y conífero" },
+    "temperate_grassland": { "label": "Pastizal Templado", "short": "Pastizal", "sublabel": "estepa y pradera" },
+    "boreal_forest": { "label": "Bosque Boreal", "short": "Boreal", "sublabel": "taiga del norte" },
+    "cropland": { "label": "Tierra de Cultivo y Agricultura", "short": "Cultivo", "sublabel": "tierras de labranza y cultivos gestionados" },
+    "freshwater": { "label": "Agua Dulce", "short": "Agua dulce", "sublabel": "lagos, ríos y embalses" },
+    "peri_urban": { "label": "Zona Periurbana", "short": "Periurbano", "sublabel": "periferia urbana y suelo abierto gestionado" },
+    "tundra": { "label": "Tundra", "short": "Tundra", "sublabel": "ártica y alpina" },
+    "desert": { "label": "Desierto y Xérico", "short": "Desierto", "sublabel": "desiertos y matorral seco" }
+  },
+  "yields": {
+    "carbon_capture": "Captura de Carbono",
+    "climate_regulation": "Regulación Climática",
+    "water_filtration": "Filtración de Agua",
+    "biodiversity_premium": "Prima de Biodiversidad",
+    "soil_nutrient_value": "Valor de Nutrientes del Suelo"
+  },
+  "sidePanel": {
+    "close": "Cerrar",
+    "connection": {
+      "live": "en vivo",
+      "offline": "fuera de línea",
+      "checking": "…",
+      "titleOk": "Conectado al motor de valoración de alpha",
+      "titleDown": "El motor de valoración de alpha no está disponible",
+      "titleChecking": "Comprobando el motor de valoración…"
+    },
+    "actions": {
+      "csv": "↓ CSV",
+      "pdf": "↓ PDF",
+      "embed": "⧉ Insertar",
+      "working": "…",
+      "exportFailed": "Error al exportar — ¿está el backend corriendo?"
+    },
+    "embed": {
+      "hint": "Coloca esto en cualquier página para mostrar el valor de {name}:",
+      "copy": "Copiar fragmento",
+      "copied": "Copiado ✓"
+    },
+    "loading": {
+      "ariaLabel": "Calculando el valor del ecosistema",
+      "note": "Calculando el valor del ecosistema…"
+    },
+    "provenance": {
+      "resolveMatchLabel": "Coincidencia RESOLVE",
+      "resolveMatchFrom": "clasificado a partir de {region}",
+      "resolveMatchFromBoundaries": "clasificado a partir de límites ingeridos",
+      "resolveMatchTitle": "{from} — RESOLVE Ecoregions 2017",
+      "catalogueLabel": "Catálogo",
+      "catalogueTitle": "Bioma proporcionado con el catálogo de regiones",
+      "defaultLabel": "Predeterminado",
+      "defaultTitle": "Sin coincidencia de límites — se usó el bioma predeterminado"
+    },
+    "stats": {
+      "area": "Área",
+      "intactness": "Integridad",
+      "intactnessTitle": "Entrega el {pct} del valor que esta tierra produciría totalmente intacta",
+      "potentialSub": "de {value}/año de potencial"
+    },
+    "yields": {
+      "heading": "Rendimientos de servicios",
+      "unit": "{currency} / m² / año",
+      "scale": "Longitud de la barra = valor frente al bioma más fuerte para ese servicio",
+      "rowTitle": "{label} — {share}% del valor de esta región"
+    },
+    "tev": {
+      "label": "Valor Total del Ecosistema",
+      "unit": "{currency} / m² / año",
+      "annualUnit": "{currency} / año en toda esta área"
+    },
+    "asset": {
+      "label": "Valor del activo en pie",
+      "discountGroup": "Tasa de descuento",
+      "sub": "valor en el balance, dejado en pie — flujo perpetuo al {rate}%",
+      "subTitle": "El flujo anual de servicios ecosistémicos capitalizado como perpetuidad — el valor en el balance de dejar esta tierra en pie"
+    },
+    "conversion": {
+      "heading": "Si se convierte",
+      "modesGroup": "Modos de análisis de conversión",
+      "liability": "Pasivo",
+      "liabilityTitle": "Enfoque de pasivo",
+      "systemic": "Sistémico",
+      "systemicTitle": "Prima sistémica y deuda de carbono",
+      "redLines": "Líneas rojas",
+      "redLinesTitle": "Líneas rojas — pérdidas irreversibles",
+      "perpetualLiability": "Pasivo perpetuo",
+      "liabilitySub": "~{loss}/año de servicios perdidos, adeudados a perpetuidad — {incidence}",
+      "systemicTagBold": "×{mult} sistémico",
+      "systemicTagRest": "— la tierra intacta y escasa sostiene más allá de la parcela misma.",
+      "carbonDebt": "+ ~{amount} de carbono almacenado liberado — una vez, en gran parte de forma irreversible.",
+      "redLinesHead": "⛔ No se puede reemplazar a ningún precio",
+      "redLinesHeadTitle": "Líneas rojas, no partidas — deliberadamente excluidas de las cifras anteriores"
+    },
+    "methodology": "Metodología"
   }
 }

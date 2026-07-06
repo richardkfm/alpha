@@ -29,6 +29,7 @@
   },
   "errors": {
     "backendUnreachable": "Could not reach the alpha backend. Is it running on :8000?",
+    "regionsUnreachable": "Could not load region data from the alpha backend. Is it running on :8000?",
     "valuationFailed": "Could not value this area: {message}",
     "valuationFailedGeneric": "Could not value this area.",
     "repriceFailed": "Could not re-price in {code}."
@@ -62,5 +63,103 @@
         "hint": "Detailed ecoregion borders, no fill"
       }
     }
+  },
+  "biomes": {
+    "tropical_rainforest": { "label": "Tropical Rainforest", "short": "Rainforest", "sublabel": "tropical moist broadleaf" },
+    "mangrove": { "label": "Mangrove", "short": "Mangrove", "sublabel": "blue-carbon coastal" },
+    "wetland": { "label": "Inland Wetland", "short": "Wetland", "sublabel": "freshwater & flooded" },
+    "temperate_forest": { "label": "Temperate Forest", "short": "Temperate", "sublabel": "broadleaf & conifer" },
+    "temperate_grassland": { "label": "Temperate Grassland", "short": "Grassland", "sublabel": "steppe & prairie" },
+    "boreal_forest": { "label": "Boreal Forest", "short": "Boreal", "sublabel": "northern taiga" },
+    "cropland": { "label": "Cropland & Agriculture", "short": "Cropland", "sublabel": "farmland & managed crops" },
+    "freshwater": { "label": "Freshwater", "short": "Freshwater", "sublabel": "lakes, rivers & reservoirs" },
+    "peri_urban": { "label": "Peri-urban Land", "short": "Peri-urban", "sublabel": "urban fringe & managed open" },
+    "tundra": { "label": "Tundra", "short": "Tundra", "sublabel": "arctic & alpine" },
+    "desert": { "label": "Desert & Xeric", "short": "Desert", "sublabel": "deserts & dry shrubland" }
+  },
+  "yields": {
+    "carbon_capture": "Carbon Capture",
+    "climate_regulation": "Climate Regulation",
+    "water_filtration": "Water Filtration",
+    "biodiversity_premium": "Biodiversity Premium",
+    "soil_nutrient_value": "Soil Nutrient Value"
+  },
+  "sidePanel": {
+    "close": "Close",
+    "connection": {
+      "live": "live",
+      "offline": "offline",
+      "checking": "…",
+      "titleOk": "Connected to the alpha valuation engine",
+      "titleDown": "The alpha valuation engine is unreachable",
+      "titleChecking": "Checking the valuation engine…"
+    },
+    "actions": {
+      "csv": "↓ CSV",
+      "pdf": "↓ PDF",
+      "embed": "⧉ Embed",
+      "working": "…",
+      "exportFailed": "Export failed — is the backend running?"
+    },
+    "embed": {
+      "hint": "Drop this into any page to show {name}'s value:",
+      "copy": "Copy snippet",
+      "copied": "Copied ✓"
+    },
+    "loading": {
+      "ariaLabel": "Calculating ecosystem value",
+      "note": "Calculating ecosystem value…"
+    },
+    "provenance": {
+      "resolveMatchLabel": "RESOLVE match",
+      "resolveMatchFrom": "classified from {region}",
+      "resolveMatchFromBoundaries": "classified from ingested boundaries",
+      "resolveMatchTitle": "{from} — RESOLVE Ecoregions 2017",
+      "catalogueLabel": "Catalogue",
+      "catalogueTitle": "Biome supplied with the region catalogue",
+      "defaultLabel": "Default",
+      "defaultTitle": "No boundary match — fell back to the default biome"
+    },
+    "stats": {
+      "area": "Area",
+      "intactness": "Intactness",
+      "intactnessTitle": "Delivering {pct} of the value this land would yield fully intact",
+      "potentialSub": "of {value}/yr potential"
+    },
+    "yields": {
+      "heading": "Service yields",
+      "unit": "{currency} / m² / yr",
+      "scale": "Bar length = value vs the strongest biome for that service",
+      "rowTitle": "{label} — {share}% of this region's value"
+    },
+    "tev": {
+      "label": "Total Ecosystem Value",
+      "unit": "{currency} / m² / yr",
+      "annualUnit": "{currency} / yr across this area"
+    },
+    "asset": {
+      "label": "Standing asset value",
+      "discountGroup": "Discount rate",
+      "sub": "worth on the balance sheet, left standing — perpetual flow at {rate}%",
+      "subTitle": "The annual flow of ecosystem services capitalised as a perpetuity — the balance-sheet value of leaving this land standing"
+    },
+    "conversion": {
+      "heading": "If converted",
+      "modesGroup": "Conversion analysis modes",
+      "liability": "Liability",
+      "liabilityTitle": "Liability framing",
+      "systemic": "Systemic",
+      "systemicTitle": "Systemic premium & carbon debt",
+      "redLines": "Red lines",
+      "redLinesTitle": "Red lines — irreversible losses",
+      "perpetualLiability": "Perpetual liability",
+      "liabilitySub": "~{loss}/yr of lost services, owed in perpetuity — {incidence}",
+      "systemicTagBold": "×{mult} systemic",
+      "systemicTagRest": "— rare, intact land is load-bearing beyond the parcel itself.",
+      "carbonDebt": "+ ~{amount} stored carbon released — once, largely irreversibly.",
+      "redLinesHead": "⛔ Cannot be replaced at any price",
+      "redLinesHeadTitle": "Red lines, not line items — deliberately left out of the figures above"
+    },
+    "methodology": "Methodology"
   }
 }
