@@ -49,6 +49,14 @@ https://github.com/user-attachments/assets/1c6a9012-97ff-424b-af78-628ee2a45e40
   display styles; a side-by-side **Compare** dashboard; a **Data Hub** with live
   tools and full provenance; custom-area search; and a dark/light theme.
 
+ 
+Flat View with more precice biome borders:
+<img width="2557" height="1280" alt="grafik" src="https://github.com/user-attachments/assets/382acfe5-b679-4b34-be78-b196f5514728" />
+
+Data Hub:
+<img width="1015" height="1234" alt="grafik" src="https://github.com/user-attachments/assets/b5c90204-5770-4dd3-85be-c08cf1e90cbd" />
+
+
 ## Conversion is a liability, not a price
 
 A head-to-head _"value standing vs. value built"_ turns nature into a line item a
