@@ -1,0 +1,66 @@
+{
+  "brand": {
+    "tagline": "poniendo a la naturaleza en el balance"
+  },
+  "nav": {
+    "appMode": "Modo de la app",
+    "map": "Mapa",
+    "compare": "Comparar",
+    "data": "Datos",
+    "mapView": "Vista del mapa",
+    "globe": "Globo",
+    "flat": "Plano"
+  },
+  "currency": {
+    "group": "Moneda"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Oscuro",
+    "switchToLight": "Cambiar a tema claro",
+    "switchToDark": "Cambiar a tema oscuro"
+  },
+  "language": {
+    "group": "Idioma"
+  },
+  "stage": {
+    "loading": "Cargando datos del ecosistema…",
+    "hint": "Selecciona cualquier ecosistema para ver su Valor Total del Ecosistema"
+  },
+  "errors": {
+    "backendUnreachable": "No se pudo conectar con el backend de alpha. ¿Está corriendo en :8000?",
+    "valuationFailed": "No se pudo valorar esta área: {message}",
+    "valuationFailedGeneric": "No se pudo valorar esta área.",
+    "repriceFailed": "No se pudo recalcular el precio en {code}."
+  },
+  "search": {
+    "placeholder": "Valora cualquier área — lat, lng o pega un GeoJSON",
+    "ariaLabel": "Buscar un área para valorar",
+    "submit": "Valorar",
+    "clear": "Borrar",
+    "hint": "Prueba {point}, un rectángulo {box}, o un polígono GeoJSON.",
+    "customAreaLabel": "Área personalizada — valorada bajo demanda"
+  },
+  "layerControl": {
+    "ariaLabel": "Capas de biomas",
+    "title": "Biomas",
+    "showAll": "Mostrar todo",
+    "hideAll": "Ocultar todo",
+    "chipTitle": "{label} — {sublabel} · {count} región | {label} — {sublabel} · {count} regiones",
+    "styleGroup": "Estilo de visualización",
+    "style": {
+      "polygons": {
+        "label": "Relleno",
+        "hint": "Polígonos de bioma rellenos"
+      },
+      "bubbles": {
+        "label": "Burbujas",
+        "hint": "Tamaño de burbuja = valor anual del ecosistema"
+      },
+      "outline": {
+        "label": "Contorno",
+        "hint": "Límites detallados de ecorregiones, sin relleno"
+      }
+    }
+  }
+}

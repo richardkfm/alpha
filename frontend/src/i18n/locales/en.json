@@ -1,0 +1,66 @@
+{
+  "brand": {
+    "tagline": "putting nature on the balance sheet"
+  },
+  "nav": {
+    "appMode": "App mode",
+    "map": "Map",
+    "compare": "Compare",
+    "data": "Data",
+    "mapView": "Map view",
+    "globe": "Globe",
+    "flat": "Flat"
+  },
+  "currency": {
+    "group": "Currency"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "switchToLight": "Switch to light theme",
+    "switchToDark": "Switch to dark theme"
+  },
+  "language": {
+    "group": "Language"
+  },
+  "stage": {
+    "loading": "Loading ecosystem data…",
+    "hint": "Select any ecosystem to reveal its Total Ecosystem Value"
+  },
+  "errors": {
+    "backendUnreachable": "Could not reach the alpha backend. Is it running on :8000?",
+    "valuationFailed": "Could not value this area: {message}",
+    "valuationFailedGeneric": "Could not value this area.",
+    "repriceFailed": "Could not re-price in {code}."
+  },
+  "search": {
+    "placeholder": "Value any area — lat, lng or paste GeoJSON",
+    "ariaLabel": "Search for an area to value",
+    "submit": "Value",
+    "clear": "Clear",
+    "hint": "Try {point}, a box {box}, or a GeoJSON Polygon.",
+    "customAreaLabel": "Custom area — valued on demand"
+  },
+  "layerControl": {
+    "ariaLabel": "Biome layers",
+    "title": "Biomes",
+    "showAll": "Show all",
+    "hideAll": "Hide all",
+    "chipTitle": "{label} — {sublabel} · {count} region | {label} — {sublabel} · {count} regions",
+    "styleGroup": "Display style",
+    "style": {
+      "polygons": {
+        "label": "Fill",
+        "hint": "Filled biome polygons"
+      },
+      "bubbles": {
+        "label": "Bubbles",
+        "hint": "Bubble size = annual ecosystem value"
+      },
+      "outline": {
+        "label": "Outline",
+        "hint": "Detailed ecoregion borders, no fill"
+      }
+    }
+  }
+}

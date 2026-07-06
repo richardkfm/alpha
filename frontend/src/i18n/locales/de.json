@@ -1,0 +1,66 @@
+{
+  "brand": {
+    "tagline": "Natur auf der Bilanz"
+  },
+  "nav": {
+    "appMode": "App-Modus",
+    "map": "Karte",
+    "compare": "Vergleichen",
+    "data": "Daten",
+    "mapView": "Kartenansicht",
+    "globe": "Globus",
+    "flat": "Flach"
+  },
+  "currency": {
+    "group": "Währung"
+  },
+  "theme": {
+    "light": "Hell",
+    "dark": "Dunkel",
+    "switchToLight": "Zu hellem Design wechseln",
+    "switchToDark": "Zu dunklem Design wechseln"
+  },
+  "language": {
+    "group": "Sprache"
+  },
+  "stage": {
+    "loading": "Ökosystemdaten werden geladen…",
+    "hint": "Wähle ein Ökosystem aus, um seinen gesamten Ökosystemwert anzuzeigen"
+  },
+  "errors": {
+    "backendUnreachable": "Das alpha-Backend ist nicht erreichbar. Läuft es auf :8000?",
+    "valuationFailed": "Diese Fläche konnte nicht bewertet werden: {message}",
+    "valuationFailedGeneric": "Diese Fläche konnte nicht bewertet werden.",
+    "repriceFailed": "Neupreisung in {code} nicht möglich."
+  },
+  "search": {
+    "placeholder": "Beliebige Fläche bewerten — Breite/Länge oder GeoJSON einfügen",
+    "ariaLabel": "Nach einer zu bewertenden Fläche suchen",
+    "submit": "Bewerten",
+    "clear": "Löschen",
+    "hint": "Versuche {point}, ein Rechteck {box} oder ein GeoJSON-Polygon.",
+    "customAreaLabel": "Benutzerdefinierte Fläche — auf Anfrage bewertet"
+  },
+  "layerControl": {
+    "ariaLabel": "Biom-Ebenen",
+    "title": "Biome",
+    "showAll": "Alle anzeigen",
+    "hideAll": "Alle ausblenden",
+    "chipTitle": "{label} — {sublabel} · {count} Region | {label} — {sublabel} · {count} Regionen",
+    "styleGroup": "Darstellungsstil",
+    "style": {
+      "polygons": {
+        "label": "Füllung",
+        "hint": "Ausgefüllte Biom-Polygone"
+      },
+      "bubbles": {
+        "label": "Blasen",
+        "hint": "Blasengröße = jährlicher Ökosystemwert"
+      },
+      "outline": {
+        "label": "Umriss",
+        "hint": "Detaillierte Ökoregionsgrenzen, ohne Füllung"
+      }
+    }
+  }
+}

@@ -1,12 +1,16 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { useI18n } from 'vue-i18n'
 import WorldMap from './components/WorldMap.vue'
 import SidePanel from './components/SidePanel.vue'
 import LayerControl from './components/LayerControl.vue'
 import SearchBar from './components/SearchBar.vue'
 import BrandLogo from './components/BrandLogo.vue'
+import LanguageSwitcher from './components/LanguageSwitcher.vue'
 import { useRegions } from './data/useRegions.js'
 import { serviceCeilings } from './data/yieldScale.js'
+
+const { t } = useI18n()
 
 // The MapLibre globe (and its ~heavy bundle) loads only when 3D mode is active;
 // the Compare dashboard and Data hub load only when their mode is opened.
@@ -150,7 +154,7 @@ async function onRegionSelect(region) {
     backendOnline.value = health.status === 'ok'
   } catch (e) {
     backendOnline.value = false
-    errorMsg.value = 'Could not reach the alpha backend. Is it running on :8000?'
+    errorMsg.value = t('errors.backendUnreachable')
     loading.value = false
     return
   }
@@ -158,8 +162,8 @@ async function onRegionSelect(region) {
     valuation.value = await fetchValuation(region)
   } catch (e) {
     errorMsg.value = e.message
-      ? `Could not value this area: ${e.message}`
-      : 'Could not value this area.'
+      ? t('errors.valuationFailed', { message: e.message })
+      : t('errors.valuationFailedGeneric')
   } finally {
     loading.value = false
   }
@@ -178,7 +182,7 @@ async function setCurrency(code) {
   try {
     valuation.value = await fetchValuation(selectedRegion.value)
   } catch (e) {
-    errorMsg.value = 'Could not re-price in ' + code + '.'
+    errorMsg.value = t('errors.repriceFailed', { code })
   } finally {
     loading.value = false
   }
@@ -198,55 +202,55 @@ function closePanel() {
         </span>
         <span class="brand-text">
           <span class="brand-mark">alpha</span>
-          <span class="brand-tag">putting nature on the balance sheet</span>
+          <span class="brand-tag">{{ t('brand.tagline') }}</span>
         </span>
       </div>
       <div class="controls">
-        <div class="viewmode" role="group" aria-label="App mode">
+        <div class="viewmode" role="group" :aria-label="t('nav.appMode')">
           <button
             class="view-btn"
             :class="{ active: appMode === 'map' }"
             @click="appMode = 'map'"
           >
-            ◍ Map
+            ◍ {{ t('nav.map') }}
           </button>
           <button
             class="view-btn"
             :class="{ active: appMode === 'compare' }"
             @click="appMode = 'compare'"
           >
-            ⊞ Compare
+            ⊞ {{ t('nav.compare') }}
           </button>
           <button
             class="view-btn"
             :class="{ active: appMode === 'data' }"
             @click="appMode = 'data'"
           >
-            ⛁ Data
+            ⛁ {{ t('nav.data') }}
           </button>
         </div>
         <div
           v-if="appMode === 'map'"
           class="viewmode"
           role="group"
-          aria-label="Map view"
+          :aria-label="t('nav.mapView')"
         >
           <button
             class="view-btn"
             :class="{ active: viewMode === '3d' }"
             @click="viewMode = '3d'"
           >
-            ◐ Globe
+            ◐ {{ t('nav.globe') }}
           </button>
           <button
             class="view-btn"
             :class="{ active: viewMode === '2d' }"
             @click="viewMode = '2d'"
           >
-            ▦ Flat
+            ▦ {{ t('nav.flat') }}
           </button>
         </div>
-        <div class="currency" role="group" aria-label="Currency">
+        <div class="currency" role="group" :aria-label="t('currency.group')">
           <button
             v-for="c in CURRENCIES"
             :key="c"
@@ -257,9 +261,10 @@ function closePanel() {
             {{ c }}
           </button>
         </div>
-        <button class="theme-toggle" @click="toggleTheme" :aria-label="isDark ? 'Switch to light theme' : 'Switch to dark theme'">
+        <LanguageSwitcher />
+        <button class="theme-toggle" @click="toggleTheme" :aria-label="isDark ? t('theme.switchToLight') : t('theme.switchToDark')">
           <span class="toggle-icon">{{ isDark ? '☀' : '☾' }}</span>
-          <span class="toggle-label">{{ isDark ? 'Light' : 'Dark' }}</span>
+          <span class="toggle-label">{{ isDark ? t('theme.light') : t('theme.dark') }}</span>
         </button>
       </div>
     </header>
@@ -277,7 +282,7 @@ function closePanel() {
       <template v-else>
         <div v-if="!regionsLoaded && regionsLoading" class="stage-state">
           <span class="stage-spinner"></span>
-          Loading ecosystem data…
+          {{ t('stage.loading') }}
         </div>
         <div v-else-if="regionsError" class="stage-state err">{{ regionsError }}</div>
 
@@ -317,7 +322,7 @@ function closePanel() {
           <transition name="hint">
             <div v-if="!selectedRegion" class="hint" aria-hidden="true">
               <span class="hint-pulse"></span>
-              <span class="hint-text">Select any ecosystem to reveal its Total Ecosystem Value</span>
+              <span class="hint-text">{{ t('stage.hint') }}</span>
             </div>
           </transition>
 

@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
   // Biome layer definitions derived from the backend catalogue (useRegions.js).
@@ -9,28 +10,33 @@ const props = defineProps({
   displayStyle: { type: String, default: 'polygons' },
 })
 const emit = defineEmits(['toggle', 'set-all', 'set-style'])
+const { t } = useI18n()
 
-const STYLES = [
-  { id: 'polygons', label: 'Fill', icon: '▦', hint: 'Filled biome polygons' },
-  { id: 'bubbles', label: 'Bubbles', icon: '⦿', hint: 'Bubble size = annual ecosystem value' },
-  { id: 'outline', label: 'Outline', icon: '□', hint: 'Detailed ecoregion borders, no fill' },
-]
+const STYLES = computed(() => [
+  { id: 'polygons', label: t('layerControl.style.polygons.label'), icon: '▦', hint: t('layerControl.style.polygons.hint') },
+  { id: 'bubbles', label: t('layerControl.style.bubbles.label'), icon: '⦿', hint: t('layerControl.style.bubbles.hint') },
+  { id: 'outline', label: t('layerControl.style.outline.label'), icon: '□', hint: t('layerControl.style.outline.hint') },
+])
 
 const onCount = computed(
   () => props.layers.filter((l) => props.visibleLayers[l.id]).length,
 )
 const allOn = computed(() => onCount.value === props.layers.length)
+
+function chipTitle(l) {
+  return t('layerControl.chipTitle', { label: l.label, sublabel: l.sublabel, count: l.count }, l.count)
+}
 </script>
 
 <template>
-  <aside class="layers" aria-label="Biome layers">
+  <aside class="layers" :aria-label="t('layerControl.ariaLabel')">
     <header class="layers-head">
       <span class="layers-title">
-        Biomes
+        {{ t('layerControl.title') }}
         <span class="layers-count num">{{ onCount }}/{{ layers.length }}</span>
       </span>
       <button class="bulk-btn" @click="emit('set-all', !allOn)">
-        {{ allOn ? 'Hide all' : 'Show all' }}
+        {{ allOn ? t('layerControl.hideAll') : t('layerControl.showAll') }}
       </button>
     </header>
 
@@ -43,7 +49,7 @@ const allOn = computed(() => onCount.value === props.layers.length)
         :style="{ '--c': l.color }"
         role="switch"
         :aria-checked="!!visibleLayers[l.id]"
-        :title="`${l.label} — ${l.sublabel} · ${l.count} region${l.count === 1 ? '' : 's'}`"
+        :title="chipTitle(l)"
         @click="emit('toggle', l.id)"
       >
         <span class="chip-dot"></span>
@@ -52,7 +58,7 @@ const allOn = computed(() => onCount.value === props.layers.length)
       </button>
     </div>
 
-    <div class="style-switch" role="group" aria-label="Display style">
+    <div class="style-switch" role="group" :aria-label="t('layerControl.styleGroup')">
       <button
         v-for="s in STYLES"
         :key="s.id"

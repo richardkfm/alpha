@@ -1,8 +1,10 @@
 <script setup>
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { parseAreaInput } from '../data/geo.js'
 
 const emit = defineEmits(['search'])
+const { t } = useI18n()
 
 const query = ref('')
 const error = ref('')
@@ -15,7 +17,7 @@ function submit() {
     emit('search', {
       id: 'custom',
       name: label,
-      region: 'Custom area — valued on demand',
+      region: t('search.customAreaLabel'),
       geojson: geometry,
     })
   } catch (e) {
@@ -32,24 +34,27 @@ function submit() {
         v-model="query"
         class="search-input"
         type="text"
-        placeholder="Value any area — lat, lng or paste GeoJSON"
-        aria-label="Search for an area to value"
+        :placeholder="t('search.placeholder')"
+        :aria-label="t('search.ariaLabel')"
         @focus="open = true"
         @input="error = ''"
       />
-      <button class="search-go" type="submit">Value</button>
+      <button class="search-go" type="submit">{{ t('search.submit') }}</button>
       <button
         v-if="query"
         class="search-clear"
         type="button"
-        aria-label="Clear"
+        :aria-label="t('search.clear')"
         @click="query = ''; error = ''"
       >×</button>
     </form>
     <transition name="fade">
       <div v-if="error" class="search-msg err">{{ error }}</div>
       <div v-else-if="open" class="search-msg hint">
-        Try <code>-3.1, -60.0</code>, a box <code>-65, -6, -60, -2</code>, or a GeoJSON Polygon.
+        <i18n-t keypath="search.hint" tag="span" scope="global">
+          <template #point><code>-3.1, -60.0</code></template>
+          <template #box><code>-65, -6, -60, -2</code></template>
+        </i18n-t>
       </div>
     </transition>
   </div>
