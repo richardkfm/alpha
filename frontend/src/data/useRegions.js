@@ -6,10 +6,14 @@
 // truth consumed by both maps (WorldMap / GlobeMap), the LayerControl, and the
 // Compare dashboard, replacing the old hardcoded 4-region file.
 import { ref, computed } from 'vue'
-import { BIOME_META, BIOME_ORDER, biomeColor } from './biomeMeta.js'
+import { useI18n } from 'vue-i18n'
+import { biomeColor } from './biomeMeta.js'
+import { useBiomeMeta } from './useBiomeMeta.js'
 import { centroid } from './geo.js'
 
 export function useRegions() {
+  const { t, locale } = useI18n()
+  const { BIOME_ORDER, biomeLabel, biomeShort, biomeSublabel } = useBiomeMeta()
   const regions = ref([])
   const loading = ref(false)
   const error = ref('')
@@ -38,7 +42,7 @@ export function useRegions() {
       }))
       loaded.value = true
     } catch (e) {
-      error.value = 'Could not load region data from the alpha backend. Is it running on :8000?'
+      error.value = t('errors.regionsUnreachable')
     } finally {
       loading.value = false
     }
@@ -63,15 +67,16 @@ export function useRegions() {
   // regions are present. Geometry is currency-independent, so the maps build
   // from this once and ignore later currency re-prices.
   const biomeLayers = computed(() => {
+    locale.value // re-derive labels when the language changes
     const byBiome = {}
     for (const r of regions.value) {
       ;(byBiome[r.biome_key] ||= []).push(r)
     }
     return BIOME_ORDER.filter((key) => byBiome[key]?.length).map((key) => ({
       id: key,
-      label: BIOME_META[key].label,
-      short: BIOME_META[key].short,
-      sublabel: BIOME_META[key].sublabel,
+      label: biomeLabel(key),
+      short: biomeShort(key),
+      sublabel: biomeSublabel(key),
       kind: 'real',
       color: biomeColor(key),
       count: byBiome[key].length,

@@ -1,11 +1,15 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 // Shared yield-category metadata, also used by the Compare dashboard.
 import { YIELD_ROWS } from '../data/yields.js'
 // Cross-biome bar scale, shared with the Compare dashboard.
 import { barPct } from '../data/yieldScale.js'
-import { BIOME_META, biomeColor } from '../data/biomeMeta.js'
+import { useBiomeMeta } from '../data/useBiomeMeta.js'
 import { useCountUp } from '../data/useCountUp.js'
+
+const { t } = useI18n()
+const { biomeColor, biomeLabel, biomeSublabel: translatedBiomeSublabel } = useBiomeMeta()
 
 const props = defineProps({
   region: { type: Object, required: true },
@@ -28,7 +32,10 @@ const symbol = computed(() => props.valuation?.currency_symbol ?? '$')
 const classification = computed(() => props.valuation?.classification ?? null)
 const biomeKey = computed(() => classification.value?.biome_key ?? props.region.biome_key)
 const biomeHue = computed(() => biomeColor(biomeKey.value))
-const biomeSublabel = computed(() => BIOME_META[biomeKey.value]?.sublabel ?? '')
+// The backend's classification.biome_label is English-only; prefer the
+// frontend's translated biome catalogue keyed by biome_key instead.
+const biomeName = computed(() => biomeLabel(biomeKey.value))
+const biomeSublabel = computed(() => translatedBiomeSublabel(biomeKey.value))
 
 // Provenance compressed into a badge; the full sentence lives in its tooltip.
 const provenance = computed(() => {
@@ -37,24 +44,36 @@ const provenance = computed(() => {
   if (c.confidence === 'matched') {
     const from =
       c.matched_region && c.matched_region !== 'N/A'
-        ? `classified from ${c.matched_region}`
-        : 'classified from ingested boundaries'
-    return { label: 'RESOLVE match', title: `${from} — RESOLVE Ecoregions 2017`, sure: true }
+        ? t('sidePanel.provenance.resolveMatchFrom', { region: c.matched_region })
+        : t('sidePanel.provenance.resolveMatchFromBoundaries')
+    return {
+      label: t('sidePanel.provenance.resolveMatchLabel'),
+      title: t('sidePanel.provenance.resolveMatchTitle', { from }),
+      sure: true,
+    }
   }
   if (c.confidence === 'explicit') {
-    return { label: 'Catalogue', title: 'Biome supplied with the region catalogue', sure: true }
+    return {
+      label: t('sidePanel.provenance.catalogueLabel'),
+      title: t('sidePanel.provenance.catalogueTitle'),
+      sure: true,
+    }
   }
-  return { label: 'Default', title: 'No boundary match — fell back to the default biome', sure: false }
+  return {
+    label: t('sidePanel.provenance.defaultLabel'),
+    title: t('sidePanel.provenance.defaultTitle'),
+    sure: false,
+  }
 })
 
 const yieldRows = computed(() => {
   if (!props.valuation) return []
   const values = YIELD_ROWS.map((r) => props.valuation.yields_per_sqm_year[r.key] ?? 0)
   const total = values.reduce((a, b) => a + b, 0) || 1
-  return YIELD_ROWS.map(({ key, label, color }) => {
+  return YIELD_ROWS.map(({ key, color }) => {
     const value = props.valuation.yields_per_sqm_year[key]
     return {
-      label,
+      label: t(`yields.${key}`),
       color,
       value,
       // share = composition within this region; bar = magnitude vs the
@@ -156,7 +175,7 @@ async function downloadExport(format) {
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e) {
-    exportError.value = 'Export failed — is the backend running?'
+    exportError.value = t('sidePanel.actions.exportFailed')
   } finally {
     exporting.value = ''
   }
@@ -191,50 +210,50 @@ async function copyEmbed() {
     <header class="panel-head">
       <div class="title-row">
         <h2>{{ region.name }}</h2>
-        <button class="close" @click="$emit('close')" aria-label="Close">×</button>
+        <button class="close" @click="$emit('close')" :aria-label="t('sidePanel.close')">×</button>
       </div>
       <div class="subtitle-row">
         <p class="region">{{ region.region }}</p>
         <span
           class="conn"
           :class="{ ok: backendOnline, down: backendOnline === false }"
-          :title="backendOnline ? 'Connected to the alpha valuation engine' : backendOnline === false ? 'The alpha valuation engine is unreachable' : 'Checking the valuation engine…'"
+          :title="backendOnline ? t('sidePanel.connection.titleOk') : backendOnline === false ? t('sidePanel.connection.titleDown') : t('sidePanel.connection.titleChecking')"
         >
           <span class="conn-dot"></span>
-          {{ backendOnline ? 'live' : backendOnline === false ? 'offline' : '…' }}
+          {{ backendOnline ? t('sidePanel.connection.live') : backendOnline === false ? t('sidePanel.connection.offline') : t('sidePanel.connection.checking') }}
         </span>
       </div>
 
       <div v-if="valuation" class="panel-actions">
         <button class="act" :disabled="!!exporting" @click="downloadExport('csv')">
-          {{ exporting === 'csv' ? '…' : '↓ CSV' }}
+          {{ exporting === 'csv' ? t('sidePanel.actions.working') : t('sidePanel.actions.csv') }}
         </button>
         <button class="act" :disabled="!!exporting" @click="downloadExport('pdf')">
-          {{ exporting === 'pdf' ? '…' : '↓ PDF' }}
+          {{ exporting === 'pdf' ? t('sidePanel.actions.working') : t('sidePanel.actions.pdf') }}
         </button>
         <button
           v-if="region.id"
           class="act"
           :class="{ on: showEmbed }"
           @click="showEmbed = !showEmbed"
-        >⧉ Embed</button>
+        >{{ t('sidePanel.actions.embed') }}</button>
       </div>
       <p v-if="exportError" class="act-err">{{ exportError }}</p>
 
       <div v-if="showEmbed && region.id" class="embed-box">
-        <p class="embed-hint">Drop this into any page to show {{ region.name }}'s value:</p>
+        <p class="embed-hint">{{ t('sidePanel.embed.hint', { name: region.name }) }}</p>
         <code class="embed-code">{{ embedSnippet }}</code>
-        <button class="embed-copy" @click="copyEmbed">{{ copied ? 'Copied ✓' : 'Copy snippet' }}</button>
+        <button class="embed-copy" @click="copyEmbed">{{ copied ? t('sidePanel.embed.copied') : t('sidePanel.embed.copy') }}</button>
       </div>
     </header>
 
-    <div v-if="loading" class="skeleton" aria-label="Calculating ecosystem value">
+    <div v-if="loading" class="skeleton" :aria-label="t('sidePanel.loading.ariaLabel')">
       <div class="sk-line sk-row"></div>
       <div class="sk-block"></div>
       <div class="sk-line"></div>
       <div class="sk-line short"></div>
       <div class="sk-hero"></div>
-      <span class="sk-note">Calculating ecosystem value…</span>
+      <span class="sk-note">{{ t('sidePanel.loading.note') }}</span>
     </div>
     <div v-else-if="error" class="state err">{{ error }}</div>
 
@@ -242,7 +261,7 @@ async function copyEmbed() {
       <section v-if="classification" class="biome" :style="{ '--biome': biomeHue }">
         <span class="biome-dot" aria-hidden="true"></span>
         <span class="biome-text">
-          <span class="biome-name">{{ classification.biome_label }}</span>
+          <span class="biome-name">{{ biomeName }}</span>
           <span v-if="biomeSublabel" class="biome-sub">{{ biomeSublabel }}</span>
         </span>
         <span
@@ -255,33 +274,33 @@ async function copyEmbed() {
 
       <section class="stats">
         <div class="stat">
-          <span class="k">Area</span>
+          <span class="k">{{ t('sidePanel.stats.area') }}</span>
           <span class="v num">{{ fmtHa(valuation.area.hectares) }} <em>ha</em></span>
           <span class="stat-sub num">{{ fmtInt(valuation.area.sqm) }} m²</span>
         </div>
         <div v-if="intactness != null && intactness < 1" class="stat">
-          <span class="k">Intactness</span>
+          <span class="k">{{ t('sidePanel.stats.intactness') }}</span>
           <span class="v num">{{ fmtPct(intactness) }}</span>
           <span class="intact-track" aria-hidden="true">
             <span class="intact-bar" :style="{ width: fmtPct(intactness) }"></span>
           </span>
-          <span class="stat-sub" :title="`Delivering ${fmtPct(intactness)} of the value this land would yield fully intact`">
-            of {{ fmtTotal(potentialAnnual) }}/yr potential
+          <span class="stat-sub" :title="t('sidePanel.stats.intactnessTitle', { pct: fmtPct(intactness) })">
+            {{ t('sidePanel.stats.potentialSub', { value: fmtTotal(potentialAnnual) }) }}
           </span>
         </div>
       </section>
 
       <section class="yields">
         <h3>
-          Service yields
-          <small>{{ valuation.currency }} / m² / yr</small>
+          {{ t('sidePanel.yields.heading') }}
+          <small>{{ t('sidePanel.yields.unit', { currency: valuation.currency }) }}</small>
         </h3>
-        <p class="yields-scale">Bar length = value vs the strongest biome for that service</p>
+        <p class="yields-scale">{{ t('sidePanel.yields.scale') }}</p>
         <ul>
           <li
             v-for="row in yieldRows"
             :key="row.label"
-            :title="`${row.label} — ${row.share}% of this region's value`"
+            :title="t('sidePanel.yields.rowTitle', { label: row.label, share: row.share })"
           >
             <div class="yield-meta">
               <span class="yield-dot" :style="{ background: row.color }"></span>
@@ -300,19 +319,19 @@ async function copyEmbed() {
       </section>
 
       <section class="tev">
-        <span class="tev-label">Total Ecosystem Value</span>
+        <span class="tev-label">{{ t('sidePanel.tev.label') }}</span>
         <span class="tev-value">{{ fmtPerSqm(tevAnim) }}</span>
-        <span class="tev-unit">{{ valuation.currency }} / m² / yr</span>
+        <span class="tev-unit">{{ t('sidePanel.tev.unit', { currency: valuation.currency }) }}</span>
         <div class="tev-annual">
           <span class="tev-annual-v num">{{ fmtTotal(valuation.total_ecosystem_value_per_year) }}</span>
-          <span class="tev-annual-k">{{ valuation.currency }} / yr across this area</span>
+          <span class="tev-annual-k">{{ t('sidePanel.tev.annualUnit', { currency: valuation.currency }) }}</span>
         </div>
       </section>
 
       <section class="asset">
         <div class="asset-head">
-          <span class="asset-label">Standing asset value</span>
-          <div class="asset-rates" role="group" aria-label="Discount rate">
+          <span class="asset-label">{{ t('sidePanel.asset.label') }}</span>
+          <div class="asset-rates" role="group" :aria-label="t('sidePanel.asset.discountGroup')">
             <button
               v-for="r in DISCOUNT_RATES"
               :key="r"
@@ -324,46 +343,44 @@ async function copyEmbed() {
         <span class="asset-value">{{ fmtTotal(assetAnim) }} <em>{{ valuation.currency }}</em></span>
         <span
           class="asset-sub"
-          title="The annual flow of ecosystem services capitalised as a perpetuity — the balance-sheet value of leaving this land standing"
-        >worth on the balance sheet, left standing — perpetual flow at {{ Math.round(discountRate * 100) }}%</span>
+          :title="t('sidePanel.asset.subTitle')"
+        >{{ t('sidePanel.asset.sub', { rate: Math.round(discountRate * 100) }) }}</span>
       </section>
 
       <section v-if="liability" class="conversion">
         <div class="conv-header">
-          <h3>If converted</h3>
-          <div class="conv-modes" role="group" aria-label="Conversion analysis modes">
-            <button :class="{ on: showLiability }" @click="emit('update:showLiability', !showLiability)" title="Liability framing">Liability</button>
-            <button :class="{ on: showSystemic }" @click="emit('update:showSystemic', !showSystemic)" title="Systemic premium & carbon debt">Systemic</button>
-            <button :class="{ on: showRedLines }" @click="emit('update:showRedLines', !showRedLines)" title="Red lines — irreversible losses">Red lines</button>
+          <h3>{{ t('sidePanel.conversion.heading') }}</h3>
+          <div class="conv-modes" role="group" :aria-label="t('sidePanel.conversion.modesGroup')">
+            <button :class="{ on: showLiability }" @click="emit('update:showLiability', !showLiability)" :title="t('sidePanel.conversion.liabilityTitle')">{{ t('sidePanel.conversion.liability') }}</button>
+            <button :class="{ on: showSystemic }" @click="emit('update:showSystemic', !showSystemic)" :title="t('sidePanel.conversion.systemicTitle')">{{ t('sidePanel.conversion.systemic') }}</button>
+            <button :class="{ on: showRedLines }" @click="emit('update:showRedLines', !showRedLines)" :title="t('sidePanel.conversion.redLinesTitle')">{{ t('sidePanel.conversion.redLines') }}</button>
           </div>
         </div>
 
         <template v-if="showLiability">
           <div class="liab">
-            <span class="liab-label">Perpetual liability</span>
+            <span class="liab-label">{{ t('sidePanel.conversion.perpetualLiability') }}</span>
             <span class="liab-value">{{ fmtTotal(liabAnim) }} <em>{{ valuation.currency }}</em></span>
             <span class="liab-sub" :title="liability.note">
-              ~{{ fmtTotal(liability.annual_loss) }}/yr of lost services, owed in perpetuity —
-              {{ liability.incidence }}
+              {{ t('sidePanel.conversion.liabilitySub', { loss: fmtTotal(liability.annual_loss), incidence: liability.incidence }) }}
             </span>
           </div>
         </template>
 
         <div v-if="systemicMult > 1.05 && showSystemic" class="systemic-tag">
-          <strong>×{{ systemicMult }} systemic</strong> — rare, intact land is load-bearing
-          beyond the parcel itself.
+          <strong>{{ t('sidePanel.conversion.systemicTagBold', { mult: systemicMult }) }}</strong>
+          {{ t('sidePanel.conversion.systemicTagRest') }}
         </div>
 
         <div v-if="liability.carbon_debt_onetime > 0 && showSystemic" class="carbon-debt">
-          + ~{{ fmtTotal(liability.carbon_debt_onetime) }} stored carbon released — once,
-          largely irreversibly.
+          {{ t('sidePanel.conversion.carbonDebt', { amount: fmtTotal(liability.carbon_debt_onetime) }) }}
         </div>
 
         <div v-if="redLines.length && showRedLines" class="redlines">
           <span
             class="rl-head"
-            title="Red lines, not line items — deliberately left out of the figures above"
-          >⛔ Cannot be replaced at any price</span>
+            :title="t('sidePanel.conversion.redLinesHeadTitle')"
+          >{{ t('sidePanel.conversion.redLinesHead') }}</span>
           <ul>
             <li v-for="rl in redLines" :key="rl.label">
               <strong>{{ rl.label }}</strong> — {{ rl.reason }}
@@ -377,7 +394,7 @@ async function copyEmbed() {
       </section>
 
       <details class="method">
-        <summary>Methodology</summary>
+        <summary>{{ t('sidePanel.methodology') }}</summary>
         <p>{{ valuation.methodology_note }}</p>
       </details>
     </template>

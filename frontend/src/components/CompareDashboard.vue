@@ -1,8 +1,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { YIELD_ROWS } from '../data/yields.js'
 import { barPct as barPctScale } from '../data/yieldScale.js'
-import { BIOME_META, BIOME_ORDER, biomeColor, biomeLabel } from '../data/biomeMeta.js'
+import { useBiomeMeta } from '../data/useBiomeMeta.js'
+
+const { t } = useI18n()
+const { BIOME_ORDER, biomeColor, biomeLabel } = useBiomeMeta()
+const translatedYieldRows = computed(() =>
+  YIELD_ROWS.map((r) => ({ ...r, label: t(`yields.${r.key}`) })),
+)
 
 const props = defineProps({
   // Pre-valued region catalogue from the backend (data/useRegions.js). Reading
@@ -50,7 +57,7 @@ const groupedRegions = computed(() => {
   for (const r of sortedRegions.value) (byBiome[r.biome_key] ||= []).push(r)
   return BIOME_ORDER.filter((k) => byBiome[k]?.length).map((k) => ({
     key: k,
-    label: BIOME_META[k].label,
+    label: biomeLabel(k),
     color: biomeColor(k),
     regions: byBiome[k],
   }))
@@ -188,7 +195,7 @@ onMounted(() => {
             <button class="remove" @click="toggle(r.id)" aria-label="Remove">×</button>
             <span class="rh-name">{{ r.name }}</span>
             <span class="rh-biome" :style="{ '--c': biomeColor(r.biome_key) }">
-              <span class="rh-dot"></span>{{ r.biome_label }}
+              <span class="rh-dot"></span>{{ biomeLabel(r.biome_key) }}
             </span>
             <span class="rh-region">{{ r.region }}</span>
           </div>
@@ -240,7 +247,7 @@ onMounted(() => {
           </div>
 
           <!-- yield breakdown rows -->
-          <template v-for="cat in YIELD_ROWS" :key="cat.key">
+          <template v-for="cat in translatedYieldRows" :key="cat.key">
             <div class="cell rowlabel">
               <span class="yl-dot" :style="{ background: cat.color }"></span>{{ cat.label }}
             </div>
