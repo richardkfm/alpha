@@ -51,10 +51,11 @@ https://github.com/user-attachments/assets/1c6a9012-97ff-424b-af78-628ee2a45e40
 
  
 Flat View with more precice biome borders:
-<img width="2557" height="1280" alt="grafik" src="https://github.com/user-attachments/assets/382acfe5-b679-4b34-be78-b196f5514728" />
+<img width="1536" height="864" alt="flatview" src="https://github.com/user-attachments/assets/573c06f4-297c-4214-ab01-a5c115bde6bb" />
+
 
 Data Hub:
-<img width="1015" height="1234" alt="grafik" src="https://github.com/user-attachments/assets/b5c90204-5770-4dd3-85be-c08cf1e90cbd" />
+<img width="1014" height="864" alt="datahub" src="https://github.com/user-attachments/assets/98541cc9-c030-44da-a7ca-e7475953886a" />
 
 
 ## Conversion is a liability, not a price
