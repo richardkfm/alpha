@@ -128,13 +128,13 @@
     },
     "yields": {
       "heading": "Service yields",
-      "unit": "{currency} / m² / yr",
+      "unit": "{currency} / ha / yr",
       "scale": "Bar length = value vs the strongest biome for that service",
       "rowTitle": "{label} — {share}% of this region's value"
     },
     "tev": {
       "label": "Total Ecosystem Value",
-      "unit": "{currency} / m² / yr",
+      "unit": "{currency} / ha / yr",
       "annualUnit": "{currency} / yr across this area"
     },
     "asset": {

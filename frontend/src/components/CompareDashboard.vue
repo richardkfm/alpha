@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { YIELD_ROWS } from '../data/yields.js'
 import { barPct as barPctScale } from '../data/yieldScale.js'
 import { useBiomeMeta } from '../data/useBiomeMeta.js'
+import { useFormat } from '../data/useFormat.js'
 
 const { t } = useI18n()
 const { BIOME_ORDER, biomeColor, biomeLabel } = useBiomeMeta()
@@ -29,8 +30,10 @@ const selectedIds = ref([])
 const query = ref('')
 const sortBy = ref('tev') // 'tev' | 'area' | 'name'
 
-const symbol = computed(() => props.regions[0]?.currency_symbol ?? '$')
-const currency = computed(() => props.regions[0]?.currency ?? 'USD')
+// Intl places the currency symbol itself, so currency_symbol goes unread here.
+const { money, moneyFull, perHa, hectares, percent, currency } = useFormat(
+  () => props.regions[0]?.currency,
+)
 
 // ----- picker (left) -------------------------------------------------------
 const sortedRegions = computed(() => {
@@ -98,18 +101,6 @@ const gridCols = computed(
   () => `minmax(120px, 168px) repeat(${selected.value.length}, minmax(150px, 1fr))`,
 )
 
-// ----- formatting ----------------------------------------------------------
-function fmtPerSqm(n) {
-  return n == null ? '—' : `${symbol.value}${Number(n).toFixed(4)}`
-}
-function fmtTotal(n) {
-  if (n == null) return '—'
-  return symbol.value + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
-}
-function fmtInt(n) {
-  return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
-}
-
 // Seed the comparison with the three highest-intensity ecosystems so the view
 // is never empty on first open.
 onMounted(() => {
@@ -165,7 +156,7 @@ onMounted(() => {
             <span class="pick-check" :style="{ '--c': g.color }"></span>
             <span class="pick-text">
               <span class="pick-name">{{ r.name }}</span>
-              <span class="pick-sub">{{ fmtPerSqm(r.total_ecosystem_value_per_sqm_year) }} / sqm · {{ fmtInt(r.area.hectares) }} ha</span>
+              <span class="pick-sub">{{ perHa(r.total_ecosystem_value_per_sqm_year) }} / ha · {{ hectares(r.area.hectares) }} ha</span>
             </span>
           </button>
         </div>
@@ -177,7 +168,7 @@ onMounted(() => {
       <header class="board-head">
         <div>
           <h2>Compare ecosystems</h2>
-          <p>Total Ecosystem Value side by side — {{ currency }} per sqm per year. Add up to {{ MAX_COMPARE }}.</p>
+          <p>Total Ecosystem Value side by side — {{ currency }} per hectare per year. Add up to {{ MAX_COMPARE }}.</p>
         </div>
         <button v-if="selected.length" class="clear" @click="clearAll">Clear</button>
       </header>
@@ -200,29 +191,44 @@ onMounted(() => {
             <span class="rh-region">{{ r.region }}</span>
           </div>
 
-          <!-- TEV / sqm hero row -->
-          <div class="cell rowlabel strong">TEV / sqm / yr</div>
+          <!-- TEV / ha hero row -->
+          <div class="cell rowlabel strong">TEV / ha / yr</div>
           <div v-for="r in selected" :key="'t-' + r.id" class="cell tev-cell">
-            {{ fmtPerSqm(r.total_ecosystem_value_per_sqm_year) }}
+            {{ perHa(r.total_ecosystem_value_per_sqm_year) }}
           </div>
 
           <!-- annual total (area-scaled) -->
           <div class="cell rowlabel">Annual value (whole area)</div>
-          <div v-for="r in selected" :key="'a-' + r.id" class="cell num-cell gold">
-            {{ fmtTotal(r.total_ecosystem_value_per_year) }}
+          <div
+            v-for="r in selected"
+            :key="'a-' + r.id"
+            class="cell num-cell gold"
+            :title="moneyFull(r.total_ecosystem_value_per_year)"
+          >
+            {{ money(r.total_ecosystem_value_per_year) }}
           </div>
 
           <!-- standing natural-asset value (capitalised) -->
           <div class="cell rowlabel strong">Standing asset value</div>
-          <div v-for="r in selected" :key="'as-' + r.id" class="cell num-cell asset">
-            {{ fmtTotal(r.capitalized_value && r.capitalized_value.asset_value_total) }}
+          <div
+            v-for="r in selected"
+            :key="'as-' + r.id"
+            class="cell num-cell asset"
+            :title="moneyFull(r.capitalized_value && r.capitalized_value.asset_value_total)"
+          >
+            {{ money(r.capitalized_value && r.capitalized_value.asset_value_total) }}
           </div>
 
           <!-- conversion liability (the perpetual debt of building over it) -->
           <template v-if="showLiability">
             <div class="cell rowlabel">Conversion liability</div>
-            <div v-for="r in selected" :key="'cl-' + r.id" class="cell num-cell liab">
-              {{ fmtTotal(r.conversion_liability && r.conversion_liability.present_value) }}
+            <div
+              v-for="r in selected"
+              :key="'cl-' + r.id"
+              class="cell num-cell liab"
+              :title="moneyFull(r.conversion_liability && r.conversion_liability.present_value)"
+            >
+              {{ money(r.conversion_liability && r.conversion_liability.present_value) }}
             </div>
           </template>
 
@@ -237,13 +243,13 @@ onMounted(() => {
           <!-- area -->
           <div class="cell rowlabel">Area</div>
           <div v-for="r in selected" :key="'ar-' + r.id" class="cell num-cell muted">
-            {{ fmtInt(r.area.hectares) }} ha
+            {{ hectares(r.area.hectares) }} ha
           </div>
 
           <!-- land-cover intactness -->
           <div class="cell rowlabel">Intactness</div>
           <div v-for="r in selected" :key="'in-' + r.id" class="cell num-cell muted">
-            {{ r.intactness != null ? Math.round(r.intactness * 100) + '%' : '—' }}
+            {{ percent(r.intactness) }}
           </div>
 
           <!-- yield breakdown rows -->
@@ -258,7 +264,7 @@ onMounted(() => {
                   :style="{ width: barPct(r, cat.key) + '%', background: cat.color }"
                 ></div>
               </div>
-              <span class="bar-num">{{ fmtPerSqm(r.yields_per_sqm_year[cat.key]) }}</span>
+              <span class="bar-num">{{ perHa(r.yields_per_sqm_year[cat.key]) }}</span>
             </div>
           </template>
         </div>

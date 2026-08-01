@@ -1,5 +1,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useFormat } from '../data/useFormat.js'
+
+// The hub's prose is English-only, but its figures should still follow the
+// user's locale. The carbon price is quoted in USD by definition
+// (price_usd_per_tco2), so that formatter is pinned rather than following the
+// app's selected display currency.
+const { money: usd, decimal } = useFormat('USD')
 
 // ----- catalogue -----------------------------------------------------------
 const catalog = ref(null)
@@ -113,14 +120,14 @@ onMounted(loadCatalog)
       <div v-if="market" class="market">
         <div class="market-item">
           <span class="market-k">Carbon price</span>
-          <span class="market-v">${{ market.carbon.price_usd_per_tco2 }}<em>/tCO₂e</em></span>
+          <span class="market-v">{{ usd(market.carbon.price_usd_per_tco2) }}<em>/tCO₂e</em></span>
           <span class="live-pill" :class="{ on: market.carbon.live }">{{ market.carbon.live ? 'LIVE' : 'static' }}</span>
         </div>
         <div class="market-item">
           <span class="market-k">FX (per USD)</span>
           <span class="market-v">
             <template v-for="(v, code) in market.fx.rates_per_usd" :key="code">
-              <span v-if="code !== 'USD'" class="fx">{{ code }} {{ v }}</span>
+              <span v-if="code !== 'USD'" class="fx">{{ code }} {{ decimal(v) }}</span>
             </template>
           </span>
           <span class="live-pill" :class="{ on: market.fx.live }">{{ market.fx.live ? 'LIVE' : 'static' }}</span>
@@ -198,7 +205,7 @@ onMounted(loadCatalog)
                 <tbody>
                   <tr v-for="(r, i) in esvResult.records" :key="i">
                     <td>{{ r.service || r.raw_service || '—' }}</td>
-                    <td class="num">{{ r.value ?? '—' }}</td>
+                    <td class="num">{{ decimal(r.value, 2) }}</td>
                     <td>{{ r.currency || '—' }}</td>
                     <td>{{ r.unit || '—' }}</td>
                   </tr>
