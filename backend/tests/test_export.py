@@ -24,6 +24,38 @@ def _result():
                            intactness=None, discount_rate=None)
 
 
+# --- locale-aware money formatting -----------------------------------------
+def test_format_money_english_prefixes_and_groups_with_commas():
+    assert export.format_money(1234567, "$", "en") == "$1,234,567"
+    assert export.format_money(1234567.891, "$", "en", decimals=2) == "$1,234,567.89"
+
+
+def test_format_money_german_suffixes_and_swaps_separators():
+    # German writes 1.234.567,89 € — dots group, comma decimals, symbol last.
+    assert export.format_money(1234567, "€", "de") == "1.234.567 €"
+    assert export.format_money(1234567.891, "€", "de", decimals=2) == "1.234.567,89 €"
+
+
+def test_format_money_spanish_matches_german_conventions():
+    assert export.format_money(1234567, "R$", "es") == "1.234.567 R$"
+
+
+def test_format_money_uses_full_digits_at_every_magnitude():
+    # No abbreviation in the PDF: a disclosure document must never leave the
+    # reader decoding "Mrd." vs "Bio." (or "billion" vs "Milliarde").
+    assert export.format_money(1_500_000_000, "€", "de") == "1.500.000.000 €"
+    assert export.format_money(91_234_567_890_123, "€", "de") == "91.234.567.890.123 €"
+
+
+def test_format_money_handles_missing_and_unparsable_values():
+    assert export.format_money(None, "€", "de") == "—"
+    assert export.format_money("n/a", "€", "de") == "n/a"
+
+
+def test_format_money_falls_back_to_english_for_unknown_locale():
+    assert export.format_money(1234567, "$", "pt") == "$1,234,567"
+
+
 # --- serialisers -----------------------------------------------------------
 def test_to_csv_parses_and_carries_totals():
     result = _result()
@@ -67,6 +99,26 @@ def test_export_pdf_endpoint():
     assert res.status_code == 200
     assert res.headers["content-type"] == "application/pdf"
     assert res.content[:4] == b"%PDF"
+
+
+def test_export_pdf_accepts_locale_and_rejects_unsupported_ones():
+    de = client.post("/api/v1/valuation/export?format=pdf&locale=de", json=AMAZON)
+    assert de.status_code == 200
+    assert de.content[:4] == b"%PDF"
+    # A German brief renders different bytes than the English default, since the
+    # separators and symbol placement differ throughout.
+    en = client.post("/api/v1/valuation/export?format=pdf&locale=en", json=AMAZON)
+    assert de.content != en.content
+    assert client.post(
+        "/api/v1/valuation/export?format=pdf&locale=xx", json=AMAZON
+    ).status_code == 422
+
+
+def test_export_csv_ignores_locale_and_stays_raw():
+    """The CSV is the machine-readable sheet — locale must not reformat it."""
+    plain = client.post("/api/v1/valuation/export?format=csv", json=AMAZON)
+    localised = client.post("/api/v1/valuation/export?format=csv&locale=de", json=AMAZON)
+    assert plain.text == localised.text
 
 
 def test_export_rejects_bad_format():

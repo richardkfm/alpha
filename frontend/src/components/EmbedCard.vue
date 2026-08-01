@@ -8,6 +8,10 @@
 // Value, the capitalised standing-asset value, and the conversion liability.
 import { ref, computed, onMounted } from 'vue'
 import { biomeColor, biomeLabel } from '../data/biomeMeta.js'
+// The embed entry (embed.js) deliberately skips vue-i18n to keep the iframe
+// bundle small, so this reaches for the pure formatters and takes its locale
+// from the URL instead of the useFormat composable.
+import { formatMoney, formatMoneyFull, formatHectares } from '../data/formatNumber.js'
 
 const region = ref(null)
 const loading = ref(true)
@@ -16,8 +20,11 @@ const error = ref('')
 const params = new URLSearchParams(window.location.search)
 const regionId = params.get('region') || ''
 const currency = (params.get('currency') || 'USD').toUpperCase()
-
-const symbol = computed(() => region.value?.currency_symbol ?? '$')
+// Host pages can request German/Spanish number conventions; anything unknown
+// falls back to English rather than letting Intl throw on a bad tag.
+const SUPPORTED = ['en', 'de', 'es']
+const rawLocale = (params.get('locale') || 'en').slice(0, 2).toLowerCase()
+const locale = SUPPORTED.includes(rawLocale) ? rawLocale : 'en'
 const biomeKey = computed(() => region.value?.biome_key ?? 'tropical_rainforest')
 const accent = computed(() => biomeColor(biomeKey.value))
 
@@ -29,15 +36,10 @@ const standingValue = computed(() => {
 })
 const liability = computed(() => region.value?.conversion_liability?.present_value ?? null)
 
-function fmtTotal(n) {
-  if (n == null) return '—'
-  return symbol.value + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
-}
-function fmtHa(n) {
-  if (n == null) return '—'
-  const v = Number(n)
-  return v.toLocaleString('en-US', { maximumFractionDigits: v < 100 ? 1 : 0 })
-}
+const opts = { locale, currency }
+const money = (n) => formatMoney(n, opts)
+const moneyFull = (n) => formatMoneyFull(n, opts)
+const hectares = (n) => formatHectares(n, opts)
 
 onMounted(async () => {
   if (!regionId) {
@@ -75,24 +77,29 @@ onMounted(async () => {
         <span class="biome-dot" aria-hidden="true"></span>
         <span class="titles">
           <span class="name">{{ region.name }}</span>
-          <span class="biome">{{ biomeLabel(biomeKey) }} · {{ fmtHa(region.area?.hectares) }} ha</span>
+          <span class="biome">{{ biomeLabel(biomeKey) }} · {{ hectares(region.area?.hectares) }} ha</span>
         </span>
       </header>
 
       <div class="tev">
         <span class="tev-k">Total Ecosystem Value</span>
-        <span class="tev-v">{{ fmtTotal(region.total_ecosystem_value_per_year) }}</span>
+        <span
+          class="tev-v"
+          :title="moneyFull(region.total_ecosystem_value_per_year)"
+          :aria-label="moneyFull(region.total_ecosystem_value_per_year)"
+          >{{ money(region.total_ecosystem_value_per_year) }}</span
+        >
         <span class="tev-u">{{ region.currency }} / year</span>
       </div>
 
       <div class="row">
         <div class="cell">
           <span class="cell-k">Standing asset</span>
-          <span class="cell-v">{{ fmtTotal(standingValue) }}</span>
+          <span class="cell-v" :title="moneyFull(standingValue)" :aria-label="moneyFull(standingValue)">{{ money(standingValue) }}</span>
         </div>
         <div class="cell">
           <span class="cell-k">If converted (liability)</span>
-          <span class="cell-v warn">{{ fmtTotal(liability) }}</span>
+          <span class="cell-v warn" :title="moneyFull(liability)" :aria-label="moneyFull(liability)">{{ money(liability) }}</span>
         </div>
       </div>
 

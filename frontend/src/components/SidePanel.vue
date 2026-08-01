@@ -7,8 +7,9 @@ import { YIELD_ROWS } from '../data/yields.js'
 import { barPct } from '../data/yieldScale.js'
 import { useBiomeMeta } from '../data/useBiomeMeta.js'
 import { useCountUp } from '../data/useCountUp.js'
+import { useFormat } from '../data/useFormat.js'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { biomeColor, biomeLabel, biomeSublabel: translatedBiomeSublabel } = useBiomeMeta()
 
 const props = defineProps({
@@ -26,7 +27,11 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'update:showLiability', 'update:showSystemic', 'update:showRedLines'])
 
-const symbol = computed(() => props.valuation?.currency_symbol ?? '$')
+// Intl places the currency symbol itself (de wants "1.234 €", not "€1.234"), so
+// the API's currency_symbol field is no longer read here.
+const { money, moneyFull, perHa, count, hectares, decimal, percent, likeTarget } = useFormat(
+  () => props.valuation?.currency,
+)
 
 // Phase 3: the backend now detects the biome from ingested boundary data.
 const classification = computed(() => props.valuation?.classification ?? null)
@@ -114,27 +119,10 @@ const tevAnim = useCountUp(
 const assetAnim = useCountUp(assetValue)
 const liabAnim = useCountUp(computed(() => liability.value?.present_value ?? null))
 
-function fmtPct(n) {
-  return n == null ? '—' : `${Math.round(n * 100)}%`
-}
-
-// Per-sqm yields are sub-cent — show 4 decimals; area totals use grouping.
-function fmtPerSqm(n) {
-  return n == null ? '—' : `${symbol.value}${Number(n).toFixed(4)}`
-}
-function fmtTotal(n) {
-  if (n == null) return '—'
-  return symbol.value + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
-}
-function fmtInt(n) {
-  return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
-}
-// Hectares: whole numbers for large regions, but keep decimals for small custom
-// areas that would otherwise round to a meaningless "0 ha".
-function fmtHa(n) {
-  if (n == null) return '—'
-  const v = Number(n)
-  return v.toLocaleString('en-US', { maximumFractionDigits: v < 100 ? 2 : 0 })
+// The intactness bar reads its width off a bare percentage, so it needs the
+// unlocalised form — `percent()` would give it "73 %" in German.
+function pctWidth(n) {
+  return n == null ? '0%' : `${Math.round(n * 100)}%`
 }
 
 // --- Phase 4: export + embed -----------------------------------------------
@@ -155,7 +143,13 @@ async function downloadExport(format) {
   exporting.value = format
   exportError.value = ''
   try {
-    const params = new URLSearchParams({ format, currency: props.valuation.currency })
+    // `locale` drives number formatting in the PDF brief, so a German user's
+    // report reads "1.234.567 €" rather than "€1,234,567".
+    const params = new URLSearchParams({
+      format,
+      currency: props.valuation.currency,
+      locale: locale.value,
+    })
     if (props.region.name) params.set('name', props.region.name)
     if (props.region.biome_key) params.set('biome', props.region.biome_key)
     if (props.region.intactness != null) params.set('intactness', props.region.intactness)
@@ -191,7 +185,9 @@ const embedSnippet = computed(() => {
   const origin = window.location.origin
   const cur = props.valuation?.currency || 'USD'
   const theme = document.documentElement.classList.contains('light') ? 'light' : 'dark'
-  const src = `${origin}/embed.html?region=${encodeURIComponent(props.region.id)}&currency=${cur}&theme=${theme}`
+  // Carry the locale through so the embedded card uses the same number
+  // conventions the user is looking at right now.
+  const src = `${origin}/embed.html?region=${encodeURIComponent(props.region.id)}&currency=${cur}&theme=${theme}&locale=${locale.value}`
   return `<iframe src="${src}" width="340" height="240" style="border:0;border-radius:14px" loading="lazy" title="alpha — ${props.region.name} ecosystem value"></iframe>`
 })
 async function copyEmbed() {
@@ -275,17 +271,21 @@ async function copyEmbed() {
       <section class="stats">
         <div class="stat">
           <span class="k">{{ t('sidePanel.stats.area') }}</span>
-          <span class="v num">{{ fmtHa(valuation.area.hectares) }} <em>ha</em></span>
-          <span class="stat-sub num">{{ fmtInt(valuation.area.sqm) }} m²</span>
+          <span class="v num" :title="count(valuation.area.hectares)"
+            >{{ hectares(valuation.area.hectares) }} <em>ha</em></span
+          >
+          <span class="stat-sub num" :title="`${count(valuation.area.sqm)} m²`"
+            >{{ decimal(valuation.area.sqm, 0) }} m²</span
+          >
         </div>
         <div v-if="intactness != null && intactness < 1" class="stat">
           <span class="k">{{ t('sidePanel.stats.intactness') }}</span>
-          <span class="v num">{{ fmtPct(intactness) }}</span>
+          <span class="v num">{{ percent(intactness) }}</span>
           <span class="intact-track" aria-hidden="true">
-            <span class="intact-bar" :style="{ width: fmtPct(intactness) }"></span>
+            <span class="intact-bar" :style="{ width: pctWidth(intactness) }"></span>
           </span>
-          <span class="stat-sub" :title="t('sidePanel.stats.intactnessTitle', { pct: fmtPct(intactness) })">
-            {{ t('sidePanel.stats.potentialSub', { value: fmtTotal(potentialAnnual) }) }}
+          <span class="stat-sub" :title="t('sidePanel.stats.intactnessTitle', { pct: percent(intactness) })">
+            {{ t('sidePanel.stats.potentialSub', { value: money(potentialAnnual) }) }}
           </span>
         </div>
       </section>
@@ -306,7 +306,7 @@ async function copyEmbed() {
               <span class="yield-dot" :style="{ background: row.color }"></span>
               <span class="yield-label">{{ row.label }}</span>
               <span class="yield-share num">{{ row.share }}%</span>
-              <span class="num yield-num">{{ fmtPerSqm(row.value) }}</span>
+              <span class="num yield-num">{{ perHa(row.value) }}</span>
             </div>
             <div class="yield-track">
               <div
@@ -320,10 +320,15 @@ async function copyEmbed() {
 
       <section class="tev">
         <span class="tev-label">{{ t('sidePanel.tev.label') }}</span>
-        <span class="tev-value">{{ fmtPerSqm(tevAnim) }}</span>
+        <span class="tev-value">{{ perHa(tevAnim) }}</span>
         <span class="tev-unit">{{ t('sidePanel.tev.unit', { currency: valuation.currency }) }}</span>
         <div class="tev-annual">
-          <span class="tev-annual-v num">{{ fmtTotal(valuation.total_ecosystem_value_per_year) }}</span>
+          <span
+            class="tev-annual-v num"
+            :title="moneyFull(valuation.total_ecosystem_value_per_year)"
+            :aria-label="moneyFull(valuation.total_ecosystem_value_per_year)"
+            >{{ money(valuation.total_ecosystem_value_per_year) }}</span
+          >
           <span class="tev-annual-k">{{ t('sidePanel.tev.annualUnit', { currency: valuation.currency }) }}</span>
         </div>
       </section>
@@ -340,7 +345,11 @@ async function copyEmbed() {
             >{{ Math.round(r * 100) }}%</button>
           </div>
         </div>
-        <span class="asset-value">{{ fmtTotal(assetAnim) }} <em>{{ valuation.currency }}</em></span>
+        <!-- Intl renders the symbol itself now, so repeating the ISO code here
+             would read as "7,1 Bio. € EUR". -->
+        <span class="asset-value" :title="moneyFull(assetValue)" :aria-label="moneyFull(assetValue)"
+          >{{ likeTarget(assetAnim, assetValue) }}</span
+        >
         <span
           class="asset-sub"
           :title="t('sidePanel.asset.subTitle')"
@@ -360,9 +369,14 @@ async function copyEmbed() {
         <template v-if="showLiability">
           <div class="liab">
             <span class="liab-label">{{ t('sidePanel.conversion.perpetualLiability') }}</span>
-            <span class="liab-value">{{ fmtTotal(liabAnim) }} <em>{{ valuation.currency }}</em></span>
+            <span
+              class="liab-value"
+              :title="moneyFull(liability.present_value)"
+              :aria-label="moneyFull(liability.present_value)"
+              >{{ likeTarget(liabAnim, liability.present_value) }}</span
+            >
             <span class="liab-sub" :title="liability.note">
-              {{ t('sidePanel.conversion.liabilitySub', { loss: fmtTotal(liability.annual_loss), incidence: liability.incidence }) }}
+              {{ t('sidePanel.conversion.liabilitySub', { loss: money(liability.annual_loss), incidence: liability.incidence }) }}
             </span>
           </div>
         </template>
@@ -373,7 +387,7 @@ async function copyEmbed() {
         </div>
 
         <div v-if="liability.carbon_debt_onetime > 0 && showSystemic" class="carbon-debt">
-          {{ t('sidePanel.conversion.carbonDebt', { amount: fmtTotal(liability.carbon_debt_onetime) }) }}
+          {{ t('sidePanel.conversion.carbonDebt', { amount: money(liability.carbon_debt_onetime) }) }}
         </div>
 
         <div v-if="redLines.length && showRedLines" class="redlines">

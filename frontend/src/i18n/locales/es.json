@@ -128,13 +128,13 @@
     },
     "yields": {
       "heading": "Rendimientos de servicios",
-      "unit": "{currency} / m² / año",
+      "unit": "{currency} / ha / año",
       "scale": "Longitud de la barra = valor frente al bioma más fuerte para ese servicio",
       "rowTitle": "{label} — {share}% del valor de esta región"
     },
     "tev": {
       "label": "Valor Total del Ecosistema",
-      "unit": "{currency} / m² / año",
+      "unit": "{currency} / ha / año",
       "annualUnit": "{currency} / año en toda esta área"
     },
     "asset": {

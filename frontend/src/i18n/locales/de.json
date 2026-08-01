@@ -128,13 +128,13 @@
     },
     "yields": {
       "heading": "Leistungserträge",
-      "unit": "{currency} / m² / Jahr",
+      "unit": "{currency} / ha / Jahr",
       "scale": "Balkenlänge = Wert im Vergleich zum stärksten Biom für diese Leistung",
       "rowTitle": "{label} — {share}% des Werts dieser Region"
     },
     "tev": {
       "label": "Gesamter Ökosystemwert",
-      "unit": "{currency} / m² / Jahr",
+      "unit": "{currency} / ha / Jahr",
       "annualUnit": "{currency} / Jahr für diese Fläche"
     },
     "asset": {

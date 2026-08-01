@@ -28,6 +28,50 @@ _SERVICE_LABELS: List[Tuple[str, str]] = [
 ]
 
 
+# Square metres in a hectare. Per-sqm yields are sub-cent, so the PDF reports
+# them per hectare — matching what the web UI shows. The CSV deliberately keeps
+# the API's raw per-sqm figures, since it is the machine-readable sheet.
+SQM_PER_HA = 10_000
+
+# Number conventions per supported UI locale: (thousands, decimal, template).
+# Deliberately hand-rolled rather than using the stdlib ``locale`` module, which
+# mutates process-global state and is unsafe inside a server process.
+_NUMBER_STYLES: Dict[str, Tuple[str, str, str]] = {
+    "en": (",", ".", "{sym}{num}"),
+    "de": (".", ",", "{num} {sym}"),
+    "es": (".", ",", "{num} {sym}"),
+}
+DEFAULT_LOCALE = "en"
+
+
+def format_money(
+    value: Any, symbol: str = "$", locale: str = DEFAULT_LOCALE, decimals: int = 0
+) -> str:
+    """Group and place a currency amount the way `locale` writes numbers.
+
+    German and Spanish swap the separators and put the symbol after the amount
+    (``1.234.567 €``), where English prefixes it (``$1,234,567``). Full digits
+    throughout — a disclosure document should never make the reader decode an
+    abbreviation, which also keeps the report clear of the Milliarde/Billion
+    false friend entirely.
+    """
+    if value is None:
+        return "—"
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    thousands, decimal, template = _NUMBER_STYLES.get(
+        locale, _NUMBER_STYLES[DEFAULT_LOCALE]
+    )
+    # Format with Python's own separators, then swap via a placeholder so the
+    # two-step substitution cannot collide (both styles reuse "." and ",").
+    num = f"{v:,.{decimals}f}".replace(",", "\x00").replace(".", decimal)
+    num = num.replace("\x00", thousands)
+    return template.format(sym=symbol, num=num)
+
+
 def report_title(result: Dict[str, Any], name: Optional[str] = None) -> str:
     """Headline for the report: the region name (if given) plus its biome."""
     biome = result.get("biome", "Ecosystem")
@@ -138,8 +182,14 @@ def to_csv(result: Dict[str, Any], name: Optional[str] = None) -> str:
 # ---------------------------------------------------------------------------
 # PDF
 # ---------------------------------------------------------------------------
-def to_pdf(result: Dict[str, Any], name: Optional[str] = None) -> bytes:
-    """Render the valuation as a one-page PDF investor brief."""
+def to_pdf(
+    result: Dict[str, Any], name: Optional[str] = None, locale: str = DEFAULT_LOCALE
+) -> bytes:
+    """Render the valuation as a one-page PDF investor brief.
+
+    ``locale`` selects the number conventions only (separators and symbol
+    placement); the report's prose stays English.
+    """
     # Imported lazily so the CSV path (and the rest of the API) has no hard
     # dependency on reportlab being installed.
     from reportlab.lib import colors
@@ -171,13 +221,16 @@ def to_pdf(result: Dict[str, Any], name: Optional[str] = None) -> bytes:
     foot = ParagraphStyle("aFoot", parent=styles["Normal"], textColor=muted, fontSize=7.5, leading=10)
 
     def money(value: Any, per_sqm: bool = False) -> str:
-        if value is None:
-            return "—"
-        try:
-            v = float(value)
-        except (TypeError, ValueError):
-            return str(value)
-        return f"{sym}{v:,.4f}" if per_sqm else f"{sym}{v:,.0f}"
+        """Whole-area totals, or a per-sqm yield rescaled to a per-hectare one."""
+        if per_sqm:
+            if value is None:
+                return "—"
+            try:
+                value = float(value) * SQM_PER_HA
+            except (TypeError, ValueError):
+                return str(value)
+            return format_money(value, sym, locale, decimals=2)
+        return format_money(value, sym, locale, decimals=0)
 
     elements: List[Any] = []
     elements.append(Paragraph("alpha · Total Ecosystem Value", h_sec))
@@ -185,7 +238,8 @@ def to_pdf(result: Dict[str, Any], name: Optional[str] = None) -> bytes:
     cls = result.get("classification") or {}
     elements.append(
         Paragraph(
-            f"{cur} · {area.get('hectares', 0):,.1f} ha · biome: {cls.get('confidence', '')}"
+            f"{cur} · {format_money(area.get('hectares', 0), '', locale, 1).strip()} ha"
+            f" · biome: {cls.get('confidence', '')}"
             f" · generated {_generated_utc()}",
             h_sub,
         )
@@ -218,7 +272,7 @@ def to_pdf(result: Dict[str, Any], name: Optional[str] = None) -> bytes:
     elements.append(Paragraph("Ecosystem-service yields", h_sec))
     ps = result.get("yields_per_sqm_year", {})
     tot = result.get("yields_total_year", {})
-    rows = [["Service", f"Per m²/yr ({cur})", f"Area total/yr ({cur})"]]
+    rows = [["Service", f"Per ha/yr ({cur})", f"Area total/yr ({cur})"]]
     for key, label in _SERVICE_LABELS:
         rows.append([label, money(ps.get(key), per_sqm=True), money(tot.get(key))])
     rows.append([

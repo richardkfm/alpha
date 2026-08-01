@@ -351,6 +351,7 @@ def valuation_export(
     currency: Optional[str] = Query(default=None),
     intactness: Optional[float] = Query(default=None, ge=0.0, le=1.0),
     discount_rate: Optional[float] = Query(default=None, gt=0.0),
+    locale: str = Query(default="en", pattern="^(en|de|es)$"),
 ) -> Response:
     """Export a polygon's TEV breakdown as a downloadable CSV or PDF report.
 
@@ -359,6 +360,10 @@ def valuation_export(
     and runs them through the very same ``build_valuation`` path, so the report
     carries identical figures to the API. CSV is a spreadsheet-ready data sheet;
     PDF is a one-page investor brief (see ``export.py``).
+
+    ``locale`` affects the PDF's number formatting only — separators and symbol
+    placement, so a German reader gets ``1.234.567 €`` rather than
+    ``€1,234,567``. The CSV is machine-readable and stays raw regardless.
     """
     result = build_valuation(
         body.to_geometry(),
@@ -370,7 +375,7 @@ def valuation_export(
     report_name = name or (body.properties or {}).get("name")
     slug = export_report.filename_slug(result, report_name)
     if format == "pdf":
-        content: Any = export_report.to_pdf(result, report_name)
+        content: Any = export_report.to_pdf(result, report_name, locale=locale)
         media_type = "application/pdf"
         ext = "pdf"
     else:
