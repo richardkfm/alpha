@@ -53,6 +53,32 @@ function money(currency, extra) {
 
 const COMPACT = { notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 1 }
 
+const NBSP = ' '
+
+// Some CLDR data sets omit the separator between a compact scale word and the
+// currency symbol. Chromium 141 formats 1.2e12 in es/BRL as "1,2 BR$": the "B"
+// (billón, 10^12) fuses with "R$" and the whole thing reads as 1.2 reais rather
+// than 1.2 trillion. Node's newer ICU emits "1,2 B R$". Rather than depend on
+// whichever ICU the runtime shipped with, guarantee the gap ourselves.
+//
+// This only ever inserts whitespace — the scale words themselves still come
+// from CLDR, so the Milliarde/Billion distinction stays out of our hands.
+function needsGap(a, b) {
+  return (
+    (a === 'compact' && b === 'currency') || (a === 'currency' && b === 'compact')
+  )
+}
+
+/** Concatenate Intl parts, keeping a scale word and a currency symbol apart. */
+export function joinNumberParts(parts) {
+  let out = ''
+  for (let i = 0; i < parts.length; i++) {
+    if (i > 0 && needsGap(parts[i - 1].type, parts[i].type)) out += NBSP
+    out += parts[i].value
+  }
+  return out
+}
+
 // --- pure formatters --------------------------------------------------------
 // All take an explicit { locale, currency } bag so they stay testable without a
 // Vue component context.
@@ -62,7 +88,8 @@ export function formatMoney(n, { locale = 'en', currency = 'USD' } = {}) {
   const v = num(n)
   if (v == null) return EMPTY
   const compact = Math.abs(v) >= COMPACT_FROM
-  return nf(locale, money(currency, compact ? COMPACT : { maximumFractionDigits: 0 })).format(v)
+  const f = nf(locale, money(currency, compact ? COMPACT : { maximumFractionDigits: 0 }))
+  return compact ? joinNumberParts(f.formatToParts(v)) : f.format(v)
 }
 
 /** Every digit, always. Feeds the tooltip/aria-label behind an abbreviated figure. */
@@ -82,7 +109,7 @@ export function formatPerHa(nPerSqm, { locale = 'en', currency = 'USD' } = {}) {
   const perHa = v * SQM_PER_HA
   const digits = Math.abs(perHa) < 100 ? 2 : 0
   if (Math.abs(perHa) >= COMPACT_FROM) {
-    return nf(locale, money(currency, COMPACT)).format(perHa)
+    return joinNumberParts(nf(locale, money(currency, COMPACT)).formatToParts(perHa))
   }
   return nf(
     locale,
@@ -159,25 +186,22 @@ export function formatLikeTarget(n, target, opts = {}) {
     maximumFractionDigits: places,
   }).format(scaled)
 
+  // Numeric parts (including any group separators between them) collapse into
+  // the single re-scaled digit string; everything else — literals, scale word,
+  // symbol — is carried over untouched.
+  const NUMERIC = ['integer', 'decimal', 'fraction', 'group', 'minusSign']
   let injected = false
-  return parts
-    .map((p) => {
-      // Numeric parts (including any group separators between them) collapse
-      // into the single re-scaled digit string.
-      if (
-        p.type === 'integer' ||
-        p.type === 'decimal' ||
-        p.type === 'fraction' ||
-        p.type === 'group' ||
-        p.type === 'minusSign'
-      ) {
-        if (injected) return ''
-        injected = true
-        return digits
-      }
-      return p.value
-    })
-    .join('')
+  const rebuilt = []
+  for (const p of parts) {
+    if (NUMERIC.includes(p.type)) {
+      if (injected) continue
+      injected = true
+      rebuilt.push({ type: 'integer', value: digits })
+    } else {
+      rebuilt.push(p)
+    }
+  }
+  return joinNumberParts(rebuilt)
 }
 
 // Rebuild the numeric value of a formatted number from its parts, so we learn

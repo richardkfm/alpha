@@ -113,9 +113,10 @@ const potentialAnnual = computed(
 )
 
 // Headline figures ease toward their value instead of snapping.
-const tevAnim = useCountUp(
-  computed(() => props.valuation?.total_ecosystem_value_per_sqm_year ?? null),
+const annualTotal = computed(
+  () => props.valuation?.total_ecosystem_value_per_year ?? null,
 )
+const annualAnim = useCountUp(annualTotal)
 const assetAnim = useCountUp(assetValue)
 const liabAnim = useCountUp(computed(() => liability.value?.present_value ?? null))
 
@@ -290,6 +291,32 @@ async function copyEmbed() {
         </div>
       </section>
 
+      <!-- Leads the value sections: the standing-asset figure is the headline
+           number the panel exists to deliver, so it comes before the flow that
+           it capitalises and before the per-service breakdown. -->
+      <section class="asset">
+        <div class="asset-head">
+          <span class="asset-label">{{ t('sidePanel.asset.label') }}</span>
+          <div class="asset-rates" role="group" :aria-label="t('sidePanel.asset.discountGroup')">
+            <button
+              v-for="r in DISCOUNT_RATES"
+              :key="r"
+              :class="{ on: discountRate === r }"
+              @click="discountRate = r"
+            >{{ Math.round(r * 100) }}%</button>
+          </div>
+        </div>
+        <!-- Intl renders the symbol itself now, so repeating the ISO code here
+             would read as "7,1 Bio. € EUR". -->
+        <span class="asset-value" :title="moneyFull(assetValue)" :aria-label="moneyFull(assetValue)"
+          >{{ likeTarget(assetAnim, assetValue) }}</span
+        >
+        <span
+          class="asset-sub"
+          :title="t('sidePanel.asset.subTitle')"
+        >{{ t('sidePanel.asset.sub', { rate: Math.round(discountRate * 100) }) }}</span>
+      </section>
+
       <section class="yields">
         <h3>
           {{ t('sidePanel.yields.heading') }}
@@ -318,42 +345,22 @@ async function copyEmbed() {
         </ul>
       </section>
 
+      <!-- The whole-area total is the hero: this section is headed "Total
+           Ecosystem Value", so leading with the per-hectare rate invited
+           reading a continental basin as being worth ~1.062 $. The rate is
+           still here, demoted and glued to its unit. -->
       <section class="tev">
         <span class="tev-label">{{ t('sidePanel.tev.label') }}</span>
-        <span class="tev-value">{{ perHa(tevAnim) }}</span>
-        <span class="tev-unit">{{ t('sidePanel.tev.unit', { currency: valuation.currency }) }}</span>
+        <span class="tev-value" :title="moneyFull(annualTotal)" :aria-label="moneyFull(annualTotal)">{{
+          likeTarget(annualAnim, annualTotal)
+        }}</span>
+        <!-- No currency code in these unit strings: the amount above already
+             carries its symbol, so "527 € EUR / ha / Jahr" read as a stutter. -->
+        <span class="tev-unit">{{ t('sidePanel.tev.annualUnit') }}</span>
         <div class="tev-annual">
-          <span
-            class="tev-annual-v num"
-            :title="moneyFull(valuation.total_ecosystem_value_per_year)"
-            :aria-label="moneyFull(valuation.total_ecosystem_value_per_year)"
-            >{{ money(valuation.total_ecosystem_value_per_year) }}</span
-          >
-          <span class="tev-annual-k">{{ t('sidePanel.tev.annualUnit', { currency: valuation.currency }) }}</span>
+          <span class="tev-annual-v num">{{ perHa(valuation.total_ecosystem_value_per_sqm_year) }}</span>
+          <span class="tev-annual-k">{{ t('sidePanel.tev.unit') }}</span>
         </div>
-      </section>
-
-      <section class="asset">
-        <div class="asset-head">
-          <span class="asset-label">{{ t('sidePanel.asset.label') }}</span>
-          <div class="asset-rates" role="group" :aria-label="t('sidePanel.asset.discountGroup')">
-            <button
-              v-for="r in DISCOUNT_RATES"
-              :key="r"
-              :class="{ on: discountRate === r }"
-              @click="discountRate = r"
-            >{{ Math.round(r * 100) }}%</button>
-          </div>
-        </div>
-        <!-- Intl renders the symbol itself now, so repeating the ISO code here
-             would read as "7,1 Bio. € EUR". -->
-        <span class="asset-value" :title="moneyFull(assetValue)" :aria-label="moneyFull(assetValue)"
-          >{{ likeTarget(assetAnim, assetValue) }}</span
-        >
-        <span
-          class="asset-sub"
-          :title="t('sidePanel.asset.subTitle')"
-        >{{ t('sidePanel.asset.sub', { rate: Math.round(discountRate * 100) }) }}</span>
       </section>
 
       <section v-if="liability" class="conversion">
