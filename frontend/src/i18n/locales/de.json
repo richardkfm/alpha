@@ -134,8 +134,8 @@
     },
     "tev": {
       "label": "Gesamter Ökosystemwert",
-      "unit": "{currency} / ha / Jahr",
-      "annualUnit": "{currency} / Jahr für diese Fläche"
+      "unit": "pro Hektar und Jahr",
+      "annualUnit": "pro Jahr für diese Fläche"
     },
     "asset": {
       "label": "Stehender Anlagewert",

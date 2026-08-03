@@ -150,6 +150,64 @@ describe('formatDecimal and formatPercent', () => {
   })
 })
 
+describe('joinNumberParts — scale word must not fuse with the currency symbol', () => {
+  // Chromium 141 really does return these parts for es/BRL at 1.2e12, with no
+  // literal between the compact "B" (billón) and "R$". Concatenated naively
+  // that is "1,2 BR$", which reads as 1.2 reais rather than 1.2 trillion. Node's
+  // newer ICU includes the separator, so this array is the only way to cover
+  // the browser's behaviour from a Node test run.
+  const chromiumEsBrl = [
+    { type: 'integer', value: '1' },
+    { type: 'decimal', value: ',' },
+    { type: 'fraction', value: '2' },
+    { type: 'literal', value: ' ' },
+    { type: 'compact', value: 'B' },
+    { type: 'currency', value: 'R$' },
+  ]
+
+  it('inserts a gap when CLDR data omits one', () => {
+    expect(F.joinNumberParts(chromiumEsBrl)).toBe('1,2 B R$')
+    expect(plainSpaces(F.joinNumberParts(chromiumEsBrl))).toBe('1,2 B R$')
+  })
+
+  it('does not double the separator when CLDR already provides one', () => {
+    const nodeEsBrl = [
+      ...chromiumEsBrl.slice(0, 5),
+      { type: 'literal', value: ' ' },
+      { type: 'currency', value: 'R$' },
+    ]
+    expect(F.joinNumberParts(nodeEsBrl)).toBe('1,2 B R$')
+  })
+
+  it('handles a leading symbol, where the scale word comes last', () => {
+    // en/USD puts the currency first: "$7.1T" needs no gap inserted.
+    expect(
+      F.joinNumberParts([
+        { type: 'currency', value: '$' },
+        { type: 'integer', value: '7' },
+        { type: 'decimal', value: '.' },
+        { type: 'fraction', value: '1' },
+        { type: 'compact', value: 'T' },
+      ]),
+    ).toBe('$7.1T')
+  })
+
+  it('keeps every compacted currency output separated, whatever the runtime', () => {
+    for (const [locale, currency] of [
+      ['en', 'USD'],
+      ['de', 'EUR'],
+      ['es', 'BRL'],
+      ['es', 'USD'],
+    ]) {
+      for (const v of [4.2e6, 1.5e9, 2.75e12]) {
+        // No letter may sit directly against the symbol's leading character.
+        expect(F.formatMoney(v, { locale, currency })).not.toMatch(/[A-Za-z]R\$/)
+        expect(F.formatLikeTarget(v, v, { locale, currency })).not.toMatch(/[A-Za-z]R\$/)
+      }
+    }
+  })
+})
+
 describe('formatLikeTarget — count-up stability', () => {
   it('holds one scale word for the whole animation', () => {
     // Formatting each frame independently would walk the suffix
