@@ -15,7 +15,7 @@ geographic area. Part of the [`alpha`](../README.md) monorepo.
 | --- | --- | --- |
 | `GET` | `/health` | Liveness probe → `{"status": "ok", "service": "alpha-backend"}` |
 | `POST` | `/api/v1/valuation` | GeoJSON polygon → full TEV breakdown (geodesic area, per-sqm + area totals, intactness, standing-asset & conversion-liability framing, currency). **Phase 3:** auto-detects the biome when none is supplied (`classification` in the response) |
-| `POST` | `/api/v1/valuation/export` | _(Phase 4)_ same breakdown as `/valuation`, rendered as a downloadable **CSV** data sheet or one-page **PDF** investor brief (`?format=csv\|pdf`, optional `name`) |
+| `POST` | `/api/v1/valuation/export` | _(Phase 4)_ same breakdown as `/valuation`, rendered as a downloadable **CSV** data sheet or one-page **PDF** investor brief. Takes every `/valuation` query parameter plus `?format=csv\|pdf`, an optional display `name`, and `?locale=en\|de\|es` for the PDF's number conventions |
 | `GET` | `/api/v1/regions` | Pre-valued catalogue of named ecosystems across all biomes, powering the map overlays + Compare view |
 | `GET` | `/api/v1/regions/{id}` | _(Phase 4)_ a single catalogue region, valued in `?currency=` — backs the embeddable widget (`/embed.html`) |
 | `GET` | `/api/v1/reference` | Supported biomes & currencies + their per-sqm reference yields |
@@ -74,7 +74,13 @@ Code layout:
   RESOLVE ecoregions (`data/ecoregions.geojson`) + curated seeds (`data/wwf_biomes.geojson`)
 - `landcover.py` — _(Phase 3)_ Copernicus CGLS-LC100 legend → biome hint + intactness
 - `esv_extraction.py` — _(Phase 3)_ LLM-assisted (Ollama-compatible) + regex ESV parser
-- `export.py` — _(Phase 4)_ CSV (stdlib) + PDF (reportlab) investor-report serialisers
+- `export.py` — _(Phase 4)_ CSV (stdlib) + PDF (reportlab) investor-report
+  serialisers. The two formats deliberately differ: the CSV is the
+  machine-readable sheet and carries the API's raw **per-sqm** figures with no
+  locale formatting, while the PDF mirrors what the web UI shows — **per
+  hectare**, with separators and symbol placement following `?locale=`. Both
+  are pure serialisers over the same `build_valuation` result, so the figures
+  are identical to `POST /api/v1/valuation`.
 - `ingest.py` — _(Phase 3)_ ingestion CLI (`validate` / `classify` / `refresh`)
 - `tests/` — unit tests for the engine and the Phase 3 ingestion layer (`python -m pytest`)
 

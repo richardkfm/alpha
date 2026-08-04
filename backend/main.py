@@ -58,7 +58,7 @@ from valuation import compute_valuation
 app = FastAPI(
     title="alpha API",
     description="Putting nature on the balance sheet — ecosystem valuation API.",
-    version="0.3.0",
+    version="0.4.0",
 )
 
 # Allow the Leaflet frontend (served on :3000) to call the API from the browser.
