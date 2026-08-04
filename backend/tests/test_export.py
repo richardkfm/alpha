@@ -56,6 +56,22 @@ def test_format_money_falls_back_to_english_for_unknown_locale():
     assert export.format_money(1234567, "$", "pt") == "$1,234,567"
 
 
+def test_format_percent_follows_the_locale_decimal_separator():
+    # The discount rate sat beside comma-decimal money as "3.0%" before this.
+    assert export.format_percent(0.03, "en") == "3.0%"
+    assert export.format_percent(0.03, "de") == "3,0%"
+    assert export.format_percent(0.03, "es") == "3,0%"
+    assert export.format_percent(None, "de") == "—"
+
+
+def test_discount_label_localises_its_rate():
+    result = {"capitalized_value": {"discount_rate": 0.03}}
+    assert "3,0%" in export._discount_label(result, "de")
+    assert "3.0%" in export._discount_label(result, "en")
+    # No rate, no percentage to mis-punctuate.
+    assert export._discount_label({}, "de") == "Capitalised standing value"
+
+
 # --- serialisers -----------------------------------------------------------
 def test_to_csv_parses_and_carries_totals():
     result = _result()

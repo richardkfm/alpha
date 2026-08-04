@@ -135,7 +135,8 @@
     "tev": {
       "label": "Total Ecosystem Value",
       "unit": "per hectare per year",
-      "annualUnit": "per year across this area"
+      "perYear": "/ yr",
+      "annualUnit": "per year, across this entire area"
     },
     "asset": {
       "label": "Standing asset value",

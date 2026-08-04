@@ -80,6 +80,56 @@ describe('formatMoney — symbol placement and separators', () => {
   })
 })
 
+// The other half of the same false-friend problem: German writes one thousand
+// as "1.000" and one-and-a-half as "1,5", which is exactly the inverse of
+// English. Any figure that reaches the DOM without passing through Intl —
+// interpolated into an i18n message, say — reads off by a factor of 1000 to
+// half our users. These pin the convention for every formatter that can emit a
+// separator, so a regression fails here rather than in a German screenshot.
+describe('thousands and decimal separators', () => {
+  // All below COMPACT_FROM, where separators are what the reader actually sees.
+  const cases = [
+    // [value, en, de, es]
+    [1000, '1,000', '1.000', '1000'],
+    [1234.5, '1,234.5', '1.234,5', '1234,5'],
+    [999999, '999,999', '999.999', '999.999'],
+    [1.595, '1.595', '1,595', '1,595'],
+  ]
+
+  it('inverts dot and comma between English and German', () => {
+    for (const [v, en, de] of cases) {
+      expect(formatDecimal(v, { locale: 'en' })).toBe(en)
+      expect(formatDecimal(v, { locale: 'de' })).toBe(de)
+    }
+  })
+
+  it('follows Spanish, which does not group four-digit numbers', () => {
+    // CLDR gives es a minimum grouping of two digits — "1000", not "1.000".
+    // It looks like a bug and is not one; pinned here so nobody "fixes" it.
+    for (const [v, , , es] of cases) {
+      expect(formatDecimal(v, { locale: 'es' })).toBe(es)
+    }
+  })
+
+  it('applies the same conventions to money and counts', () => {
+    expect(formatMoney(999999, { locale: 'de', currency: 'EUR' })).toBe('999.999 €')
+    expect(formatMoney(999999, { locale: 'en', currency: 'USD' })).toBe('$999,999')
+    // Above the threshold the separator question moves into the tooltip, which
+    // is precisely why moneyFull has to honour it too.
+    expect(formatMoneyFull(1234567, { locale: 'de', currency: 'EUR' })).toBe('1.234.567 €')
+    expect(formatMoneyFull(1234567, { locale: 'en', currency: 'USD' })).toBe('$1,234,567')
+    expect(formatCount(1000, { locale: 'de' })).toBe('1.000')
+    expect(formatCount(1000, { locale: 'en' })).toBe('1,000')
+  })
+
+  it('formats a bare multiplier so 1.595 cannot be read as 1595', () => {
+    // The systemic premium is interpolated into a sentence; raw JS
+    // stringification would print "1.595" to a German reader.
+    expect(formatDecimal(1.595, { locale: 'de', maxDigits: 2 })).toBe('1,6')
+    expect(formatDecimal(1.595, { locale: 'en', maxDigits: 2 })).toBe('1.6')
+  })
+})
+
 describe('formatMoney — the compact threshold', () => {
   it('stays fully grouped below COMPACT_FROM', () => {
     expect(COMPACT_FROM).toBe(1e6)

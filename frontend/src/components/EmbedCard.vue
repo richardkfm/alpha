@@ -83,13 +83,20 @@ onMounted(async () => {
 
       <div class="tev">
         <span class="tev-k">Total Ecosystem Value</span>
+        <!-- The period rides on the figure's baseline, not in a caption under
+             it: in a 340x240 embed the caption is the first thing a reader's
+             eye skips, and an unlabelled total reads as a stock, not a flow.
+             The currency code is gone from the caption too — money() already
+             renders the symbol, so it only ever said "1,4 Bio. € EUR". -->
         <span
           class="tev-v"
           :title="moneyFull(region.total_ecosystem_value_per_year)"
-          :aria-label="moneyFull(region.total_ecosystem_value_per_year)"
-          >{{ money(region.total_ecosystem_value_per_year) }}</span
+          :aria-label="`${moneyFull(region.total_ecosystem_value_per_year)} per year`"
         >
-        <span class="tev-u">{{ region.currency }} / year</span>
+          <span class="tev-n">{{ money(region.total_ecosystem_value_per_year) }}</span>
+          <span class="tev-per" aria-hidden="true">/ yr</span>
+        </span>
+        <span class="tev-u">per year, whole area</span>
       </div>
 
       <div class="row">
@@ -177,10 +184,19 @@ onMounted(async () => {
   color: var(--text-muted, #93a3a0);
 }
 .tev-v {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 6px;
   font-family: 'Spline Sans Mono', ui-monospace, monospace;
-  font-size: 1.8rem;
   font-weight: 800;
   color: var(--accent);
+}
+.tev-n {
+  font-size: 1.8rem;
+}
+.tev-per {
+  font-size: 0.95rem;
 }
 .tev-u {
   font-size: 0.72rem;

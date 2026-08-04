@@ -117,6 +117,12 @@ const annualTotal = computed(
   () => props.valuation?.total_ecosystem_value_per_year ?? null,
 )
 const annualAnim = useCountUp(annualTotal)
+// Screen readers get the exact figure with its period spelled out — "143 Mrd. €"
+// read on its own is ambiguous between a yearly flow and a standing stock, and
+// the visible "/ Jahr" is decorative markup they would otherwise stumble over.
+const annualAria = computed(
+  () => `${moneyFull(annualTotal.value)} ${t('sidePanel.tev.annualUnit')}`,
+)
 const assetAnim = useCountUp(assetValue)
 const liabAnim = useCountUp(computed(() => liability.value?.present_value ?? null))
 
@@ -351,9 +357,15 @@ async function copyEmbed() {
            still here, demoted and glued to its unit. -->
       <section class="tev">
         <span class="tev-label">{{ t('sidePanel.tev.label') }}</span>
-        <span class="tev-value" :title="moneyFull(annualTotal)" :aria-label="moneyFull(annualTotal)">{{
-          likeTarget(annualAnim, annualTotal)
-        }}</span>
+        <!-- "/ Jahr" rides on the hero's own baseline rather than living in the
+             caption below it. This is a flow, and the two figures either side of
+             it (standing asset, conversion liability) are stocks — reading
+             "143 Mrd. €" without its period puts it in the wrong category
+             entirely, and a caption underneath is too easy to skip. -->
+        <span class="tev-value" :title="moneyFull(annualTotal)" :aria-label="annualAria">
+          <span class="tev-amount">{{ likeTarget(annualAnim, annualTotal) }}</span>
+          <span class="tev-per" aria-hidden="true">{{ t('sidePanel.tev.perYear') }}</span>
+        </span>
         <!-- No currency code in these unit strings: the amount above already
              carries its symbol, so "527 € EUR / ha / Jahr" read as a stutter. -->
         <span class="tev-unit">{{ t('sidePanel.tev.annualUnit') }}</span>
@@ -388,8 +400,11 @@ async function copyEmbed() {
           </div>
         </template>
 
+        <!-- The multiplier has to go through `decimal()` like every other
+             figure: interpolated raw, JS stringifies 1.595 with a dot, which a
+             German reader parses as one thousand five hundred ninety-five. -->
         <div v-if="systemicMult > 1.05 && showSystemic" class="systemic-tag">
-          <strong>{{ t('sidePanel.conversion.systemicTagBold', { mult: systemicMult }) }}</strong>
+          <strong>{{ t('sidePanel.conversion.systemicTagBold', { mult: decimal(systemicMult, 2) }) }}</strong>
           {{ t('sidePanel.conversion.systemicTagRest') }}
         </div>
 
@@ -892,14 +907,35 @@ async function copyEmbed() {
   color: var(--text-muted);
 }
 .tev-value {
-  font-size: 2.4rem;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  margin: 2px 0;
+}
+/* 2.2rem rather than 2.4: the widest German compact string ("212,5 Mrd. €")
+   measures 277px at 2.4rem against 263px of usable row, so the period marker
+   wrapped to its own line — back to being a caption. At 2.2rem the pair fits
+   the 420px panel. Narrower than that (a phone) it wraps, which flex-wrap
+   handles and which is still legible, since the marker stays large and
+   accent-coloured. */
+.tev-amount {
+  font-size: 2.2rem;
   font-weight: 800;
   line-height: 1.05;
-  margin: 2px 0;
   background: linear-gradient(95deg, var(--accent), var(--forest-overlay));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+/* Big enough to be read in the same glance as the amount, plain enough not to
+   be mistaken for part of it. */
+.tev-per {
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.05;
+  white-space: nowrap;
+  color: var(--accent);
 }
 .tev-unit {
   font-size: 0.76rem;
