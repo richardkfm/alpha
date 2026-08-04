@@ -123,6 +123,11 @@ sources (Copernicus satellite data, ESVD API, carbon market prices).
 - ✅ **Embeddable widget** — a lightweight iframe (`frontend/embed.html`, served from a
   separate Vite entry so it skips the globe bundle) renders a single region's value from
   `GET /api/v1/regions/{id}`; the side panel generates a copy-paste `<iframe>` snippet.
+- ✅ **Localised figures (EN / DE / ES)** — every number in the UI runs through a
+  shared formatter (`frontend/src/data/formatNumber.js`), and the PDF brief takes
+  `?locale=`. Scale words come from CLDR rather than a hand-rolled suffix table,
+  because English *billion* is 10⁹ while German *Billion* is 10¹² — getting that
+  wrong misreports a figure by a factor of 1000 on a financial disclosure.
 - Harden the API with versioning, rate limiting, and API key authentication (for
   commercial users under AGPL dual-licensing) — *still to do*
 
@@ -158,9 +163,13 @@ The visual centrepiece is a **full-screen world map** — a 3D MapLibre globe
 - Clicking a polygon (or a bubble) opens a **side panel** that shows:
   - Ecosystem name, country/region
   - Total area (sqm and hectares)
+  - The capitalised **standing natural-asset value**, leading the value sections
   - Breakdown of all ecosystem service values (carbon, water, climate,
-    biodiversity, soil)
-  - **Total Ecosystem Value (TEV) in USD per sqm per year**
+    biodiversity, soil), **per hectare per year** — the engine works in per-m²
+    but those figures are sub-cent, so the UI scales them at the display
+    boundary only
+  - **Total Ecosystem Value (TEV)** — the whole-area annual total as the
+    headline, with the per-hectare rate beneath it
   - A comparison callout: _"This region generates more annual economic value
     standing than the GDP contribution of [industry X] in this country"_
 - A global search/query bar so users can enter custom coordinates or paste a

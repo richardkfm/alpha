@@ -29,7 +29,13 @@ https://github.com/user-attachments/assets/1c6a9012-97ff-424b-af78-628ee2a45e40
 - **Total Ecosystem Value (TEV) engine** — geodesic-area valuation of any GeoJSON
   polygon across **eleven biomes**, broken into five ecosystem-service yields
   (carbon capture, climate regulation, water filtration, biodiversity, soil
-  nutrients), reported per sqm/year and area-scaled, in USD / EUR / BRL.
+  nutrients), reported per sqm/year and area-scaled, in USD / EUR / BRL. The API
+  and CSV speak per-sqm; the UI and PDF display per-hectare, since per-m² yields
+  are sub-cent.
+- **Localised figures** — English, German and Spanish, with every scale word
+  taken from CLDR. English *billion* is 10⁹ but German *Billion* is 10¹², so
+  hand-rolled `K/M/B/T` suffixes would misreport a €1.5 Mrd. figure by a factor
+  of 1000. See [`frontend/README.md`](./frontend/README.md#numbers--localisation).
 - **Automatic biome detection** — classifies a polygon against real **RESOLVE
   Ecoregions 2017** boundaries, layered with curated seeds for the land-use and
   freshwater types RESOLVE omits (cropland, peri-urban, lakes & rivers).
@@ -184,10 +190,20 @@ curl -X POST "http://localhost:8000/api/v1/valuation/export?format=pdf&name=Amaz
   -d '{"type":"Polygon","coordinates":[[[-65,-5],[-60,-5],[-60,-2],[-65,-2],[-65,-5]]]}' \
   -o amazon.pdf
 
+# ...in German number conventions ("1.234.567 €" rather than "€1,234,567")
+curl -X POST "http://localhost:8000/api/v1/valuation/export?format=pdf&currency=EUR&locale=de" \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"Polygon","coordinates":[[[-65,-5],[-60,-5],[-60,-2],[-65,-2],[-65,-5]]]}' \
+  -o amazon-de.pdf
+
 # Embeddable widget for a catalogue region (served from this app's own origin)
-# <iframe src="http://localhost:3000/embed.html?region=amazon&currency=USD&theme=dark"
+# <iframe src="http://localhost:3000/embed.html?region=amazon&currency=USD&theme=dark&locale=en"
 #         width="340" height="240" style="border:0"></iframe>
 ```
+
+`locale` sets the PDF's separators and currency-symbol placement only — the
+figures are identical, and the CSV stays raw regardless. The PDF reports yields
+**per hectare** to match the web UI; the CSV keeps the API's per-sqm values.
 
 ## Repository layout
 
