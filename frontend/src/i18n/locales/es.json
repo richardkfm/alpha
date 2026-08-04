@@ -135,7 +135,8 @@
     "tev": {
       "label": "Valor Total del Ecosistema",
       "unit": "por hectárea y año",
-      "annualUnit": "por año en toda esta área"
+      "perYear": "/ año",
+      "annualUnit": "por año, en toda esta área"
     },
     "asset": {
       "label": "Valor del activo en pie",

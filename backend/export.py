@@ -72,6 +72,24 @@ def format_money(
     return template.format(sym=symbol, num=num)
 
 
+def format_percent(
+    value: Any, locale: str = DEFAULT_LOCALE, decimals: int = 1
+) -> str:
+    """Render a 0..1 share as a percentage in `locale`'s number conventions.
+
+    Python's own ``{:.1%}`` always writes a dot, so a German report showed
+    "3.0%" where the rest of its figures used a comma decimal.
+    """
+    if value is None:
+        return "—"
+    try:
+        v = float(value) * 100
+    except (TypeError, ValueError):
+        return str(value)
+    _, decimal, _ = _NUMBER_STYLES.get(locale, _NUMBER_STYLES[DEFAULT_LOCALE])
+    return f"{v:.{decimals}f}".replace(".", decimal) + "%"
+
+
 def report_title(result: Dict[str, Any], name: Optional[str] = None) -> str:
     """Headline for the report: the region name (if given) plus its biome."""
     biome = result.get("biome", "Ecosystem")
@@ -91,10 +109,10 @@ def _generated_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def _discount_label(result: Dict[str, Any]) -> str:
+def _discount_label(result: Dict[str, Any], locale: str = DEFAULT_LOCALE) -> str:
     rate = (result.get("capitalized_value") or {}).get("discount_rate")
     if isinstance(rate, (int, float)):
-        return f"Capitalised standing value (@ {rate:.1%})"
+        return f"Capitalised standing value (@ {format_percent(rate, locale)})"
     return "Capitalised standing value"
 
 
@@ -248,7 +266,7 @@ def to_pdf(
     # Headline figures.
     headline = [
         ["Total Ecosystem Value / yr", money(result.get("total_ecosystem_value_per_year"))],
-        [_discount_label(result), money((result.get("capitalized_value") or {}).get("asset_value_total"))],
+        [_discount_label(result, locale), money((result.get("capitalized_value") or {}).get("asset_value_total"))],
         ["Conversion liability (present value)", money((result.get("conversion_liability") or {}).get("present_value"))],
     ]
     t = Table(headline, colWidths=[110 * mm, 60 * mm])
