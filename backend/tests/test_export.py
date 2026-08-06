@@ -1,6 +1,7 @@
 """Tests for the Phase 4 export layer (CSV / PDF investor reports)."""
 import csv
 import io
+import re
 import os
 import sys
 
@@ -62,6 +63,49 @@ def test_format_percent_follows_the_locale_decimal_separator():
     assert export.format_percent(0.03, "de") == "3,0%"
     assert export.format_percent(0.03, "es") == "3,0%"
     assert export.format_percent(None, "de") == "—"
+
+
+def test_comparison_note_reads_as_a_multiple_or_a_percentage():
+    assert export._comparison_note([{"anchor": "marketcap_apple", "multiple": 2.14}]) == (
+        "~ 2.1x Apple's market cap"
+    )
+    assert export._comparison_note([{"anchor": "gdp_austria", "multiple": 14.3}]) == (
+        "~ 14x Austria's GDP"
+    )
+    # Under 1 a percentage reads better than "0.4x".
+    assert export._comparison_note([{"anchor": "gdp_world", "multiple": 0.4}]) == (
+        "~ 40% of world GDP"
+    )
+
+
+def test_comparison_note_is_empty_when_there_is_nothing_to_say():
+    assert export._comparison_note([]) == ""
+    assert export._comparison_note(None) == ""
+    assert export._comparison_note([{"anchor": "not_a_real_anchor", "multiple": 2.0}]) == ""
+    assert export._comparison_note([{"anchor": "marketcap_apple"}]) == ""
+
+
+def test_every_anchor_has_an_english_label_for_the_pdf():
+    """The web UI translates these; the PDF needs its own copy, and a missing
+    key would silently drop the comparison from the brief."""
+    from scale_anchors import ANCHORS
+
+    missing = {a["key"] for a in ANCHORS} - set(export._ANCHOR_LABELS)
+    assert not missing, f"unlabelled anchors: {sorted(missing)}"
+
+
+def test_pdf_carries_a_comparison_next_to_each_headline_figure():
+    import reportlab.rl_config as rl_config
+
+    rl_config.pageCompression = 0
+    basin = {
+        "type": "Polygon",
+        "coordinates": [[[-70, -10], [-50, -10], [-50, 5], [-70, 5], [-70, -10]]],
+    }
+    res = client.post("/api/v1/valuation/export?format=pdf&currency=USD", json=basin)
+    assert res.status_code == 200
+    text = b"".join(re.findall(rb"\((.*?)\)\s*Tj", res.content, re.S)).decode("latin-1", "replace")
+    assert text.count("~ ") >= 3, "expected a comparison on all three headline rows"
 
 
 def test_discount_label_localises_its_rate():

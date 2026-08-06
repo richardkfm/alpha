@@ -12,6 +12,28 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
 
 ## [Unreleased]
 
+### Added
+
+- **Human-scale comparisons on the headline figures.** Each of the three hero
+  numbers in the side panel now carries a one-line anchor to something the
+  reader already has a feel for — `≈ 2,7× Staatsschulden Deutschlands`. The
+  formatting work made these figures legible; this makes them comprehensible.
+  - Anchors live in `backend/scale_anchors.py` as dated, sourced reference data
+    and are listed in the Data Hub like every other input. `POST
+    /api/v1/valuation` returns a language-free shortlist per figure; the UI
+    renders the phrase from its own i18n catalogue, so no English leaks into a
+    translated panel.
+  - **Flows are only ever compared to flows and present values to present
+    values.** Total Ecosystem Value is a per-year flow while the standing asset
+    and conversion liability are stocks; comparing a present value to a
+    country's annual GDP would be an apples-to-oranges error.
+  - Anchor choice follows the reader's language — a German reader gets the EU
+    budget or Germany's national debt, an English reader US or UK figures —
+    falling back to the best-fitting anchor when nothing is tagged for them.
+  - Figures below ~1 billion USD get no comparison at all. `0.000002× Austria's
+    GDP` is worse than saying nothing.
+  - The PDF brief carries the same cue next to each headline row.
+
 ## [0.4.0]
 
 ### Added

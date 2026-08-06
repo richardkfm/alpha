@@ -92,6 +92,34 @@ Per-service yields are stored and served **per m²** but displayed **per
 hectare** (`formatPerHa` scales by `SQM_PER_HA` at the formatting boundary
 only) — per-m² figures are sub-cent and unreadable.
 
+### Human-scale comparisons
+
+Formatting makes a figure legible; it does not make it comprehensible. Each of
+the side panel's three hero numbers therefore carries a one-line anchor to
+something the reader already has a feel for, via `src/data/useComparison.js`.
+
+The backend ships a ranked, language-free shortlist per figure
+(`valuation.comparisons`) and this picks from it, because the anchor a reader
+relates to depends on their language and `POST /api/v1/valuation` takes no
+locale — threading one through would mean re-fetching the whole valuation on
+every language switch. Three rules:
+
+- **Locale preference.** A German reader gets the EU budget over the UK's GDP,
+  unless the local anchor fits markedly worse. A tag means "extra resonant
+  here", not "off-limits to everyone else", so with no match we simply take the
+  best-reading anchor.
+- **Rescaling.** The discount-rate buttons recapitalise the standing asset
+  client-side, so its multiple is rescaled and the shortlist re-ranked — a
+  comparison still quoting the 3% ratio at 1% would be wrong.
+- **No repeats.** The standing asset and the conversion liability are both
+  stocks of a similar size sitting inches apart, so whatever the asset used is
+  excluded from the liability's choice. The backend does this too, but only for
+  the anchor *it* would have picked; once the locale preference chooses
+  differently that guard misses.
+
+Multiples under 1 render as a percentage (`40 %`, not `0,4×`), and everything
+goes through `formatNumber` so the decimal separator follows the locale.
+
 The embed card is the one exception to `useFormat`: `embed.js` skips vue-i18n
 to keep the iframe bundle small, so `EmbedCard.vue` calls the pure formatters
 directly and takes its locale from `?locale=`.
@@ -130,5 +158,7 @@ frontend/
         ├── formatNumber.js     # pure locale-correct number/currency formatting
         ├── formatNumber.test.js
         ├── useFormat.js        # binds formatNumber to the active locale
+        ├── useComparison.js    # "≈ 2,7× Staatsschulden Deutschlands"
+        ├── useComparison.test.js
         └── geo.js              # centroid + search-input parsing helpers
 ```

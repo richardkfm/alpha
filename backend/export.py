@@ -90,6 +90,53 @@ def format_percent(
     return f"{v:.{decimals}f}".replace(".", decimal) + "%"
 
 
+# English labels for the comparison anchors. The web UI translates these from
+# its own i18n catalogue; the PDF's section headings are English throughout, so
+# an English label is the consistent choice here rather than a missing one.
+_ANCHOR_LABELS: Dict[str, str] = {
+    "nasa_annual_budget": "NASA's annual budget",
+    "revenue_netflix": "Netflix's annual revenue",
+    "eu_annual_budget": "the EU's annual budget",
+    "revenue_apple": "Apple's annual revenue",
+    "gdp_austria": "Austria's GDP",
+    "revenue_walmart": "Walmart's annual revenue",
+    "gdp_switzerland": "Switzerland's GDP",
+    "gdp_spain": "Spain's GDP",
+    "gdp_mexico": "Mexico's GDP",
+    "gdp_brazil": "Brazil's GDP",
+    "military_spending_world": "world military spending",
+    "gdp_uk": "the UK's GDP",
+    "gdp_germany": "Germany's GDP",
+    "gdp_usa": "US GDP",
+    "gdp_world": "world GDP",
+    "apollo_programme": "the Apollo programme",
+    "debt_germany": "Germany's national debt",
+    "marketcap_apple": "Apple's market cap",
+    "marketcap_nvidia": "Nvidia's market cap",
+    "all_gold_ever_mined": "all gold ever mined",
+    "debt_usa": "US national debt",
+    "global_equity_marketcap": "all listed shares on earth",
+}
+
+
+def _comparison_note(entries: Any) -> str:
+    """"~ 2.1x Apple's market cap" from a comparison shortlist, or "" if empty.
+
+    Takes the best-reading entry — the list arrives ranked, and the PDF has no
+    reader language to prefer a local anchor by.
+    """
+    if not entries:
+        return ""
+    best = entries[0]
+    label = _ANCHOR_LABELS.get(best.get("anchor"))
+    multiple = best.get("multiple")
+    if not label or not isinstance(multiple, (int, float)):
+        return ""
+    if multiple < 1:
+        return f"~ {multiple * 100:.0f}% of {label}"
+    return f"~ {multiple:.1f}x {label}" if multiple < 10 else f"~ {multiple:.0f}x {label}"
+
+
 def report_title(result: Dict[str, Any], name: Optional[str] = None) -> str:
     """Headline for the report: the region name (if given) plus its biome."""
     biome = result.get("biome", "Ecosystem")
@@ -263,11 +310,27 @@ def to_pdf(
         )
     )
 
-    # Headline figures.
+    # Headline figures, each with a human-scale comparison appended to its label
+    # so the brief carries the same "≈ 2x Apple's market cap" cue as the panel.
+    cmp_map = result.get("comparisons") or {}
+
+    def with_comparison(label: str, key: str) -> str:
+        note = _comparison_note(cmp_map.get(key))
+        return f"{label}  ({note})" if note else label
+
     headline = [
-        ["Total Ecosystem Value / yr", money(result.get("total_ecosystem_value_per_year"))],
-        [_discount_label(result, locale), money((result.get("capitalized_value") or {}).get("asset_value_total"))],
-        ["Conversion liability (present value)", money((result.get("conversion_liability") or {}).get("present_value"))],
+        [
+            with_comparison("Total Ecosystem Value / yr", "total_ecosystem_value_per_year"),
+            money(result.get("total_ecosystem_value_per_year")),
+        ],
+        [
+            with_comparison(_discount_label(result, locale), "asset_value_total"),
+            money((result.get("capitalized_value") or {}).get("asset_value_total")),
+        ],
+        [
+            with_comparison("Conversion liability (present value)", "conversion_liability"),
+            money((result.get("conversion_liability") or {}).get("present_value")),
+        ],
     ]
     t = Table(headline, colWidths=[110 * mm, 60 * mm])
     t.setStyle(

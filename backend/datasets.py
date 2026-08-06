@@ -11,6 +11,7 @@ Nothing here computes valuations; it only describes the inputs.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List
 
 from biome_classifier import boundary_source
@@ -21,6 +22,7 @@ from reference_data import (
     FX_AS_OF,
 )
 from regions import dataset_provenance
+from scale_anchors import anchor_provenance
 
 # Status vocabulary surfaced as colour-coded badges in the GUI:
 #   authoritative — real, survey/peer-reviewed data used as-is
@@ -94,6 +96,49 @@ def _fx_domain() -> Dict[str, Any]:
     }
 
 
+def _years(values: Any) -> List[str]:
+    """Pull four-digit years out of assorted as-of labels."""
+    found = []
+    for v in values:
+        match = re.search(r"(\d{4})", str(v))
+        if match:
+            found.append(match.group(1))
+    return found
+
+
+def _anchors_domain() -> Dict[str, Any]:
+    """Well-known magnitudes the UI compares headline figures against.
+
+    Reference, not authoritative: published figures that drift year to year and
+    are shown behind an "≈". They are a readability aid only — nothing here
+    feeds the valuation.
+    """
+    anchors = anchor_provenance()
+    by_source: Dict[str, str] = {}
+    for a in anchors:
+        by_source.setdefault(a["source"], a["as_of"])
+    return {
+        "id": "scale_anchors",
+        "label": "Human-scale comparison anchors",
+        "category": "finance",
+        "status": _REFERENCE,
+        "sources": [
+            {"citation": f"{source} (as of {as_of})"} for source, as_of in sorted(by_source.items())
+        ],
+        # Anchor as-of values are mixed ("2024", "FY2025", "2025-12"), so take the
+        # latest four-digit year rather than a lexical max, which ranks "FY2025"
+        # above "2025" and would report a fiscal-year label as the domain's date.
+        "as_of": max(_years(a["as_of"] for a in anchors), default="2025"),
+        "note": (
+            f"{len(anchors)} well-known magnitudes (GDPs, revenues, market caps, national "
+            "debts) used to make the headline figures graspable — e.g. \"≈ 2x Apple's market "
+            "cap\". Annual flows are only ever compared to flows and present values to "
+            "present values. Indicative and rounded; not an input to any valuation."
+        ),
+        "exposed_via": ["POST /api/v1/valuation (comparisons)"],
+    }
+
+
 def _domains() -> List[Dict[str, Any]]:
     boundaries = boundary_source()
     regions_meta = dataset_provenance()
@@ -153,6 +198,7 @@ def _domains() -> List[Dict[str, Any]]:
         },
         _carbon_domain(),
         _fx_domain(),
+        _anchors_domain(),
         {
             "id": "land_cover",
             "label": "Land-cover intactness",
