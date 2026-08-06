@@ -24,6 +24,7 @@ from reference_data import (
     biome_red_lines,
     biome_scarcity_weight,
 )
+from scale_anchors import KIND_FLOW, KIND_STOCK, rank_anchors
 
 # Mean Earth radius (metres), IUGG. Used for the spherical-excess area formula.
 EARTH_RADIUS_M = 6_371_008.8
@@ -170,6 +171,26 @@ def compute_valuation(
 
     red_lines = biome_red_lines(biome_key)
 
+    # --- Human-scale comparisons ---------------------------------------------
+    # Ranked against the *USD* figures, never the converted ones: the anchors are
+    # USD, so dividing by `rate` on both sides would cancel out anyway, and doing
+    # it here means the same polygon reports the same multiple in every currency.
+    # Flows only draw flow anchors and stocks only stock anchors — see
+    # scale_anchors for why that separation matters.
+    asset_anchors = rank_anchors(asset_total / rate, KIND_STOCK)
+    comparisons = {
+        "total_ecosystem_value_per_year": rank_anchors(tev_total / rate, KIND_FLOW),
+        "asset_value_total": asset_anchors,
+        # The liability is the asset times the systemic premium, so it is always
+        # within a small factor of it. Excluding what the asset already used
+        # stops the panel showing the same anchor twice, inches apart.
+        "conversion_liability": rank_anchors(
+            systemic_asset_total / rate,
+            KIND_STOCK,
+            exclude=[a["anchor"] for a in asset_anchors[:1]],
+        ),
+    }
+
     methodology = {
         "carbon_capture": {
             "formula": "sequestration (tCO2/ha/yr) x carbon price (USD/tCO2) / 10000",
@@ -244,6 +265,9 @@ def compute_valuation(
             "note": "A debt owed to others in perpetuity, not a price the project can buy out.",
         },
         "red_lines": red_lines,
+        # Language-free: {anchor key, multiple}. The UI turns it into a phrase
+        # from its own i18n catalogue, so no English leaks into a German panel.
+        "comparisons": comparisons,
         "fx": {"base": "USD", "rate_per_usd": rate, "as_of": as_of},
         "methodology": methodology,
         "methodology_note": (

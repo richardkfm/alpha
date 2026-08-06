@@ -170,6 +170,10 @@ The visual centrepiece is a **full-screen world map** — a 3D MapLibre globe
     boundary only
   - **Total Ecosystem Value (TEV)** — the whole-area annual total as the
     headline, with the per-hectare rate beneath it
+  - A **human-scale comparison** under each of those three figures — "≈ 2.7×
+    Germany's national debt" — anchored to well-known magnitudes
+    (`backend/scale_anchors.py`). Annual flows are compared only to flows and
+    present values only to present values
   - A comparison callout: _"This region generates more annual economic value
     standing than the GDP contribution of [industry X] in this country"_
 - A global search/query bar so users can enter custom coordinates or paste a

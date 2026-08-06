@@ -162,5 +162,33 @@
       "redLinesHeadTitle": "Líneas rojas, no partidas — deliberadamente excluidas de las cifras anteriores"
     },
     "methodology": "Metodología"
+  },
+  "comparisons": {
+    "approx": "≈",
+    "title": "Comparación aproximada — cifras de referencia indicativas, no una entrada de la valoración",
+    "anchors": {
+      "nasa_annual_budget": "el presupuesto anual de la NASA",
+      "revenue_netflix": "los ingresos anuales de Netflix",
+      "eu_annual_budget": "el presupuesto anual de la UE",
+      "revenue_apple": "los ingresos anuales de Apple",
+      "gdp_austria": "el PIB de Austria",
+      "revenue_walmart": "los ingresos anuales de Walmart",
+      "gdp_switzerland": "el PIB de Suiza",
+      "gdp_spain": "el PIB de España",
+      "gdp_mexico": "el PIB de México",
+      "gdp_brazil": "el PIB de Brasil",
+      "military_spending_world": "el gasto militar mundial",
+      "gdp_uk": "el PIB del Reino Unido",
+      "gdp_germany": "el PIB de Alemania",
+      "gdp_usa": "el PIB de EE. UU.",
+      "gdp_world": "el PIB mundial",
+      "apollo_programme": "el programa Apolo",
+      "debt_germany": "la deuda pública de Alemania",
+      "marketcap_apple": "la capitalización de Apple",
+      "marketcap_nvidia": "la capitalización de Nvidia",
+      "all_gold_ever_mined": "todo el oro jamás extraído",
+      "debt_usa": "la deuda pública de EE. UU.",
+      "global_equity_marketcap": "todas las acciones cotizadas del mundo"
+    }
   }
 }

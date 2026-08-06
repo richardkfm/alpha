@@ -14,7 +14,7 @@ geographic area. Part of the [`alpha`](../README.md) monorepo.
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | Liveness probe → `{"status": "ok", "service": "alpha-backend"}` |
-| `POST` | `/api/v1/valuation` | GeoJSON polygon → full TEV breakdown (geodesic area, per-sqm + area totals, intactness, standing-asset & conversion-liability framing, currency). **Phase 3:** auto-detects the biome when none is supplied (`classification` in the response) |
+| `POST` | `/api/v1/valuation` | GeoJSON polygon → full TEV breakdown (geodesic area, per-sqm + area totals, intactness, standing-asset & conversion-liability framing, currency, `comparisons`). **Phase 3:** auto-detects the biome when none is supplied (`classification` in the response) |
 | `POST` | `/api/v1/valuation/export` | _(Phase 4)_ same breakdown as `/valuation`, rendered as a downloadable **CSV** data sheet or one-page **PDF** investor brief. Takes every `/valuation` query parameter plus `?format=csv\|pdf`, an optional display `name`, and `?locale=en\|de\|es` for the PDF's number conventions |
 | `GET` | `/api/v1/regions` | Pre-valued catalogue of named ecosystems across all biomes, powering the map overlays + Compare view |
 | `GET` | `/api/v1/regions/{id}` | _(Phase 4)_ a single catalogue region, valued in `?currency=` — backs the embeddable widget (`/embed.html`) |
@@ -74,6 +74,16 @@ Code layout:
   RESOLVE ecoregions (`data/ecoregions.geojson`) + curated seeds (`data/wwf_biomes.geojson`)
 - `landcover.py` — _(Phase 3)_ Copernicus CGLS-LC100 legend → biome hint + intactness
 - `esv_extraction.py` — _(Phase 3)_ LLM-assisted (Ollama-compatible) + regex ESV parser
+- `scale_anchors.py` — well-known magnitudes (GDPs, revenues, market caps,
+  national debts) the headline figures are compared against, so a reader has
+  something to hang a trillion on. Annual **flows** are only ever ranked against
+  flow anchors and present values against **stock** anchors — a present value is
+  not a year's GDP. `POST /api/v1/valuation` returns a `comparisons` shortlist
+  of `{anchor, multiple, locales}` per figure rather than a finished sentence:
+  the endpoint takes no locale, so the UI picks the anchor its reader relates to
+  and writes the phrase from its own i18n catalogue. Figures under ~1e9 USD get
+  an empty list. Indicative reference values only — nothing here feeds a
+  valuation.
 - `export.py` — _(Phase 4)_ CSV (stdlib) + PDF (reportlab) investor-report
   serialisers. The two formats deliberately differ: the CSV is the
   machine-readable sheet and carries the API's raw **per-sqm** figures with no

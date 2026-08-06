@@ -8,6 +8,7 @@ import { barPct } from '../data/yieldScale.js'
 import { useBiomeMeta } from '../data/useBiomeMeta.js'
 import { useCountUp } from '../data/useCountUp.js'
 import { useFormat } from '../data/useFormat.js'
+import { useComparison } from '../data/useComparison.js'
 
 const { t, locale } = useI18n()
 const { biomeColor, biomeLabel, biomeSublabel: translatedBiomeSublabel } = useBiomeMeta()
@@ -125,6 +126,33 @@ const annualAria = computed(
 )
 const assetAnim = useCountUp(assetValue)
 const liabAnim = useCountUp(computed(() => liability.value?.present_value ?? null))
+
+// --- Human-scale comparisons ------------------------------------------------
+// "7,1 Bio. €" is legible but not comprehensible; "≈ 2× Börsenwert von Apple"
+// is. The backend ships a shortlist of anchors per figure and this picks the one
+// that suits the reader's language — see useComparison. Each is null when the
+// figure is too small for a comparison to be anything but silly.
+const { compare } = useComparison()
+const cmp = computed(() => props.valuation?.comparisons ?? {})
+// The discount-rate buttons recapitalise the asset locally, so its multiple has
+// to move with it — at 1% the figure is three times what the backend ranked.
+// The other two figures come straight off the payload and need no rescaling.
+const assetFactor = computed(() => {
+  const ranked = props.valuation?.capitalized_value?.asset_value_total
+  if (!ranked || assetValue.value == null) return 1
+  return assetValue.value / ranked
+})
+const assetCmp = computed(() =>
+  compare(cmp.value.asset_value_total, { factor: assetFactor.value }),
+)
+const tevCmp = computed(() => compare(cmp.value.total_ecosystem_value_per_year))
+// Both stock figures, a few centimetres apart and within a small factor of each
+// other. Without excluding what the asset just used they cite the same anchor.
+const liabCmp = computed(() =>
+  compare(cmp.value.conversion_liability, {
+    exclude: assetCmp.value ? [assetCmp.value.anchor] : [],
+  }),
+)
 
 // The intactness bar reads its width off a bare percentage, so it needs the
 // unlocalised form — `percent()` would give it "73 %" in German.
@@ -317,6 +345,10 @@ async function copyEmbed() {
         <span class="asset-value" :title="moneyFull(assetValue)" :aria-label="moneyFull(assetValue)"
           >{{ likeTarget(assetAnim, assetValue) }}</span
         >
+        <span v-if="assetCmp" class="cmp" :title="t('comparisons.title')">
+          <span class="cmp-x">{{ t('comparisons.approx') }} {{ assetCmp.multiple }}</span>
+          <span class="cmp-label">{{ assetCmp.label }}</span>
+        </span>
         <span
           class="asset-sub"
           :title="t('sidePanel.asset.subTitle')"
@@ -366,6 +398,10 @@ async function copyEmbed() {
           <span class="tev-amount">{{ likeTarget(annualAnim, annualTotal) }}</span>
           <span class="tev-per" aria-hidden="true">{{ t('sidePanel.tev.perYear') }}</span>
         </span>
+        <span v-if="tevCmp" class="cmp" :title="t('comparisons.title')">
+          <span class="cmp-x">{{ t('comparisons.approx') }} {{ tevCmp.multiple }}</span>
+          <span class="cmp-label">{{ tevCmp.label }}</span>
+        </span>
         <!-- No currency code in these unit strings: the amount above already
              carries its symbol, so "527 € EUR / ha / Jahr" read as a stutter. -->
         <span class="tev-unit">{{ t('sidePanel.tev.annualUnit') }}</span>
@@ -394,6 +430,10 @@ async function copyEmbed() {
               :aria-label="moneyFull(liability.present_value)"
               >{{ likeTarget(liabAnim, liability.present_value) }}</span
             >
+            <span v-if="liabCmp" class="cmp" :title="t('comparisons.title')">
+              <span class="cmp-x">{{ t('comparisons.approx') }} {{ liabCmp.multiple }}</span>
+              <span class="cmp-label">{{ liabCmp.label }}</span>
+            </span>
             <span class="liab-sub" :title="liability.note">
               {{ t('sidePanel.conversion.liabilitySub', { loss: money(liability.annual_loss), incidence: liability.incidence }) }}
             </span>
@@ -940,6 +980,37 @@ async function copyEmbed() {
 .tev-unit {
   font-size: 0.76rem;
   color: var(--text-muted);
+}
+
+/* Human-scale comparison, one line under a hero figure.
+   An annotation on the number above, not a fourth data point: the multiple
+   borrows its block's accent so it reads as belonging to that figure, the
+   anchor stays muted, and the whole thing sits at caption size. The label
+   wraps under the multiple rather than overflowing — German anchor names are
+   long and the panel is 420px. */
+.cmp {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  margin-top: 1px;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  cursor: help;
+}
+.cmp-x {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.cmp-label {
+  color: var(--text-muted);
+}
+.asset .cmp-x {
+  color: var(--gold);
+}
+.liab .cmp-x {
+  color: #f87171;
 }
 .tev-annual {
   display: flex;
