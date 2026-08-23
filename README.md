@@ -132,6 +132,19 @@ mapping changes — the containers still talk to each other on `backend:8000` an
 `db:5432` internally, so nothing else needs touching. Just open the web app on
 whatever `ALPHA_WEB_PORT` you set (e.g. http://localhost:3300).
 
+### Securing the database password
+
+`docker-compose.yml` defaults `POSTGRES_PASSWORD` to `alpha` so the stack runs
+with zero config. For anything beyond a trusted local machine, generate a
+random password instead:
+
+```bash
+scripts/gen-env.sh   # writes a random ALPHA_DB_PASSWORD into .env
+docker compose up --build
+```
+
+Re-running it is safe — it leaves an existing password in `.env` untouched.
+
 ### Behind a reverse proxy or tunnel
 
 The web tier is the Vite dev server, which rejects requests whose `Host` header

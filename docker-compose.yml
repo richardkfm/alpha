@@ -6,13 +6,18 @@
 # ALPHA_DB_PORT — only the host side changes; container-internal ports and the
 # service-to-service URLs (db:5432, backend:8000) stay fixed, so nothing else
 # needs editing.
+#
+# The db password defaults to "alpha" for a zero-config `docker compose up`.
+# Run scripts/gen-env.sh once to generate a random ALPHA_DB_PASSWORD into .env
+# instead — recommended for anything beyond a trusted local machine.
 services:
   db:
     image: postgis/postgis:15-3.4
     container_name: alpha-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: alpha
-      POSTGRES_PASSWORD: alpha
+      POSTGRES_PASSWORD: ${ALPHA_DB_PASSWORD:-alpha}
       POSTGRES_DB: alpha
     ports:
       - "${ALPHA_DB_PORT:-5432}:5432"
@@ -27,8 +32,9 @@ services:
   backend:
     build: ./backend
     container_name: alpha-backend
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://alpha:alpha@db:5432/alpha
+      DATABASE_URL: postgresql://alpha:${ALPHA_DB_PASSWORD:-alpha}@db:5432/alpha
       # Phase 4 live market data: live FX (ECB via Frankfurter) out of the box,
       # with graceful fallback to static references if the feed is unreachable.
       # Plug a carbon feed in via CARBON_PRICE_URL (or CARBON_PRICE_USD_PER_TCO2).
@@ -44,6 +50,7 @@ services:
   frontend:
     build: ./frontend
     container_name: alpha-frontend
+    restart: unless-stopped
     environment:
       # The Vite dev server proxies /api and /health to this origin (server-side),
       # so the browser can use same-origin relative paths.
