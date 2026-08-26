@@ -45,15 +45,15 @@ Response:
   "currency_symbol": "$",
   "area": { "sqm": 12290000000.0, "hectares": 1229000.0 },
   "yields_per_sqm_year": {
-    "carbon_capture": 0.0069,
+    "carbon_capture": 0.0092,
     "climate_regulation": 0.036,
     "water_filtration": 0.02,
     "biodiversity_premium": 0.05,
     "soil_nutrient_value": 0.012
   },
-  "yields_total_year": { "carbon_capture": 84801000.0, "...": "..." },
-  "total_ecosystem_value_per_sqm_year": 0.1249,
-  "total_ecosystem_value_per_year": 1535021000.0,
+  "yields_total_year": { "carbon_capture": 113068000.0, "...": "..." },
+  "total_ecosystem_value_per_sqm_year": 0.1272,
+  "total_ecosystem_value_per_year": 1563288000.0,
   "fx": { "base": "USD", "rate_per_usd": 1.0, "as_of": "2025-12" },
   "methodology": { "carbon_capture": { "formula": "...", "citation": "..." } },
   "methodology_note": "Phase 2 valuation engine. ... See backend/METHODOLOGY.md."
@@ -127,5 +127,10 @@ seeds for the land-use/freshwater types RESOLVE omits) to auto-detect the
 biome, adds the Copernicus land-cover intactness layer, and an LLM-assisted ESV
 extractor — see [`INGESTION.md`](./INGESTION.md). **Phase 4** is underway: live FX
 feeds, CSV/PDF report export (`/api/v1/valuation/export`) and the embeddable widget
-(`/api/v1/regions/{id}` + `/embed.html`) are shipped; API hardening (versioning,
-auth, rate limiting) and a live carbon feed are still to do.
+(`/api/v1/regions/{id}` + `/embed.html`) are shipped. The carbon price now has a
+wiring path too — `CARBON_PRICE_URL` accepts most providers' payloads as-is
+(`live_data.py`), and the static reference was bumped from $30 to $40/tCO2 to
+track where compliance markets actually are (EU ETS ~$65-95/tCO2 in
+2025-2026) — but there's still no single free/keyless spot feed to default to
+out of the box, so an operator has to point it at one (see `.env.example`).
+API hardening (versioning, auth, rate limiting) is still to do.

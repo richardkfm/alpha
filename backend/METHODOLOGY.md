@@ -43,10 +43,16 @@ All reference values are stored as **USD per hectare per year** and converted to
 | **Biodiversity Premium** | ESVD genetic resources + habitat/refugia (USD/ha/yr) ÷ 10,000 | de Groot et al. 2012 (ESVD) |
 | **Soil Nutrient Value** | ESVD erosion prevention + soil-fertility maintenance (USD/ha/yr) ÷ 10,000 | de Groot et al. 2012 (ESVD) |
 
-**Carbon price:** a single transparent reference of **$30/tCO₂** is applied to
-every biome's sequestration rate. It sits between voluntary nature-based credit
-prices (~$10–15) and central social-cost-of-carbon / compliance estimates ($50+),
-within the IPCC AR6 WGIII range for sub-2 °C pathways.
+**Carbon price:** a single transparent reference of **$40/tCO₂** is applied to
+every biome's sequestration rate, blended across major markets rather than
+pinned to any one of them (the app values land worldwide). It sits between
+voluntary nature-based credit prices (~$15–20) and today's compliance-market
+prices — EU ETS ~$65–95/tCO₂ as of 2025–2026, well above schemes like
+California's cap-and-trade or China's national ETS (~$30–40) — and stays
+within the IPCC AR6 WGIII range for sub-2 °C pathways. See
+`reference_data.py` for the full reasoning and citations; `live_data.py`
+lets an operator wire a live market feed in via `CARBON_PRICE_URL` to
+bypass this static reference.
 
 ### Total
 
@@ -115,13 +121,13 @@ field. Phase 4 connects to a live FX source.
 A 1 ha (10,000 m²) tropical-rainforest polygon, in USD:
 
 ```
-carbon_capture      = 2.3 × 30 / 10,000   = 0.0069  USD/m²/yr  →  69    USD/yr
+carbon_capture      = 2.3 × 40 / 10,000   = 0.0092  USD/m²/yr  →  92    USD/yr
 climate_regulation  = 360 / 10,000        = 0.0360  USD/m²/yr  →  360   USD/yr
 water_filtration    = 200 / 10,000        = 0.0200  USD/m²/yr  →  200   USD/yr
 biodiversity_premium= 500 / 10,000        = 0.0500  USD/m²/yr  →  500   USD/yr
 soil_nutrient_value = 120 / 10,000        = 0.0120  USD/m²/yr  →  120   USD/yr
 ------------------------------------------------------------------------------
-TEV                 = 0.1249 USD/m²/yr    →  1,249 USD/yr for the hectare
+TEV                 = 0.1272 USD/m²/yr    →  1,272 USD/yr for the hectare
 ```
 
 ---

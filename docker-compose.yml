@@ -37,8 +37,12 @@ services:
       DATABASE_URL: postgresql://alpha:${ALPHA_DB_PASSWORD:-alpha}@db:5432/alpha
       # Phase 4 live market data: live FX (ECB via Frankfurter) out of the box,
       # with graceful fallback to static references if the feed is unreachable.
-      # Plug a carbon feed in via CARBON_PRICE_URL (or CARBON_PRICE_USD_PER_TCO2).
+      # Plug a carbon feed in via CARBON_PRICE_URL (or CARBON_PRICE_USD_PER_TCO2)
+      # in .env — see .env.example for candidate providers. Empty/unset keeps
+      # carbon on the documented static reference.
       ALPHA_LIVE_DATA: "1"
+      CARBON_PRICE_URL: "${CARBON_PRICE_URL:-}"
+      CARBON_PRICE_USD_PER_TCO2: "${CARBON_PRICE_USD_PER_TCO2:-}"
     ports:
       - "${ALPHA_API_PORT:-8000}:8000"
     depends_on:
