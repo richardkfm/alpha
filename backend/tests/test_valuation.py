@@ -52,9 +52,10 @@ def test_feature_is_unwrapped():
 
 
 def test_tev_per_sqm_matches_reference_sum():
-    # 1 ha tropical rainforest: 0.0069+0.036+0.02+0.05+0.012 = 0.1249 USD/m2/yr.
+    # 1 ha tropical rainforest: 0.0092+0.036+0.02+0.05+0.012 = 0.1272 USD/m2/yr
+    # (carbon capture = 2.3 tCO2/ha/yr * $40/tCO2 / 10,000).
     res = compute_valuation(_square_one_degree_at_equator(), "tropical_rainforest", "USD")
-    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.1249, abs_tol=1e-6)
+    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.1272, abs_tol=1e-6)
     assert math.isclose(
         res["total_ecosystem_value_per_sqm_year"],
         sum(res["yields_per_sqm_year"].values()),
@@ -114,7 +115,7 @@ def test_intactness_scales_realised_value_but_not_potential():
 def test_default_intactness_is_one_preserving_phase2_behaviour():
     res = compute_valuation(_square_one_degree_at_equator(), "tropical_rainforest", "USD")
     assert res["intactness"] == 1.0
-    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.1249, abs_tol=1e-6)
+    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.1272, abs_tol=1e-6)
 
 
 def test_systemic_premium_and_red_lines():

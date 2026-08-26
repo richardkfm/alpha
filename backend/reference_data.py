@@ -31,12 +31,19 @@ from __future__ import annotations
 # Carbon price (USD per tonne CO2-equivalent).
 #
 # A single transparent reference price applied to every biome's sequestration
-# rate. $30/tCO2 sits between voluntary nature-based credit prices (~$10-15) and
-# central social-cost-of-carbon / compliance estimates ($50+), and is within the
-# IPCC AR6 WGIII range for 2030 mitigation pathways. Phase 4 connects to live
-# carbon-market data.
+# rate, blended across the major compliance and voluntary markets rather than
+# pinned to any one of them (the app values land worldwide, not just the EU).
+# $40/tCO2 sits between voluntary nature-based credit prices (~$15-20) and
+# today's compliance-market prices — EU ETS ~$65-95/tCO2 (2025-2026, up sharply
+# from ~$80 in 2022-2023 and back near multi-year highs by mid-2026), well
+# above the ~$30-40 seen in schemes like California's cap-and-trade or China's
+# national ETS. It remains within the IPCC AR6 WGIII range for sub-2C
+# mitigation pathways. Revisit periodically — carbon markets move fast enough
+# that a static reference goes stale; `live_data.py` lets an operator wire a
+# live feed in via `CARBON_PRICE_URL` (see that module's docstring) to bypass
+# this reference entirely.
 # ---------------------------------------------------------------------------
-CARBON_PRICE_USD_PER_TCO2 = 30.0
+CARBON_PRICE_USD_PER_TCO2 = 40.0
 
 # Hectare -> square metre.
 SQM_PER_HECTARE = 10_000.0

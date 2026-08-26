@@ -12,6 +12,26 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
 
 ## [Unreleased]
 
+### Changed
+
+- **Carbon price reference bumped $30 → $40/tCO2** (`backend/reference_data.py`,
+  `backend/METHODOLOGY.md`). Compliance-market prices have moved well past the
+  2022 IPCC AR6 anchor since — EU ETS has been trading at ~$65-95/tCO2 through
+  2025-2026 — so the old figure was understating carbon-capture yield by a
+  wide margin. Still a static, blended reference (not EU-ETS-pinned, since the
+  app values land worldwide), just a less stale one.
+- **`CARBON_PRICE_URL` now understands most providers' payloads as-is**
+  (`backend/live_data.py`): recognises common field names (`price`, `value`,
+  `price_usd_per_tco2`, …) and common nesting (`{"data": [...]}`), and rejects
+  a response outside a $1-500/tCO2 plausibility band instead of trusting it
+  blindly — falls back to the static reference either way. `docker-compose.yml`
+  and `.env.example` now pass `CARBON_PRICE_URL` / `CARBON_PRICE_USD_PER_TCO2`
+  through, and document candidate free/keyed providers; previously these were
+  only mentioned in the module's docstring and had no effect via `.env`. There
+  is still no single free, keyless, officially-documented carbon spot feed to
+  default to the way Frankfurter is for FX, so an operator still has to wire
+  one in.
+
 ### Added
 
 - **Human-scale comparisons on the headline figures.** Each of the three hero

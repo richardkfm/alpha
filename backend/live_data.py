@@ -12,11 +12,33 @@ Configuration (all optional)
 - ``ALPHA_FX_URL``         FX endpoint returning ``{"rates": {CODE: per_USD}}``
                            (default Frankfurter / ECB).
 - ``CARBON_PRICE_USD_PER_TCO2``  direct numeric override for the carbon price.
-- ``CARBON_PRICE_URL``     JSON endpoint returning ``{"price_usd_per_tco2": N}``.
+- ``CARBON_PRICE_URL``     JSON endpoint carrying a USD/tCO2 price (see
+                           ``_extract_carbon_price`` for the field names it
+                           recognises — most providers' payloads work as-is).
 
-There is no free, keyless live carbon-spot feed, so carbon stays on the cited
-reference price unless an operator wires ``CARBON_PRICE_URL`` or sets the direct
-override — matching the project's "plug in your own source" deployment model.
+There is no single, universally free, keyless, officially-documented carbon
+*spot* feed the way Frankfurter is for FX, so carbon stays on the cited
+reference price unless an operator wires ``CARBON_PRICE_URL`` (or the direct
+override) — matching the project's "plug in your own source" deployment
+model. Candidates worth pointing it at (verify shape/auth before relying on
+one — none of these are exercised by this project's tests):
+
+- **Ember / Sandbag "Carbon Price Viewer"** (ember-climate.org) — EU ETS
+  (ICE EUA settlement), free, dashboard-first; check whether its data feed is
+  exposed as a plain JSON/CSV URL before wiring it in.
+- **EEX EUA auction results** (eex.com) — the EU's own primary auction
+  operator; auction-day clearing prices, EUR-denominated, public download
+  page (verify whether a stable unauthenticated URL exists).
+- **Trading Economics carbon commodity API** (tradingeconomics.com) —
+  broad market coverage; normally requires a (free-tier) API key appended to
+  the URL as a query parameter, which this module supports natively since
+  ``CARBON_PRICE_URL`` is passed through unmodified.
+- Any in-house feed (Bloomberg/Refinitiv terminal export, a subscription
+  data vendor, a self-hosted scraper) — point ``CARBON_PRICE_URL`` at
+  whatever endpoint serves it.
+
+If the provider prices in EUR rather than USD, convert before serving it
+(or front it with a tiny shim) — this module expects USD/tCO2.
 """
 from __future__ import annotations
 
@@ -65,6 +87,52 @@ def _fetch_json(url: str, timeout: float = 6.0) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Carbon price
 # ---------------------------------------------------------------------------
+# Plausibility band (USD/tCO2): rejects a feed that responded but returned a
+# nonsense number — wrong units, a percentage, an unrelated field picked up by
+# accident — so a malformed live response can never silently distort a
+# valuation. Wide enough to comfortably span voluntary credits (~$5) through
+# the highest compliance markets seen to date (EU ETS, low hundreds).
+_CARBON_PRICE_MIN_USD = 1.0
+_CARBON_PRICE_MAX_USD = 500.0
+
+# Field names recognised in a live feed's JSON payload, in priority order.
+# Covers the common shapes providers actually use ("price", "value", "last",
+# a nested "data"/"results" list) without requiring a specific vendor's schema.
+_CARBON_PRICE_FIELDS = (
+    "price_usd_per_tco2",
+    "usd_per_tco2",
+    "price_usd",
+    "price",
+    "value",
+    "last",
+    "close",
+)
+
+
+def _extract_carbon_price(data: Any) -> Optional[float]:
+    """Best-effort pull of a USD/tCO2 number out of a live feed's JSON body."""
+    if isinstance(data, list) and data:
+        data = data[-1]
+    if isinstance(data, dict):
+        for container_key in ("data", "results", "result"):
+            nested = data.get(container_key)
+            if isinstance(nested, (list, dict)):
+                nested_price = _extract_carbon_price(nested)
+                if nested_price is not None:
+                    return nested_price
+        for key in _CARBON_PRICE_FIELDS:
+            if key in data:
+                try:
+                    return float(data[key])
+                except (TypeError, ValueError):
+                    continue
+        return None
+    try:
+        return float(data)
+    except (TypeError, ValueError):
+        return None
+
+
 def get_carbon_price() -> Tuple[float, Dict[str, Any]]:
     """Return ``(price_usd_per_tco2, meta)``; meta carries source/as_of/live."""
     ref_meta = {
@@ -93,13 +161,21 @@ def get_carbon_price() -> Tuple[float, Dict[str, Any]]:
         return cached
     try:
         data = _fetch_json(url)
-        price = float(data["price_usd_per_tco2"])
+        price = _extract_carbon_price(data)
+        if price is None:
+            raise ValueError(f"no recognisable price field in response from {url}")
+        if not (_CARBON_PRICE_MIN_USD <= price <= _CARBON_PRICE_MAX_USD):
+            raise ValueError(
+                f"live carbon price {price} USD/tCO2 outside plausible range "
+                f"[{_CARBON_PRICE_MIN_USD}, {_CARBON_PRICE_MAX_USD}] — refusing it"
+            )
+        as_of = data.get("as_of", "") if isinstance(data, dict) else ""
         return _store(
             "carbon",
-            (price, {"source": url, "as_of": str(data.get("as_of", "")), "live": True}),
+            (price, {"source": url, "as_of": str(as_of), "live": True}),
         )
     except Exception:
-        return REF_CARBON, {**ref_meta, "note": "live carbon feed unreachable — using reference price"}
+        return REF_CARBON, {**ref_meta, "note": "live carbon feed unreachable or implausible — using reference price"}
 
 
 # ---------------------------------------------------------------------------
