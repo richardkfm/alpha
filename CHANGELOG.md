@@ -34,6 +34,12 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
 
 ### Added
 
+- **Build/version footer.** A small `v0.4.0` marker now sits in the bottom
+  corner of the map (`frontend/src/App.vue`), sourced from `package.json` at
+  build time, so a deployed instance can be confirmed at a glance. `GET
+  /health` now also echoes the API's own version; if the two ever diverge
+  (mid-deploy, or a stale cached frontend) the footer appends `· api vX.Y.Z`
+  instead of hiding the mismatch.
 - **Human-scale comparisons on the headline figures.** Each of the three hero
   numbers in the side panel now carries a one-line anchor to something the
   reader already has a feel for — `≈ 2,7× Staatsschulden Deutschlands`. The

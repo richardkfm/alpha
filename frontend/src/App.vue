@@ -9,8 +9,15 @@ import BrandLogo from './components/BrandLogo.vue'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
 import { useRegions } from './data/useRegions.js'
 import { serviceCeilings } from './data/yieldScale.js'
+import { version as frontendVersion } from '../package.json'
 
 const { t } = useI18n()
+
+// Tiny build/version footer so a deployed instance can be confirmed at a
+// glance instead of guessed at. The frontend version is bundled at build time
+// from package.json; the backend version comes from /health, so a mismatch
+// (mid-deploy, or a stale cached frontend) is visible rather than silent.
+const backendVersion = ref(null)
 
 // The MapLibre globe (and its ~heavy bundle) loads only when 3D mode is active;
 // the Compare dashboard and Data hub load only when their mode is opened.
@@ -111,6 +118,10 @@ function onKeydown(e) {
 onMounted(async () => {
   applyTheme()
   window.addEventListener('keydown', onKeydown)
+  fetch('/health')
+    .then((r) => r.json())
+    .then((h) => { backendVersion.value = h.version || null })
+    .catch(() => {})
   await loadRegions(currency.value)
   syncLayerVisibility()
 })
@@ -344,11 +355,16 @@ function closePanel() {
         </template>
       </template>
     </main>
+
+    <div class="build-footer" :title="backendVersion ? `frontend v${frontendVersion} · backend v${backendVersion}` : `frontend v${frontendVersion}`">
+      v{{ frontendVersion }}<template v-if="backendVersion && backendVersion !== frontendVersion"> · api v{{ backendVersion }}</template>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .app {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -625,5 +641,18 @@ function closePanel() {
   .toggle-label {
     display: none;
   }
+}
+
+.build-footer {
+  position: absolute;
+  left: 10px;
+  bottom: 6px;
+  z-index: 1000;
+  font-size: 0.66rem;
+  letter-spacing: 0.2px;
+  color: var(--text-muted);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
 }
 </style>
