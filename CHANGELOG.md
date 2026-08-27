@@ -34,6 +34,21 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
 
 ### Added
 
+- **Ranked live carbon-price provider recommendation.** `backend/live_data.py`'s
+  docstring and `.env.example` now name a specific order to try for
+  `CARBON_PRICE_URL` — Trading Economics' "EU Carbon Permits" first (free
+  guest tier, single-symbol JSON works with this module as-is, but prices in
+  EUR), Nasdaq Data Link's `CHRIS/ICE_C1` EUA futures dataset second (needs a
+  small shim), and the World Bank Carbon Pricing Dashboard for periodically
+  refreshing the *static* reference price rather than live wiring — instead
+  of a flat, unranked candidate list. None have been reachable from this
+  project's sandboxed sessions to verify live, so this is evaluated on paper;
+  verify against the provider's current docs before relying on one.
+- **Case-insensitive field matching in the live carbon-price parser**
+  (`_extract_carbon_price`): several real providers (Trading Economics
+  included) title-case their JSON keys (`"Last"`, `"Close"`), which the
+  previous lowercase-only match would have silently missed, falling back to
+  the static reference with no error.
 - **Build/version footer.** A small `v0.4.0` marker now sits in the bottom
   corner of the map (`frontend/src/App.vue`), sourced from `package.json` at
   build time, so a deployed instance can be confirmed at a glance. `GET

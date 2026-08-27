@@ -20,22 +20,46 @@ There is no single, universally free, keyless, officially-documented carbon
 *spot* feed the way Frankfurter is for FX, so carbon stays on the cited
 reference price unless an operator wires ``CARBON_PRICE_URL`` (or the direct
 override) — matching the project's "plug in your own source" deployment
-model. Candidates worth pointing it at (verify shape/auth before relying on
-one — none of these are exercised by this project's tests):
+model.
 
-- **Ember / Sandbag "Carbon Price Viewer"** (ember-climate.org) — EU ETS
-  (ICE EUA settlement), free, dashboard-first; check whether its data feed is
-  exposed as a plain JSON/CSV URL before wiring it in.
-- **EEX EUA auction results** (eex.com) — the EU's own primary auction
-  operator; auction-day clearing prices, EUR-denominated, public download
-  page (verify whether a stable unauthenticated URL exists).
-- **Trading Economics carbon commodity API** (tradingeconomics.com) —
-  broad market coverage; normally requires a (free-tier) API key appended to
-  the URL as a query parameter, which this module supports natively since
-  ``CARBON_PRICE_URL`` is passed through unmodified.
-- Any in-house feed (Bloomberg/Refinitiv terminal export, a subscription
-  data vendor, a self-hosted scraper) — point ``CARBON_PRICE_URL`` at
-  whatever endpoint serves it.
+**Ranked recommendation** (evaluated on paper — this session has no outbound
+network access to a general host, so none of these have been hit live from
+here; confirm the current shape against the provider's own docs before
+relying on one in production, and expect endpoints/auth to drift over time):
+
+1. **Trading Economics carbon commodity data** (tradingeconomics.com,
+   "EU Carbon Permits" / ticker ``CFI2``) — best first choice for
+   ``CARBON_PRICE_URL`` as it stands: a free "guest" tier exists for light
+   use (a real key removes its rate limit), and a single-symbol query
+   returns one flat JSON object rather than a big multi-commodity list, so
+   ``_extract_carbon_price`` can read it without a shim. Two caveats: (a) it
+   prices in **EUR**, and this module expects USD/tCO2 — either front it
+   with a tiny conversion shim or apply this deployment's own live
+   EUR/USD rate (``get_fx_rates()``) before setting the override; (b) the
+   guest tier is delayed/rate-limited, fine for a dashboard, not for
+   anything latency-sensitive.
+2. **Nasdaq Data Link** (data.nasdaq.com, formerly Quandl), dataset
+   ``CHRIS/ICE_C1`` — continuous ICE EUA futures, free with registration.
+   Returns OHLC rows as parallel arrays (``column_names`` + ``data``) rather
+   than one of the field names below, so it needs a few lines of shim code
+   to flatten before ``CARBON_PRICE_URL`` can consume it as-is — not a
+   drop-in today, but a well-established, citable provider if Trading
+   Economics's guest tier proves too limited.
+3. **World Bank Carbon Pricing Dashboard**
+   (carbonpricingdashboard.worldbank.org) — not a live spot feed (updated on
+   roughly an annual cadence) but the most authoritative multi-jurisdiction
+   reference available. Better suited to periodically refreshing the
+   *static* ``CARBON_PRICE_USD_PER_TCO2`` constant in
+   ``reference_data.py`` (the way it was bumped $30→$40) than to wiring as
+   a live ``CARBON_PRICE_URL``.
+
+Also still viable, unranked: **Ember/Sandbag's Carbon Price Viewer**
+(ember-climate.org, dashboard-first — check whether its data is exposed as a
+plain JSON/CSV URL before wiring it in), **EEX's EUA auction results**
+(eex.com, the EU's own primary auction operator, but published as a download
+page rather than a clean unauthenticated REST endpoint), or any in-house
+feed (a Bloomberg/Refinitiv terminal export, a subscription data vendor, a
+self-hosted scraper) — point ``CARBON_PRICE_URL`` at whatever serves it.
 
 If the provider prices in EUR rather than USD, convert before serving it
 (or front it with a tiny shim) — this module expects USD/tCO2.
@@ -110,20 +134,26 @@ _CARBON_PRICE_FIELDS = (
 
 
 def _extract_carbon_price(data: Any) -> Optional[float]:
-    """Best-effort pull of a USD/tCO2 number out of a live feed's JSON body."""
+    """Best-effort pull of a USD/tCO2 number out of a live feed's JSON body.
+
+    Field-name matching is case-insensitive: several real providers (Trading
+    Economics among them) title-case their keys (``"Last"``, ``"Close"``)
+    rather than using the lowercase names in ``_CARBON_PRICE_FIELDS``.
+    """
     if isinstance(data, list) and data:
         data = data[-1]
     if isinstance(data, dict):
+        lower = {str(k).lower(): v for k, v in data.items()}
         for container_key in ("data", "results", "result"):
-            nested = data.get(container_key)
+            nested = lower.get(container_key)
             if isinstance(nested, (list, dict)):
                 nested_price = _extract_carbon_price(nested)
                 if nested_price is not None:
                     return nested_price
         for key in _CARBON_PRICE_FIELDS:
-            if key in data:
+            if key in lower:
                 try:
-                    return float(data[key])
+                    return float(lower[key])
                 except (TypeError, ValueError):
                     continue
         return None

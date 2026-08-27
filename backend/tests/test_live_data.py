@@ -54,6 +54,13 @@ def test_extract_carbon_price_recognises_common_shapes():
     assert live_data._extract_carbon_price("not json-ish") is None
 
 
+def test_extract_carbon_price_is_case_insensitive():
+    # Trading Economics and several other providers title-case their keys.
+    assert live_data._extract_carbon_price({"Last": 82.3}) == 82.3
+    assert live_data._extract_carbon_price({"Close": "79.4"}) == 79.4
+    assert live_data._extract_carbon_price([{"Symbol": "CFI2", "Last": 83.1}]) == 83.1
+
+
 def test_live_carbon_feed_used_when_url_configured(monkeypatch):
     monkeypatch.setenv("ALPHA_LIVE_DATA", "1")
     monkeypatch.setenv("CARBON_PRICE_URL", "https://example.invalid/carbon")
