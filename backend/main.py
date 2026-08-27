@@ -100,8 +100,13 @@ class ValuationRequest(BaseModel):
 
 @app.get("/health")
 def health() -> Dict[str, str]:
-    """Liveness probe used by infra and by the frontend on region click."""
-    return {"status": "ok", "service": "alpha-backend"}
+    """Liveness probe used by infra and by the frontend on region click.
+
+    Carries the API version (single-sourced from the FastAPI app's own
+    ``version=``, set alongside the frontend's ``package.json`` version) so a
+    deployed build can be confirmed at a glance rather than guessed at.
+    """
+    return {"status": "ok", "service": "alpha-backend", "version": app.version}
 
 
 def _market_for(currency: str) -> Dict[str, Any]:
