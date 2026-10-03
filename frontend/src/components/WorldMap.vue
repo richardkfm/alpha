@@ -28,16 +28,16 @@ onMounted(() => {
     zoomControl: true,
   })
 
-  // Dark basemap (CARTO) keeps the neon overlays as the focal point.
-  L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 19,
-    }
-  ).addTo(map)
+  // Dark basemap keeps the neon overlays as the focal point: OpenFreeMap's Dark
+  // vector style (free, no API key), drawn through MapLibre inside Leaflet.
+  // Loaded on demand so MapLibre stays out of the main bundle.
+  Promise.all([
+    import('@maplibre/maplibre-gl-leaflet'),
+    import('maplibre-gl/dist/maplibre-gl.css'),
+  ]).then(([{ maplibreGL }]) => {
+    if (!map) return
+    maplibreGL({ style: 'https://tiles.openfreemap.org/styles/dark' }).addTo(map)
+  })
 
   // Build one Leaflet layer per thematic layer from the shared registry, each
   // tinted with its own neon hue.
@@ -146,6 +146,7 @@ watch(() => props.points, applyStyle)
 
 onBeforeUnmount(() => {
   if (map) map.remove()
+  map = null
 })
 </script>
 

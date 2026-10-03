@@ -361,14 +361,58 @@ const livingTex = {
   },
 }
 
-const CARTO_ATTR =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+// Basemap: OpenFreeMap — free OpenMapTiles vector tiles, no API key, no
+// sign-up, no usage limits. Its Dark and Positron styles are the open designs
+// CARTO's dark/light basemaps are built on, so the globe keeps its look. Both
+// themes share one tile source; they are merged into the map side by side and
+// the theme toggle only flips which set is visible.
+const BASEMAP_STYLES = {
+  dark: 'https://tiles.openfreemap.org/styles/dark',
+  light: 'https://tiles.openfreemap.org/styles/positron',
+}
+let basemapLayers = [] // [{ id, theme }]
 
-function tilesFor(dark) {
-  const set = dark ? 'dark_nolabels' : 'light_nolabels'
-  return ['a', 'b', 'c', 'd'].map(
-    (s) => `https://${s}.basemaps.cartocdn.com/${set}/{z}/{x}/{y}.png`,
+async function loadBasemap() {
+  const styles = await Promise.all(
+    Object.entries(BASEMAP_STYLES).map(async ([theme, url]) => {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`)
+      return [theme, await res.json()]
+    }),
   )
+  const sources = {}
+  const layers = []
+  for (const [theme, style] of styles) {
+    Object.assign(sources, style.sources)
+    for (const layer of style.layers) {
+      // No labels or sprite patterns (like the old *_nolabels raster tiles) —
+      // the overlays and the info panel carry the names.
+      if (layer.type === 'symbol' || layer.paint?.['fill-pattern']) continue
+      layers.push({ ...layer, id: `basemap-${theme}-${layer.id}`, theme })
+    }
+  }
+  return { sources, layers }
+}
+
+function addBasemap(basemap) {
+  if (!map || !basemap) return
+  for (const [id, source] of Object.entries(basemap.sources)) {
+    if (!map.getSource(id)) map.addSource(id, source)
+  }
+  // Slot the basemap right above the 'space' background, under every overlay.
+  const beforeId = map.getStyle().layers.find((l) => l.id !== 'space')?.id
+  for (const { theme, ...layer } of basemap.layers) {
+    map.addLayer(layer, beforeId)
+    basemapLayers.push({ id: layer.id, theme })
+  }
+  applyBasemapTheme()
+}
+
+function applyBasemapTheme() {
+  const theme = props.isDark ? 'dark' : 'light'
+  for (const { id, theme: t } of basemapLayers) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', t === theme ? 'visible' : 'none')
+  }
 }
 
 function skyFor(dark) {
@@ -399,22 +443,11 @@ function buildStyle(dark) {
     // Gentler than the default directional light, so adjacent wall facets of
     // the extruded value column don't step in brightness at every vertex.
     light: { anchor: 'viewport', color: '#ffffff', intensity: 0.3 },
-    sources: {
-      basemap: {
-        type: 'raster',
-        tiles: tilesFor(dark),
-        tileSize: 256,
-        attribution: CARTO_ATTR,
-      },
-    },
+    // The OpenFreeMap basemap is added once its styles arrive (see addBasemap),
+    // so the globe and overlays render without waiting on it.
+    sources: {},
     layers: [
       { id: 'space', type: 'background', paint: { 'background-color': dark ? '#05070d' : '#dfeaf0' } },
-      {
-        id: 'basemap',
-        type: 'raster',
-        source: 'basemap',
-        paint: { 'raster-opacity': dark ? 0.9 : 0.95, 'raster-fade-duration': 300 },
-      },
     ],
   }
 }
@@ -752,13 +785,9 @@ function toggleSpin() {
 
 function updateTheme() {
   if (!map) return
-  const src = map.getSource('basemap')
-  if (src && src.setTiles) src.setTiles(tilesFor(props.isDark))
+  applyBasemapTheme()
   if (map.getLayer('space')) {
     map.setPaintProperty('space', 'background-color', props.isDark ? '#05070d' : '#dfeaf0')
-  }
-  if (map.getLayer('basemap')) {
-    map.setPaintProperty('basemap', 'raster-opacity', props.isDark ? 0.9 : 0.95)
   }
   try {
     map.setSky(skyFor(props.isDark))
@@ -768,6 +797,12 @@ function updateTheme() {
 }
 
 onMounted(() => {
+  basemapLayers = []
+  const basemap = loadBasemap().catch((err) => {
+    console.warn('Basemap unavailable, showing the globe without it:', err)
+    return null
+  })
+
   map = new maplibregl.Map({
     container: mapEl.value,
     style: buildStyle(props.isDark),
@@ -798,6 +833,7 @@ onMounted(() => {
       /* ignore */
     }
     addThematicLayers()
+    basemap.then(addBasemap)
   })
 
   rafId = requestAnimationFrame(frame)
@@ -807,6 +843,7 @@ onBeforeUnmount(() => {
   if (rafId) cancelAnimationFrame(rafId)
   if (resumeTimer) clearTimeout(resumeTimer)
   if (map) map.remove()
+  map = null
 })
 
 watch(() => props.visibleLayers, applyVisibility, { deep: true })
