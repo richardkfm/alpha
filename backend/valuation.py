@@ -45,7 +45,13 @@ def _ring_area_sqm(ring: list[list[float]]) -> float:
     for i in range(n):
         lon1, lat1 = ring[i][0], ring[i][1]
         lon2, lat2 = ring[(i + 1) % n][0], ring[(i + 1) % n][1]
-        total += math.radians(lon2 - lon1) * (
+        dlon = lon2 - lon1
+        # Edges are geodesics, i.e. the short way round: an antimeridian-crossing
+        # edge written 179 -> -179 spans 2 degrees, not 358. An exact +/-360 edge
+        # is kept as-is — that is the -180 -> 180 seam of a polar-cap ring.
+        if 180.0 < abs(dlon) < 360.0:
+            dlon -= math.copysign(360.0, dlon)
+        total += math.radians(dlon) * (
             2 + math.sin(math.radians(lat1)) + math.sin(math.radians(lat2))
         )
     return total * EARTH_RADIUS_M * EARTH_RADIUS_M / 2.0

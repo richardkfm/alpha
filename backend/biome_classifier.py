@@ -119,7 +119,16 @@ def representative_point(geometry: dict[str, Any]) -> Optional[tuple[float, floa
     # Drop the closing vertex (== first) so it doesn't bias the centroid.
     if len(ext) > 1 and ext[0] == ext[-1]:
         ext = ext[:-1]
-    lon = sum(p[0] for p in ext) / len(ext)
+    # Unwrap longitudes along the ring before averaging: a polygon crossing the
+    # antimeridian (177 .. -178) would otherwise average to ~0 deg and be
+    # classified as whatever lies on the opposite side of the planet.
+    lons = [ext[0][0]]
+    for p in ext[1:]:
+        step = p[0] - lons[-1]
+        step -= 360.0 * round(step / 360.0)
+        lons.append(lons[-1] + step)
+    lon = sum(lons) / len(lons)
+    lon = (lon + 180.0) % 360.0 - 180.0  # back into [-180, 180)
     lat = sum(p[1] for p in ext) / len(ext)
     return lon, lat
 
