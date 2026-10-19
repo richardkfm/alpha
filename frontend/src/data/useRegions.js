@@ -24,15 +24,22 @@ export function useRegions() {
   const ecoLoading = ref(false)
   const ecoLoaded = ref(false)
 
+  // Only the newest load may land: switching USD -> EUR -> BRL quickly let a
+  // slow EUR response arrive last and leave the catalogue (Compare, bubbles,
+  // bar ceilings) priced in EUR under an active BRL button.
+  let latestLoad = 0
+
   // Fetch (or re-price) the catalogue. Called on mount and when the currency
   // changes so the map, picker and Compare numbers all reflect one currency.
   async function load(currency = 'USD') {
+    const req = ++latestLoad
     loading.value = true
     error.value = ''
     try {
-      const res = await fetch(`/api/v1/regions?currency=${currency}`)
+      const res = await fetch(`/api/v1/regions?currency=${encodeURIComponent(currency)}`)
       if (!res.ok) throw new Error(`regions HTTP ${res.status}`)
       const body = await res.json()
+      if (req !== latestLoad) return
       regions.value = (body.regions || []).map((r) => ({
         ...r,
         // Alias geometry -> geojson and gdp_callout -> gdpCallout so the existing
@@ -42,9 +49,9 @@ export function useRegions() {
       }))
       loaded.value = true
     } catch (e) {
-      error.value = t('errors.regionsUnreachable')
+      if (req === latestLoad) error.value = t('errors.regionsUnreachable')
     } finally {
-      loading.value = false
+      if (req === latestLoad) loading.value = false
     }
   }
 
