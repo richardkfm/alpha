@@ -1,4 +1,4 @@
-"""alpha — Phase 2 Total Ecosystem Value (TEV) engine.
+"""alpha — Total Ecosystem Value (TEV) engine.
 
 Pure-Python, dependency-free valuation: compute the geodesic area of a GeoJSON
 polygon, look up biome reference yields, scale by area, and convert to the
@@ -11,6 +11,7 @@ import math
 from typing import Any
 
 from reference_data import (
+    BIOME_CARBON_POOLS,
     BIOMES,
     CARBON_PRICE_USD_PER_TCO2,
     CURRENCIES,
@@ -18,11 +19,15 @@ from reference_data import (
     DEFAULT_CURRENCY,
     DEFAULT_DISCOUNT_RATE,
     FX_AS_OF,
+    PRICE_YEAR,
+    SEQUESTRATION,
+    SQM_PER_HECTARE,
     YIELD_CATEGORIES,
-    biome_carbon_stock_tco2_ha,
+    biome_carbon_debt_tco2_ha,
     biome_per_sqm_usd,
     biome_red_lines,
     biome_scarcity_weight,
+    esv_provenance,
 )
 from scale_anchors import KIND_FLOW, KIND_STOCK, rank_anchors
 
@@ -163,11 +168,12 @@ def compute_valuation(
     systemic_per_sqm = tev_per_sqm * systemic_multiplier
     systemic_asset_total = asset_total * systemic_multiplier
 
-    # One-time, largely irreversible carbon debt of clearing the standing stock.
-    area_ha = area_sqm / 10_000.0
-    carbon_debt_onetime = (
-        biome_carbon_stock_tco2_ha(biome_key) * area_ha * carbon_price * rate
-    )
+    # One-time, largely irreversible carbon debt of clearing the land: the
+    # vegetation carbon still standing (scaled by intactness) plus the share of
+    # soil carbon that conversion releases — not the whole 1 m soil stock.
+    area_ha = area_sqm / SQM_PER_HECTARE
+    debt_tco2_ha = biome_carbon_debt_tco2_ha(biome_key, intactness)
+    carbon_debt_onetime = debt_tco2_ha * area_ha * carbon_price * rate
 
     red_lines = biome_red_lines(biome_key)
 
@@ -191,34 +197,60 @@ def compute_valuation(
         ),
     }
 
+    seq = SEQUESTRATION[biome_key]
+    pool = BIOME_CARBON_POOLS[biome_key]
     methodology = {
         "carbon_capture": {
             "formula": "sequestration (tCO2/ha/yr) x carbon price (USD/tCO2) / 10000",
             "sequestration_tco2_ha_yr": b["sequestration_tco2_ha_yr"],
+            "sequestration_basis": seq["basis"],
+            "sequestration_source": seq["source"],
             "carbon_price_usd_per_tco2": round(carbon_price, 4),
-            "citation": "Pan et al. 2011; IPCC AR6 WGIII (2022)",
-        },
-        "climate_regulation": {
-            "formula": "ESVD climate-regulation reference (USD/ha/yr) / 10000",
-            "reference_usd_ha_yr": b["climate_regulation_usd_ha_yr"],
-            "citation": "de Groot et al. 2012; Costanza et al. 2014",
-        },
-        "water_filtration": {
-            "formula": "ESVD water purification + flow regulation (USD/ha/yr) / 10000",
-            "reference_usd_ha_yr": b["water_filtration_usd_ha_yr"],
-            "citation": "de Groot et al. 2012 (ESVD)",
-        },
-        "biodiversity_premium": {
-            "formula": "ESVD genetic resources + habitat/refugia (USD/ha/yr) / 10000",
-            "reference_usd_ha_yr": b["biodiversity_premium_usd_ha_yr"],
-            "citation": "de Groot et al. 2012 (ESVD)",
-        },
-        "soil_nutrient_value": {
-            "formula": "ESVD erosion prevention + soil fertility (USD/ha/yr) / 10000",
-            "reference_usd_ha_yr": b["soil_nutrient_value_usd_ha_yr"],
-            "citation": "de Groot et al. 2012 (ESVD)",
+            "carbon_debt_tco2_ha": round(debt_tco2_ha, 1),
+            "carbon_debt_formula": (
+                "(vegetation tC/ha x intactness + soil tC/ha x soil release fraction) x 44/12"
+            ),
+            "carbon_debt_basis": pool["basis"],
+            "carbon_debt_source": pool["source"],
+            "price_year": PRICE_YEAR,
+            "citation": (
+                "Pan et al. 2024; IPCC 2013 Wetlands Supplement; IPCC 2006 GL Vol. 4; "
+                "IPCC AR6 WGIII (2022) Ch. 3"
+            ),
         },
     }
+    _esv_formulas = {
+        "climate_regulation": (
+            "ESVD air-quality regulation + moderation of extreme events "
+            "(median basis, USD/ha/yr) / 10000; carbon is counted under carbon_capture"
+        ),
+        "water_filtration": (
+            "ESVD waste treatment / water purification + regulation of water flows "
+            "(median basis, USD/ha/yr) / 10000"
+        ),
+        "biodiversity_premium": (
+            "ESVD habitat services + pollination + biological control + existence & "
+            "bequest values (median basis, USD/ha/yr) / 10000"
+        ),
+        "soil_nutrient_value": (
+            "ESVD erosion prevention + maintenance of soil fertility "
+            "(median basis, USD/ha/yr) / 10000"
+        ),
+    }
+    for cat, formula in _esv_formulas.items():
+        prov = esv_provenance(biome_key, cat)
+        methodology[cat] = {
+            "formula": formula,
+            "reference_usd_ha_yr": b[f"{cat}_usd_ha_yr"],
+            "basis": prov["basis"],
+            "evidence_n": sum(e["n_estimates"] for e in prov["evidence"]),
+            "price_year": PRICE_YEAR,
+            "citation": (
+                "Brander et al. 2024 (ESVD); de Groot et al. 2012"
+                if prov["basis"] == "literature"
+                else "Unverified estimate — too few published value estimates"
+            ),
+        }
 
     return {
         "biome": b["label"],
@@ -227,7 +259,7 @@ def compute_valuation(
         "currency_symbol": fx["symbol"],
         "area": {
             "sqm": round(area_sqm, 2),
-            "hectares": round(area_sqm / 10_000.0, 4),
+            "hectares": round(area_sqm / SQM_PER_HECTARE, 4),
         },
         "yields_per_sqm_year": yields_per_sqm,
         "yields_total_year": yields_total,
@@ -271,9 +303,12 @@ def compute_valuation(
         "fx": {"base": "USD", "rate_per_usd": rate, "as_of": as_of},
         "methodology": methodology,
         "methodology_note": (
-            "Phase 2 valuation engine. Per-biome reference values from the ESVD "
-            "(de Groot et al. 2012) and carbon sequestration from Pan et al. 2011, "
-            "priced via an IPCC-AR6-consistent reference carbon price. FX rates are "
-            "indicative (as of {as_of}). See backend/METHODOLOGY.md.".format(as_of=FX_AS_OF)
+            "Per-biome regulating, habitat and non-use values from the Ecosystem "
+            "Services Valuation Database (Brander et al. 2024; de Groot et al. 2012), "
+            "median basis, in {py} US dollars; forest carbon sinks from Pan et al. 2024 "
+            "and blue carbon from the IPCC 2013 Wetlands Supplement, priced at a "
+            "reference carbon price anchored on IPCC AR6 WGIII. Coefficients the "
+            "literature cannot support are flagged as estimates. FX as of {as_of}. "
+            "See backend/METHODOLOGY.md.".format(py=PRICE_YEAR, as_of=as_of)
         ),
     }

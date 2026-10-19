@@ -52,14 +52,17 @@ def test_feature_is_unwrapped():
 
 
 def test_tev_per_sqm_matches_reference_sum():
-    # 1 ha tropical rainforest: 0.0092+0.036+0.02+0.05+0.012 = 0.1272 USD/m2/yr
-    # (carbon capture = 2.3 tCO2/ha/yr * $40/tCO2 / 10,000).
+    # 1 ha tropical rainforest, 2024 USD:
+    #   carbon 2.4 tCO2/ha/yr * $80/tCO2 = 192; climate 6; water 11;
+    #   biodiversity 569; soil 17  ->  795 USD/ha/yr = 0.0795 USD/m2/yr.
     res = compute_valuation(_square_one_degree_at_equator(), "tropical_rainforest", "USD")
-    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.1272, abs_tol=1e-6)
+    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.0795, abs_tol=1e-6)
+    # Each category is rounded to 6 dp on its own, so the sum may drift by up to
+    # 5 x 0.5e-6 from the separately rounded total.
     assert math.isclose(
         res["total_ecosystem_value_per_sqm_year"],
         sum(res["yields_per_sqm_year"].values()),
-        abs_tol=1e-6,
+        abs_tol=2.5e-6,
     )
 
 
@@ -115,7 +118,7 @@ def test_intactness_scales_realised_value_but_not_potential():
 def test_default_intactness_is_one_preserving_phase2_behaviour():
     res = compute_valuation(_square_one_degree_at_equator(), "tropical_rainforest", "USD")
     assert res["intactness"] == 1.0
-    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.1272, abs_tol=1e-6)
+    assert math.isclose(res["total_ecosystem_value_per_sqm_year"], 0.0795, abs_tol=1e-6)
 
 
 def test_systemic_premium_and_red_lines():
@@ -150,10 +153,15 @@ def test_new_ordinary_biomes_are_available():
         assert res["total_ecosystem_value_per_sqm_year"] > 0
 
 
-def test_freshwater_is_water_dominated():
+def test_freshwater_has_no_soil_or_carbon_yield():
+    # Open water: no soil column and no dependable net sink. (Freshwater was once
+    # "water-dominated" only because drinking-water *supply* — a provisioning
+    # service, outside alpha's scope — had been folded into water_filtration.)
     res = compute_valuation(_square_one_degree_at_equator(), "freshwater", "USD")
     yields = res["yields_per_sqm_year"]
-    assert yields["water_filtration"] == max(yields.values())
+    assert yields["soil_nutrient_value"] == 0
+    assert yields["carbon_capture"] == 0
+    assert yields["water_filtration"] > 0
 
 
 def test_cropland_below_wetland():
