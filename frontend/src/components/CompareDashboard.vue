@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { YIELD_ROWS } from '../data/yields.js'
 import { barPct as barPctScale } from '../data/yieldScale.js'
@@ -22,7 +22,12 @@ const props = defineProps({
   ceilings: { type: Object, default: () => ({}) },
   showLiability: { type: Boolean, default: true },
   showRedLines: { type: Boolean, default: true },
+  // Catalogue fetch state, so the view can say "loading" / "unreachable"
+  // instead of rendering an empty picker.
+  loading: { type: Boolean, default: false },
+  error: { type: String, default: '' },
 })
+const emit = defineEmits(['retry'])
 
 const MAX_COMPARE = 5
 
@@ -102,8 +107,9 @@ const gridCols = computed(
 )
 
 // Seed the comparison with the three highest-intensity ecosystems so the view
-// is never empty on first open.
-onMounted(() => {
+// is never empty on first open — or as soon as the catalogue arrives, if it was
+// still loading (or retried) when the view opened.
+function seed() {
   if (!selectedIds.value.length && props.regions.length) {
     selectedIds.value = [...props.regions]
       .sort(
@@ -113,33 +119,50 @@ onMounted(() => {
       .slice(0, 3)
       .map((r) => r.id)
   }
-})
+}
+onMounted(seed)
+watch(() => props.regions.length, seed)
 </script>
 
 <template>
   <section class="compare">
     <!-- Picker -->
-    <aside class="picker">
+    <aside class="picker" :aria-label="t('compare.regions')">
       <header class="picker-head">
         <div class="picker-title">
-          <span>Regions</span>
-          <span class="picker-count">{{ regions.length }}</span>
+          <span>{{ t('compare.regions') }}</span>
+          <span class="picker-count num">{{ regions.length }}</span>
+          <span class="picker-cap num" :class="{ full: atCapacity }" :title="t('compare.capacityTitle', { max: MAX_COMPARE })">
+            {{ t('compare.selected', { n: selectedIds.length, max: MAX_COMPARE }) }}
+          </span>
         </div>
         <input
           v-model="query"
           class="search"
           type="search"
-          placeholder="Search ecosystems…"
-          aria-label="Search regions"
+          :placeholder="t('compare.searchPlaceholder')"
+          :aria-label="t('compare.searchLabel')"
+          @keydown.esc.stop="query = ''"
         />
-        <div class="sort" role="group" aria-label="Sort regions">
-          <button :class="{ on: sortBy === 'tev' }" @click="sortBy = 'tev'">Value</button>
-          <button :class="{ on: sortBy === 'area' }" @click="sortBy = 'area'">Area</button>
-          <button :class="{ on: sortBy === 'name' }" @click="sortBy = 'name'">A–Z</button>
+        <div class="sort" role="group" :aria-label="t('compare.sortGroup')">
+          <button :class="{ on: sortBy === 'tev' }" :aria-pressed="sortBy === 'tev'" @click="sortBy = 'tev'">{{ t('compare.sort.value') }}</button>
+          <button :class="{ on: sortBy === 'area' }" :aria-pressed="sortBy === 'area'" @click="sortBy = 'area'">{{ t('compare.sort.area') }}</button>
+          <button :class="{ on: sortBy === 'name' }" :aria-pressed="sortBy === 'name'" @click="sortBy = 'name'">{{ t('compare.sort.name') }}</button>
         </div>
       </header>
 
       <div class="picker-list">
+        <div v-if="loading && !regions.length" class="picker-state" role="status">
+          <span class="spinner" aria-hidden="true"></span>{{ t('compare.loading') }}
+        </div>
+        <div v-else-if="!regions.length" class="picker-state">
+          {{ t('compare.noRegions') }}
+        </div>
+        <div v-else-if="!groupedRegions.length" class="picker-state">
+          <span>{{ t('compare.noResults', { query: query.trim() }) }}</span>
+          <button class="link-btn" @click="query = ''">{{ t('compare.clearSearch') }}</button>
+        </div>
+        <p v-else-if="atCapacity" class="capacity-note">{{ t('compare.capacityFull') }}</p>
         <div v-for="g in groupedRegions" :key="g.key" class="group">
           <div class="group-head">
             <span class="group-dot" :style="{ background: g.color }"></span>
@@ -150,13 +173,15 @@ onMounted(() => {
             :key="r.id"
             class="pick"
             :class="{ on: isSelected(r.id) }"
+            :aria-pressed="isSelected(r.id)"
             :disabled="!isSelected(r.id) && atCapacity"
+            :title="!isSelected(r.id) && atCapacity ? t('compare.capacityFull') : r.name"
             @click="toggle(r.id)"
           >
-            <span class="pick-check" :style="{ '--c': g.color }"></span>
+            <span class="pick-check" :style="{ '--c': g.color }" aria-hidden="true"></span>
             <span class="pick-text">
               <span class="pick-name">{{ r.name }}</span>
-              <span class="pick-sub">{{ perHa(r.total_ecosystem_value_per_sqm_year) }} / ha · {{ hectares(r.area.hectares) }} ha</span>
+              <span class="pick-sub num">{{ t('compare.pickSub', { value: perHa(r.total_ecosystem_value_per_sqm_year), area: hectares(r.area.hectares) }) }}</span>
             </span>
           </button>
         </div>
@@ -167,15 +192,28 @@ onMounted(() => {
     <div class="board">
       <header class="board-head">
         <div>
-          <h2>Compare ecosystems</h2>
-          <p>Total Ecosystem Value side by side — {{ currency }} per hectare per year. Add up to {{ MAX_COMPARE }}.</p>
+          <h2>{{ t('compare.title') }}</h2>
+          <p>{{ t('compare.subtitle', { currency, max: MAX_COMPARE }) }}</p>
         </div>
-        <button v-if="selected.length" class="clear" @click="clearAll">Clear</button>
+        <button v-if="selected.length" class="clear" @click="clearAll">{{ t('compare.clear') }}</button>
       </header>
 
-      <div v-if="!selected.length" class="empty">
-        <span class="empty-mark">⊞</span>
-        <p>Pick regions from the left to compare their ecosystem-service yields and Total Ecosystem Value.</p>
+      <div v-if="error && !regions.length" class="empty" role="alert">
+        <span class="empty-mark err" aria-hidden="true">!</span>
+        <p>{{ error }}</p>
+        <button class="retry" :disabled="loading" @click="emit('retry')">
+          {{ loading ? t('stage.retrying') : t('stage.retry') }}
+        </button>
+      </div>
+
+      <div v-else-if="loading && !regions.length" class="empty" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>{{ t('compare.loading') }}</p>
+      </div>
+
+      <div v-else-if="!selected.length" class="empty">
+        <span class="empty-mark" aria-hidden="true">⊞</span>
+        <p>{{ t('compare.empty') }}</p>
       </div>
 
       <div v-else class="matrix-scroll">
@@ -183,7 +221,12 @@ onMounted(() => {
           <!-- header row -->
           <div class="cell corner"></div>
           <div v-for="r in selected" :key="'h-' + r.id" class="cell region-head">
-            <button class="remove" @click="toggle(r.id)" aria-label="Remove">×</button>
+            <button
+              class="remove"
+              @click="toggle(r.id)"
+              :aria-label="t('compare.remove', { name: r.name })"
+              :title="t('compare.remove', { name: r.name })"
+            >×</button>
             <span class="rh-name">{{ r.name }}</span>
             <span class="rh-biome" :style="{ '--c': biomeColor(r.biome_key) }">
               <span class="rh-dot"></span>{{ biomeLabel(r.biome_key) }}
@@ -192,28 +235,28 @@ onMounted(() => {
           </div>
 
           <!-- TEV / ha hero row -->
-          <div class="cell rowlabel strong">TEV / ha / yr</div>
-          <div v-for="r in selected" :key="'t-' + r.id" class="cell tev-cell">
+          <div class="cell rowlabel strong">{{ t('compare.rows.tevHa') }}</div>
+          <div v-for="r in selected" :key="'t-' + r.id" class="cell tev-cell num">
             {{ perHa(r.total_ecosystem_value_per_sqm_year) }}
           </div>
 
           <!-- annual total (area-scaled) -->
-          <div class="cell rowlabel">Annual value (whole area)</div>
+          <div class="cell rowlabel">{{ t('compare.rows.annual') }}</div>
           <div
             v-for="r in selected"
             :key="'a-' + r.id"
-            class="cell num-cell gold"
+            class="cell num-cell gold num"
             :title="moneyFull(r.total_ecosystem_value_per_year)"
           >
             {{ money(r.total_ecosystem_value_per_year) }}
           </div>
 
           <!-- standing natural-asset value (capitalised) -->
-          <div class="cell rowlabel strong">Standing asset value</div>
+          <div class="cell rowlabel strong">{{ t('compare.rows.asset') }}</div>
           <div
             v-for="r in selected"
             :key="'as-' + r.id"
-            class="cell num-cell asset"
+            class="cell num-cell asset num"
             :title="moneyFull(r.capitalized_value && r.capitalized_value.asset_value_total)"
           >
             {{ money(r.capitalized_value && r.capitalized_value.asset_value_total) }}
@@ -221,11 +264,11 @@ onMounted(() => {
 
           <!-- conversion liability (the perpetual debt of building over it) -->
           <template v-if="showLiability">
-            <div class="cell rowlabel">Conversion liability</div>
+            <div class="cell rowlabel">{{ t('compare.rows.liability') }}</div>
             <div
               v-for="r in selected"
               :key="'cl-' + r.id"
-              class="cell num-cell liab"
+              class="cell num-cell liab num"
               :title="moneyFull(r.conversion_liability && r.conversion_liability.present_value)"
             >
               {{ money(r.conversion_liability && r.conversion_liability.present_value) }}
@@ -234,21 +277,21 @@ onMounted(() => {
 
           <!-- irreversible / un-nettable losses -->
           <template v-if="showRedLines">
-            <div class="cell rowlabel">Red lines</div>
+            <div class="cell rowlabel">{{ t('compare.rows.redLines') }}</div>
             <div v-for="r in selected" :key="'rl-' + r.id" class="cell num-cell muted">
-              {{ r.red_lines ? r.red_lines.length : 0 }} irreversible
+              {{ t('compare.rows.redLinesCount', { n: r.red_lines?.length ?? 0 }, r.red_lines?.length ?? 0) }}
             </div>
           </template>
 
           <!-- area -->
-          <div class="cell rowlabel">Area</div>
-          <div v-for="r in selected" :key="'ar-' + r.id" class="cell num-cell muted">
+          <div class="cell rowlabel">{{ t('compare.rows.area') }}</div>
+          <div v-for="r in selected" :key="'ar-' + r.id" class="cell num-cell muted num">
             {{ hectares(r.area.hectares) }} ha
           </div>
 
           <!-- land-cover intactness -->
-          <div class="cell rowlabel">Intactness</div>
-          <div v-for="r in selected" :key="'in-' + r.id" class="cell num-cell muted">
+          <div class="cell rowlabel">{{ t('compare.rows.intactness') }}</div>
+          <div v-for="r in selected" :key="'in-' + r.id" class="cell num-cell muted num">
             {{ percent(r.intactness) }}
           </div>
 
@@ -264,7 +307,7 @@ onMounted(() => {
                   :style="{ width: barPct(r, cat.key) + '%', background: cat.color }"
                 ></div>
               </div>
-              <span class="bar-num">{{ perHa(r.yields_per_sqm_year[cat.key]) }}</span>
+              <span class="bar-num num">{{ perHa(r.yields_per_sqm_year[cat.key]) }}</span>
             </div>
           </template>
         </div>
@@ -278,9 +321,9 @@ onMounted(() => {
   position: absolute;
   inset: 0;
   display: flex;
-  padding: 70px 18px 18px;
-  gap: 16px;
-  background: radial-gradient(circle at 30% 10%, #0a1424 0%, var(--bg) 70%);
+  padding: var(--topbar-h) 18px 18px;
+  gap: var(--space-4);
+  background: var(--stage-bg);
 }
 
 /* ----- picker ----- */
@@ -293,8 +336,8 @@ onMounted(() => {
   border-radius: var(--radius);
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
@@ -312,6 +355,50 @@ onMounted(() => {
   text-transform: uppercase;
   color: var(--text);
   margin-bottom: 10px;
+}
+.picker-cap {
+  margin-left: auto;
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-faint);
+}
+.picker-cap.full {
+  color: var(--gold);
+}
+.picker-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-3);
+  text-align: center;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.capacity-note {
+  margin: 0 2px var(--space-3);
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--gold-bg);
+  border: 1px solid var(--gold-border);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  color: var(--text-muted);
 }
 .picker-count {
   font-size: 0.66rem;
@@ -429,7 +516,7 @@ onMounted(() => {
   place-items: center;
   font-size: 0.7rem;
   font-weight: 800;
-  color: #05120e;
+  color: var(--on-accent);
 }
 .pick-text {
   display: flex;
@@ -458,8 +545,8 @@ onMounted(() => {
   border-radius: var(--radius);
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
@@ -473,7 +560,7 @@ onMounted(() => {
 }
 .board-head h2 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
   font-weight: 800;
   color: var(--text);
 }
@@ -484,8 +571,8 @@ onMounted(() => {
 }
 .clear {
   flex: none;
-  padding: 6px 13px;
-  font-size: 0.74rem;
+  padding: 5px 12px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   border-radius: 999px;
   background: var(--bg-deep);
@@ -514,6 +601,34 @@ onMounted(() => {
   font-size: 2.4rem;
   color: var(--accent);
   opacity: 0.7;
+}
+.empty-mark.err {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1.3rem;
+  font-weight: 900;
+  opacity: 1;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+}
+.retry {
+  padding: 8px 20px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: linear-gradient(180deg, var(--accent), var(--teal-strong));
+  color: var(--on-accent);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.retry:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 .empty p {
   max-width: 340px;
@@ -640,9 +755,9 @@ onMounted(() => {
   background: color-mix(in srgb, var(--gold) 8%, var(--bg-deep));
 }
 .num-cell.liab {
-  color: #f87171;
+  color: var(--danger);
   font-weight: 700;
-  background: color-mix(in srgb, #f87171 8%, var(--bg-deep));
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg-deep));
 }
 .num-cell.muted {
   color: var(--text-muted);
@@ -679,9 +794,21 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
+/* Phones: stack the picker above the board instead of squeezing both. */
 @media (max-width: 720px) {
+  .compare {
+    flex-direction: column;
+    padding: var(--topbar-h) 12px 12px;
+    gap: var(--space-3);
+  }
   .picker {
-    width: 220px;
+    width: 100%;
+    max-width: none;
+    max-height: 42%;
+  }
+  .board {
+    flex: 1;
+    min-height: 0;
   }
 }
 </style>

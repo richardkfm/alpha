@@ -144,7 +144,8 @@ frontend/
     │   ├── SidePanel.vue       # TEV breakdown + GDP callout + export/embed
     │   ├── EmbedCard.vue       # compact single-region widget (the iframe body)
     │   ├── CompareDashboard.vue# side-by-side TEV comparison
-    │   └── DataHub.vue         # data catalogue + live tools
+    │   ├── DataHub.vue         # data catalogue + live tools
+    │   └── OnboardingGuide.vue # first-run orientation card (re-open via "?")
     ├── i18n/
     │   ├── index.js            # vue-i18n setup; locale persisted to localStorage
     │   └── locales/            # en.json, de.json, es.json

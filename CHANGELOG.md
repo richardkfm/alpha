@@ -75,6 +75,45 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
     GDP` is worse than saying nothing.
   - The PDF brief carries the same cue next to each headline row.
 
+### Design & UI
+
+- **First-run guide.** A short, dismissible orientation card explains what to
+  click, what the three headline figures mean (standing asset, annual TEV,
+  conversion liability), how to value a custom area and where display styles,
+  Compare and the Data Hub live. Shown once, re-openable from a new **?**
+  button in the topbar; Esc or a backdrop click closes it.
+- **Loading, empty and error states everywhere.** Backend-unreachable now shows
+  a card with a **Try again** button instead of a bare red line; the side panel
+  error, Data Hub and Compare all get retry actions; a failed currency re-price
+  keeps the last good figures and shows a small notice instead of blanking the
+  map; Compare says when a search matches nothing (with "Clear search"), shows
+  an "n / 5 selected" counter and explains the cap; the Data Hub says in words
+  when live market feeds have fallen back to static references.
+- **Fully localised UI.** Compare, Data Hub, globe controls, search errors and
+  the embeddable card were English-only; every string now goes through the
+  en/de/es catalogues. The embed card lazy-loads just its one locale.
+- **Design tokens.** `theme.css` gains a spacing scale, type scale, pill radius,
+  semantic status colours (`--danger`, `--warn`, `--accent-bg`, `--gold-bg`, …),
+  `--on-accent`, `--stage-bg` and topbar/map-control offsets; hard-coded hex and
+  rgba colours in components were replaced with them. Buttons and inputs now
+  inherit Inter.
+- **Light theme fixed and legible.** Compare, Data Hub, the loading stage and the
+  globe no longer paint a dark navy blob behind light-theme content; the flat
+  map switches to the light Positron basemap; light accent, gold, faint-text
+  and danger colours were darkened for contrast on white. The theme choice is
+  remembered per browser.
+- **Layout & discoverability.** Mode buttons carry tooltips; the Biomes panel is
+  collapsible (collapsed by default on phones), labels its display-style switch
+  and states what the active style encodes; Outline shows a spinner while
+  detailed borders load. Zoom controls no longer hide under the topbar, clicked
+  flat-map shapes lose the stray focus rectangle, the 3D column caption no
+  longer sits under the Biomes panel, and the search bar re-centres beside an
+  open side panel. Data Hub content scrolls below the topbar instead of under
+  it. On phones the topbar wraps to a scrollable control strip and Compare
+  stacks vertically. Map / Compare / Data switch with a short fade.
+- **Keyboard.** Esc closes the guide, then the side panel; inside the search
+  field it clears the input first. Toggle buttons expose `aria-pressed`.
+
 ## [0.4.0]
 
 ### Added

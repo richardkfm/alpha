@@ -9,7 +9,12 @@
     "data": "Daten",
     "mapView": "Kartenansicht",
     "globe": "Globus",
-    "flat": "Flach"
+    "flat": "Flach",
+    "mapHint": "Bewertete Ökosysteme auf dem Globus oder der flachen Karte erkunden",
+    "compareHint": "Bis zu 5 Ökosysteme nebeneinander vergleichen",
+    "dataHint": "Datenquellen, Live-Marktdaten und Werkzeuge",
+    "globeHint": "3D-Globus",
+    "flatHint": "Flache 2D-Karte mit detaillierten Grenzen"
   },
   "currency": {
     "group": "Währung"
@@ -25,7 +30,12 @@
   },
   "stage": {
     "loading": "Ökosystemdaten werden geladen…",
-    "hint": "Wähle ein Ökosystem aus, um seinen gesamten Ökosystemwert anzuzeigen"
+    "hint": "Wähle ein Ökosystem aus, um seinen gesamten Ökosystemwert anzuzeigen",
+    "errorTitle": "Bewertungs-Engine nicht erreichbar",
+    "errorHint": "Die Karte benötigt die alpha-API. Prüfe, ob das Backend läuft, und versuche es erneut.",
+    "retry": "Erneut versuchen",
+    "retrying": "Wird erneut versucht…",
+    "refreshFailed": "Zahlen konnten nicht aktualisiert werden — es werden die zuletzt geladenen Werte angezeigt."
   },
   "errors": {
     "backendUnreachable": "Das alpha-Backend ist nicht erreichbar. Läuft es auf :8000?",
@@ -40,7 +50,19 @@
     "submit": "Bewerten",
     "clear": "Löschen",
     "hint": "Versuche {point}, ein Rechteck {box} oder ein GeoJSON-Polygon.",
-    "customAreaLabel": "Benutzerdefinierte Fläche — auf Anfrage bewertet"
+    "customAreaLabel": "Benutzerdefinierte Fläche — auf Anfrage bewertet",
+    "errors": {
+      "empty": "Koordinaten eingeben oder ein GeoJSON-Polygon einfügen.",
+      "badJson": "Das sieht nach JSON aus, ließ sich aber nicht einlesen.",
+      "notPolygon": "Ein GeoJSON-Polygon oder -MultiPolygon einfügen (oder ein Feature, das eines enthält).",
+      "outOfRange": "Punkt außerhalb des gültigen Bereichs — erwartet wird \"Breite, Länge\".",
+      "unrecognised": "\"Breite, Länge\", ein Rechteck \"W, S, O, N\" eingeben oder ein GeoJSON-Polygon einfügen."
+    },
+    "labels": {
+      "polygon": "Eigenes Polygon",
+      "box": "Rechteck",
+      "point": "Punkt {coords}"
+    }
   },
   "layerControl": {
     "ariaLabel": "Biom-Ebenen",
@@ -62,7 +84,10 @@
         "label": "Umriss",
         "hint": "Detaillierte Ökoregionsgrenzen, ohne Füllung"
       }
-    }
+    },
+    "collapse": "Biom-Panel einklappen",
+    "expand": "Biom-Panel ausklappen",
+    "styleLoading": "Detaillierte Ökoregionsgrenzen werden geladen…"
   },
   "biomes": {
     "tropical_rainforest": { "label": "Tropischer Regenwald", "short": "Regenwald", "sublabel": "tropisch, feucht, laubwerfend" },
@@ -161,7 +186,13 @@
       "redLinesHead": "⛔ Zu keinem Preis ersetzbar",
       "redLinesHeadTitle": "Rote Linien, keine Posten — bewusst aus den obigen Zahlen ausgeklammert"
     },
-    "methodology": "Methodik"
+    "methodology": "Methodik",
+    "closeTitle": "Schließen (Esc)",
+    "error": {
+      "title": "Dieses Gebiet konnte nicht bewertet werden",
+      "offlineTitle": "Bewertungs-Engine offline",
+      "retry": "Erneut versuchen"
+    }
   },
   "comparisons": {
     "approx": "≈",
@@ -190,5 +221,152 @@
       "debt_usa": "Staatsschulden der USA",
       "global_equity_marketcap": "alle börsennotierten Aktien weltweit"
     }
+  },
+  "guide": {
+    "open": "Kurzanleitung",
+    "close": "Anleitung schließen",
+    "eyebrow": "Kurzanleitung",
+    "title": "Was ist die Natur wert?",
+    "lead": "alpha beziffert die Leistungen, die Ökosysteme jedes Jahr erbringen — und was verloren geht, wenn die Fläche umgewandelt wird.",
+    "steps": {
+      "click": {
+        "title": "Auf eine farbige Fläche klicken",
+        "body": "Jede Form ist ein benanntes Ökosystem, eingefärbt nach Biom. Ein Klick öffnet rechts die vollständige Bewertung."
+      },
+      "numbers": {
+        "title": "Die drei Kennzahlen lesen",
+        "body": "Bestandswert — was die Fläche unberührt wert ist. Gesamter Ökosystemwert — die Leistungen pro Jahr. Dauerhafte Verbindlichkeit — die bleibenden Kosten einer Umwandlung."
+      },
+      "search": {
+        "title": "Eigene Fläche bewerten",
+        "body": "\"Breite, Länge\", ein Rechteck \"W, S, O, N\" oder ein GeoJSON-Polygon in die Suchleiste eingeben."
+      },
+      "styles": {
+        "title": "Ansicht anpassen",
+        "body": "Im Biom-Panel Ebenen filtern und zwischen Füllung, Wertblasen und detaillierten Umrissen wechseln; oben zwischen Globus / Flach und der Währung umschalten."
+      }
+    },
+    "note": "Die Zahlen sind indikative, belegte Referenzwerte — jedes Panel verweist auf seine Methodik, und der Daten-Hub listet jede Quelle auf.",
+    "openCompare": "Ökosysteme vergleichen",
+    "openData": "Daten-Hub öffnen",
+    "start": "Los geht's"
+  },
+  "globe": {
+    "pause": "Drehung anhalten",
+    "resume": "Drehung fortsetzen",
+    "spinning": "Dreht sich",
+    "paused": "Angehalten",
+    "columnCaption": "Säulenhöhe = jährlicher Ökosystemwert"
+  },
+  "compare": {
+    "regions": "Regionen",
+    "selected": "{n} / {max} ausgewählt",
+    "capacityTitle": "Du kannst bis zu {max} Ökosysteme gleichzeitig vergleichen",
+    "searchPlaceholder": "Ökosysteme suchen…",
+    "searchLabel": "Regionen suchen",
+    "sortGroup": "Regionen sortieren",
+    "sort": {
+      "value": "Wert",
+      "area": "Fläche",
+      "name": "A–Z"
+    },
+    "loading": "Ökosysteme werden geladen…",
+    "noRegions": "Noch keine Ökosysteme verfügbar.",
+    "noResults": "Keine Ökosysteme passen zu „{query}“.",
+    "clearSearch": "Suche zurücksetzen",
+    "capacityFull": "Maximum erreicht — entferne eines, um ein weiteres hinzuzufügen.",
+    "pickSub": "{value} / ha · {area} ha",
+    "title": "Ökosysteme vergleichen",
+    "subtitle": "Gesamter Ökosystemwert im Vergleich — {currency} pro Hektar und Jahr. Bis zu {max} hinzufügen.",
+    "clear": "Leeren",
+    "empty": "Wähle links Regionen aus, um ihre Ökosystemleistungen und ihren Gesamten Ökosystemwert zu vergleichen.",
+    "remove": "{name} entfernen",
+    "rows": {
+      "tevHa": "TEV / ha / Jahr",
+      "annual": "Jahreswert (gesamte Fläche)",
+      "asset": "Bestandswert",
+      "liability": "Umwandlungsverbindlichkeit",
+      "redLines": "Rote Linien",
+      "redLinesCount": "{n} irreversibler Verlust | {n} irreversible Verluste",
+      "area": "Fläche",
+      "intactness": "Intaktheit"
+    }
+  },
+  "dataHub": {
+    "title": "Daten-Hub",
+    "subtitle": "Jede Eingangsgröße einer Bewertung — woher sie stammt, wie aktuell sie ist und was uns noch fehlt.",
+    "market": {
+      "carbon": "CO₂-Preis",
+      "fx": "Wechselkurse (pro USD)",
+      "live": "Live",
+      "static": "Statisch",
+      "liveTitle": "Live aus dem Markt-Feed abgerufen",
+      "staticTitle": "Live-Feed nicht verfügbar oder nicht konfiguriert — es gilt der dokumentierte statische Referenzwert",
+      "fallbackNote": "Mindestens ein Live-Markt-Feed ist deaktiviert oder nicht erreichbar, daher verwenden die Bewertungen die dokumentierten statischen Referenzwerte.",
+      "unavailable": "Marktdaten sind derzeit nicht verfügbar."
+    },
+    "asOf": "Stand {date}",
+    "loading": "Datenkatalog wird geladen…",
+    "error": "Der Datenkatalog konnte nicht vom alpha-Backend geladen werden.",
+    "status": {
+      "authoritative": {
+        "label": "Maßgeblich",
+        "hint": "Begutachteter oder amtlicher Datensatz, unverändert verwendet"
+      },
+      "reference": {
+        "label": "Referenz",
+        "hint": "Dokumentierte Referenzwerte — fundiert, aber statisch"
+      },
+      "placeholder": {
+        "label": "Platzhalter",
+        "hint": "Übergangslösung, bis eine bessere Quelle angebunden ist"
+      }
+    },
+    "sections": {
+      "sources": "Datenquellen",
+      "needs": "Daten, die uns noch fehlen",
+      "tools": "Live-Werkzeuge"
+    },
+    "tools": {
+      "esv": {
+        "title": "ESV-Werte aus Text extrahieren",
+        "sub": "Zieht strukturierte Werte von Ökosystemleistungen aus Berichts- bzw. TNFD-Offenlegungstexten.",
+        "run": "Extrahieren",
+        "running": "Wird extrahiert…",
+        "failed": "Extraktion fehlgeschlagen. Läuft das Backend?",
+        "records": "{n} Datensatz | {n} Datensätze",
+        "backend": "Backend: {name}",
+        "fallback": "Fallback",
+        "cols": {
+          "service": "Leistung",
+          "value": "Wert",
+          "currency": "Whg.",
+          "unit": "Einheit"
+        },
+        "empty": "In diesem Text wurden keine strukturierten Werte gefunden."
+      },
+      "classify": {
+        "title": "Biom eines Polygons bestimmen",
+        "sub": "Verortet ein GeoJSON-Polygon in den eingelesenen Grenzdaten und liefert das erkannte Biom samt Herkunft.",
+        "run": "Bestimmen",
+        "running": "Wird bestimmt…",
+        "invalidJson": "Das ist kein gültiges JSON. Bitte eine GeoJSON-Polygon-Geometrie einfügen.",
+        "failed": "Bestimmung fehlgeschlagen. Geometrie und Backend prüfen.",
+        "confidence": "Konfidenz: {value}",
+        "matched": "Treffer: {value}"
+      }
+    }
+  },
+  "embed": {
+    "noRegion": "Keine Region angegeben.",
+    "notFound": "Region nicht gefunden.",
+    "failed": "Bewertung konnte nicht geladen werden.",
+    "open": "alpha öffnen",
+    "tev": "Gesamter Ökosystemwert",
+    "perYear": "/ Jahr",
+    "perYearAria": "pro Jahr",
+    "wholeArea": "pro Jahr, gesamte Fläche",
+    "standing": "Bestandswert",
+    "liability": "Bei Umwandlung (Verbindlichkeit)"
   }
 }

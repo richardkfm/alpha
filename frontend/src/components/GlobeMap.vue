@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { centroid } from '../data/geo.js'
@@ -21,6 +22,7 @@ const props = defineProps({
   selected: { type: Object, default: null },
 })
 const emit = defineEmits(['select'])
+const { t } = useI18n()
 
 const mapEl = ref(null)
 const spinning = ref(true)
@@ -859,16 +861,17 @@ watch(() => props.selected, (region) => updateSelection(region))
     <button
       class="spin-toggle"
       :class="{ active: spinning }"
+      :aria-pressed="spinning"
       @click="toggleSpin"
-      :title="spinning ? 'Pause rotation' : 'Resume rotation'"
+      :title="spinning ? t('globe.pause') : t('globe.resume')"
     >
-      <span class="spin-dot"></span>
-      {{ spinning ? 'Spinning' : 'Paused' }}
+      <span class="spin-dot" aria-hidden="true"></span>
+      {{ spinning ? t('globe.spinning') : t('globe.paused') }}
     </button>
     <transition name="cap">
       <div v-if="selectionActive" class="column-cap" aria-hidden="true">
         <span class="column-cap-bar"></span>
-        Column height = annual ecosystem value
+        {{ t('globe.columnCaption') }}
       </div>
     </transition>
   </div>
@@ -884,13 +887,13 @@ watch(() => props.selected, (region) => updateSelection(region))
   inset: 0;
   height: 100%;
   width: 100%;
-  background: radial-gradient(circle at 50% 40%, #0a1424 0%, var(--space, #05070d) 70%);
+  background: radial-gradient(circle at 50% 40%, var(--globe-core), var(--space) 70%);
 }
 
 .spin-toggle {
   position: absolute;
   left: 18px;
-  top: 74px;
+  top: var(--map-ctrl-top);
   z-index: 900;
   display: inline-flex;
   align-items: center;
@@ -936,11 +939,14 @@ watch(() => props.selected, (region) => updateSelection(region))
   }
 }
 
-/* Explains the 3D column metaphor while a region is raised. */
+/* Explains the 3D column metaphor while a region is raised. Centred in the
+   strip between the Biomes panel (282px incl. margin) and the side panel, so
+   neither covers it. */
 .column-cap {
   position: absolute;
-  left: 18px;
+  left: calc(141px + (100% - min(420px, 94vw)) / 2);
   bottom: 30px;
+  transform: translateX(-50%);
   z-index: 900;
   display: inline-flex;
   align-items: center;
@@ -972,12 +978,21 @@ watch(() => props.selected, (region) => updateSelection(region))
 .cap-enter-from,
 .cap-leave-to {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateX(-50%) translateY(8px);
+}
+@media (max-width: 860px) {
+  .column-cap {
+    display: none; /* the panel covers the map on phones */
+  }
 }
 </style>
 
 <!-- MapLibre renders controls/popups outside the scoped tree -> global theming. -->
 <style>
+/* Keep the zoom buttons clear of the floating topbar. */
+.maplibregl-ctrl-top-right {
+  top: calc(var(--map-ctrl-top) - 4px) !important;
+}
 .maplibregl-ctrl-group {
   background: var(--bg-glass) !important;
   border: 1px solid var(--border) !important;
