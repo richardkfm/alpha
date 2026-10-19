@@ -64,7 +64,11 @@ npm test
 
 Vitest, no jsdom — the formatters in `src/data/formatNumber.js` are deliberately
 pure so they can be tested without a Vue component context. The suite is mostly
-a locale × magnitude table; see below for what it is guarding.
+a locale × magnitude table; see below for what it is guarding. Component
+regression tests (`src/**/*.test.js` starting with
+`// @vitest-environment happy-dom`) mount single components with
+`@vue/test-utils` against a stubbed `fetch`; the maps themselves need WebGL and
+are not unit-tested.
 
 ## Numbers & localisation
 

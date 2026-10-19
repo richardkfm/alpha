@@ -19,7 +19,7 @@ const errorKey = ref('') // an "embed.*" message key, resolved at render time
 
 const params = new URLSearchParams(window.location.search)
 const regionId = params.get('region') || ''
-const currency = (params.get('currency') || 'USD').toUpperCase()
+const requestedCurrency = (params.get('currency') || 'USD').toUpperCase()
 // Host pages can request German/Spanish number conventions; anything unknown
 // falls back to English rather than letting Intl throw on a bad tag.
 const SUPPORTED = ['en', 'de', 'es']
@@ -55,10 +55,14 @@ const standingValue = computed(() => {
 })
 const liability = computed(() => region.value?.conversion_liability?.present_value ?? null)
 
-const opts = { locale, currency }
-const money = (n) => formatMoney(n, opts)
-const moneyFull = (n) => formatMoneyFull(n, opts)
-const hectares = (n) => formatHectares(n, opts)
+// Format in the currency the backend actually priced in, not the one the URL
+// asked for: the API falls back to USD for an unsupported code, so ?currency=XYZ
+// labelled dollar figures "XYZ", and ?currency=dollars made Intl throw and left
+// the card stuck on "Loading…".
+const opts = computed(() => ({ locale, currency: region.value?.currency || 'USD' }))
+const money = (n) => formatMoney(n, opts.value)
+const moneyFull = (n) => formatMoneyFull(n, opts.value)
+const hectares = (n) => formatHectares(n, opts.value)
 
 async function loadMessages() {
   try {
@@ -74,7 +78,9 @@ async function loadRegion() {
     return
   }
   try {
-    const res = await fetch(`/api/v1/regions/${encodeURIComponent(regionId)}?currency=${currency}`)
+    const res = await fetch(
+      `/api/v1/regions/${encodeURIComponent(regionId)}?currency=${encodeURIComponent(requestedCurrency)}`,
+    )
     if (res.status === 404) throw new Error('not-found')
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     region.value = (await res.json()).region

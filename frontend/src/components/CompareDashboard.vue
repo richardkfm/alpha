@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { YIELD_ROWS } from '../data/yields.js'
 import { barPct as barPctScale } from '../data/yieldScale.js'
@@ -107,21 +107,26 @@ const gridCols = computed(
 )
 
 // Seed the comparison with the three highest-intensity ecosystems so the view
-// is never empty on first open — or as soon as the catalogue arrives, if it was
-// still loading (or retried) when the view opened.
-function seed() {
-  if (!selectedIds.value.length && props.regions.length) {
-    selectedIds.value = [...props.regions]
+// is never empty on first open. Watched rather than done on mount: opened
+// before the catalogue had arrived, the board used to stay empty for good.
+// Seeds once, so clearing the selection isn't undone by a currency re-price.
+let seeded = false
+watch(
+  () => props.regions,
+  (regions) => {
+    if (seeded || !regions.length) return
+    seeded = true
+    if (selectedIds.value.length) return
+    selectedIds.value = [...regions]
       .sort(
         (a, b) =>
           b.total_ecosystem_value_per_sqm_year - a.total_ecosystem_value_per_sqm_year,
       )
       .slice(0, 3)
       .map((r) => r.id)
-  }
-}
-onMounted(seed)
-watch(() => props.regions.length, seed)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>

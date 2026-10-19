@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 // Shared yield-category metadata, also used by the Compare dashboard.
 import { YIELD_ROWS } from '../data/yields.js'
@@ -103,7 +103,17 @@ const assetValue = computed(() => {
 
 // Cost-of-conversion reframing: a permanent liability + red lines, never a
 // price to net against revenue.
-const liability = computed(() => props.valuation?.conversion_liability ?? null)
+// Its present value is the standing asset times the systemic premium at the
+// backend's reference rate, so it is recapitalised at the selected rate just
+// like the asset. Left at the payload figure, a 1% rate showed a liability
+// smaller than the asset it is a premium on.
+const liability = computed(() => {
+  const l = props.valuation?.conversion_liability
+  if (!l) return null
+  const refRate = props.valuation?.capitalized_value?.discount_rate
+  if (l.present_value == null || !refRate) return l
+  return { ...l, present_value: (l.present_value * refRate) / discountRate.value }
+})
 const systemicMult = computed(() => props.valuation?.systemic?.multiplier ?? 1)
 const redLines = computed(() => props.valuation?.red_lines ?? [])
 
@@ -136,7 +146,8 @@ const { compare } = useComparison()
 const cmp = computed(() => props.valuation?.comparisons ?? {})
 // The discount-rate buttons recapitalise the asset locally, so its multiple has
 // to move with it — at 1% the figure is three times what the backend ranked.
-// The other two figures come straight off the payload and need no rescaling.
+// The liability is recapitalised by the same factor; the annual flow comes
+// straight off the payload and needs no rescaling.
 const assetFactor = computed(() => {
   const ranked = props.valuation?.capitalized_value?.asset_value_total
   if (!ranked || assetValue.value == null) return 1
@@ -150,6 +161,7 @@ const tevCmp = computed(() => compare(cmp.value.total_ecosystem_value_per_year))
 // other. Without excluding what the asset just used they cite the same anchor.
 const liabCmp = computed(() =>
   compare(cmp.value.conversion_liability, {
+    factor: assetFactor.value,
     exclude: assetCmp.value ? [assetCmp.value.anchor] : [],
   }),
 )
@@ -175,6 +187,10 @@ const exporting = ref('')
 const exportError = ref('')
 async function downloadExport(format) {
   if (!props.valuation || exporting.value) return
+  // Snapshot the region being exported: the panel can switch to another one
+  // while the request is in flight, and the file used to be named after
+  // whichever region was showing when it arrived.
+  const region = props.region
   exporting.value = format
   exportError.value = ''
   try {
@@ -185,30 +201,38 @@ async function downloadExport(format) {
       currency: props.valuation.currency,
       locale: locale.value,
     })
-    if (props.region.name) params.set('name', props.region.name)
-    if (props.region.biome_key) params.set('biome', props.region.biome_key)
-    if (props.region.intactness != null) params.set('intactness', props.region.intactness)
+    if (region.name) params.set('name', region.name)
+    if (region.biome_key) params.set('biome', region.biome_key)
+    if (region.intactness != null) params.set('intactness', region.intactness)
     const res = await fetch(`/api/v1/valuation/export?${params}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(props.region.geojson),
+      body: JSON.stringify(region.geojson),
     })
     if (!res.ok) throw new Error(`export HTTP ${res.status}`)
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `alpha-${slugify(props.region.name || props.region.biome_key)}.${format}`
+    a.download = `alpha-${slugify(region.name || region.biome_key)}.${format}`
     document.body.appendChild(a)
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e) {
-    exportError.value = t('sidePanel.actions.exportFailed')
+    // Only report it against the region it belongs to.
+    if (props.region === region) exportError.value = t('sidePanel.actions.exportFailed')
   } finally {
     exporting.value = ''
   }
 }
+// A previous region's export failure must not follow the panel to the next one.
+watch(
+  () => props.region,
+  () => {
+    exportError.value = ''
+  },
+)
 
 // Embeddable widget: a copy-paste <iframe> snippet for a catalogue region (only
 // those carry a stable id). The iframe loads /embed.html from this same origin,

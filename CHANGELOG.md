@@ -149,6 +149,43 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
 - **Keyboard.** Esc closes the guide, then the side panel; inside the search
   field it clears the input first. Toggle buttons expose `aria-pressed`.
 
+### Bug fixes
+
+- **API input validation:** malformed GeoJSON (empty rings, non-numeric or NaN
+  positions, latitudes outside ±90°) now gets a `422` instead of a `500` or a
+  nonsense area, and an unknown explicit `biome` is a `422` rather than being
+  silently valued as tropical rainforest.
+- **Antimeridian-crossing polygons** (`178 … -179`) are valued and classified
+  correctly — previously ~119× too large and located half a planet away. The
+  frontend's centroid (globe fly-to, bubbles) got the same fix.
+- **Exports:** region names with `<`, non-Latin scripts (`Москва`) or accents
+  no longer crash the PDF/CSV download; the CSV neutralises formula-like names.
+- **Live data:** an unreachable FX/carbon feed is remembered for 60 s instead
+  of costing a 6 s timeout on every request; a `nan`/negative
+  `CARBON_PRICE_USD_PER_TCO2` override is ignored.
+- **ESV extraction:** a leading year (`In 2019, … $120 per ha`) is no longer
+  taken as the value, ISO codes (`EUR 150`) are recognised, and a malformed
+  LLM reply falls back to the regex extractor instead of a `500`.
+- **`ingest.py`** works again (it imported a removed `DATA_PATH`).
+- **UI races / stale state:** a slow valuation for a previously clicked region,
+  or an out-of-order currency re-price, can no longer overwrite the current
+  panel or catalogue; exports are named after the region actually exported;
+  Compare seeds itself when opened before the catalogue arrives; a failed
+  re-price keeps the map on screen.
+- **Outline mode** now really draws the detailed RESOLVE ecoregion borders
+  (both maps ignored the swapped geometry).
+- **Side panel:** the conversion liability follows the selected discount rate
+  like the standing asset it is a premium on; custom search areas no longer
+  offer a broken embed snippet.
+- **Embed widget:** an unsupported `?currency=` no longer crashes the card or
+  mislabels dollar figures.
+- **Search box:** rejects non-numeric input instead of dropping tokens, accepts
+  a trailing comma, and range-checks bounding boxes.
+- **Start-up:** blocked `localStorage` no longer prevents the app from loading.
+- **Deployment:** `scripts/gen-env.sh` generates a URL-safe password (base64's
+  `/` broke `DATABASE_URL`); the frontend image no longer copies a host
+  `node_modules` and installs from the lockfile.
+
 ## [0.4.0]
 
 ### Added

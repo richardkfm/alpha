@@ -39,7 +39,10 @@ function submit() {
     const { geometry, label } = parseAreaInput(query.value)
     open.value = false
     emit('search', {
-      id: 'custom',
+      // No `id`: only catalogue regions carry one, and SidePanel offers the
+      // embed snippet for anything with an id. 'custom' produced an
+      // /embed.html?region=custom iframe that could only say "Region not found."
+      id: null,
       name: translateLabel(label),
       region: t('search.customAreaLabel'),
       geojson: geometry,

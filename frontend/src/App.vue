@@ -191,31 +191,42 @@ async function fetchValuation(region) {
   return res.json()
 }
 
+// Only the newest panel request may write to it. Without this, clicking region
+// A and then B (or switching currency mid-flight) let A's slower response land
+// last: the panel titled B showed A's valuation, and A's `finally` cleared the
+// spinner while B was still loading.
+let panelRequest = 0
+
 // On region click, confirm backend connectivity via GET /health, then value it.
 // Connectivity and valuation are reported separately: a reachable backend that
 // rejects a geometry must not masquerade as "backend offline".
 async function onRegionSelect(region) {
+  const req = ++panelRequest
   selectedRegion.value = region
   valuation.value = null
   errorMsg.value = ''
   loading.value = true
   try {
     const health = await fetch('/health').then((r) => r.json())
+    if (req !== panelRequest) return
     backendOnline.value = health.status === 'ok'
   } catch (e) {
+    if (req !== panelRequest) return
     backendOnline.value = false
     errorMsg.value = t('errors.backendUnreachable')
     loading.value = false
     return
   }
   try {
-    valuation.value = await fetchValuation(region)
+    const result = await fetchValuation(region)
+    if (req === panelRequest) valuation.value = result
   } catch (e) {
+    if (req !== panelRequest) return
     errorMsg.value = e.message
       ? t('errors.valuationFailed', { message: e.message })
       : t('errors.valuationFailedGeneric')
   } finally {
-    loading.value = false
+    if (req === panelRequest) loading.value = false
   }
 }
 
@@ -227,19 +238,23 @@ async function setCurrency(code) {
   // maps don't rebuild — only the Compare numbers and a selected region update).
   loadRegions(code)
   if (!selectedRegion.value) return
+  const req = ++panelRequest
   loading.value = true
   errorMsg.value = ''
   try {
-    valuation.value = await fetchValuation(selectedRegion.value)
+    const result = await fetchValuation(selectedRegion.value)
+    if (req === panelRequest) valuation.value = result
   } catch (e) {
-    errorMsg.value = t('errors.repriceFailed', { code })
+    if (req === panelRequest) errorMsg.value = t('errors.repriceFailed', { code })
   } finally {
-    loading.value = false
+    if (req === panelRequest) loading.value = false
   }
 }
 
 function closePanel() {
+  panelRequest++ // a response still in flight belongs to a closed panel
   selectedRegion.value = null
+  loading.value = false
 }
 </script>
 

@@ -177,3 +177,17 @@ def test_regions_respects_currency():
     assert brl_amazon["total_ecosystem_value_per_year"] > usd_amazon[
         "total_ecosystem_value_per_year"
     ]
+
+
+def test_unknown_explicit_biome_is_rejected_not_valued_as_the_default():
+    for params, body in (
+        ({"biome": "mangroves"}, AMAZON),
+        ({}, {**AMAZON, "biome": "rainforest"}),
+    ):
+        res = client.post("/api/v1/valuation", params=params, json=body)
+        assert res.status_code == 422
+        assert "Unknown biome" in res.json()["detail"]
+    export = client.post(
+        "/api/v1/valuation/export", params={"format": "csv", "biome": "nope"}, json=AMAZON
+    )
+    assert export.status_code == 422
