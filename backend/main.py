@@ -331,7 +331,8 @@ def build_valuation(
 
     The single code path behind both ``POST /api/v1/valuation`` and the export
     endpoint, so an exported report carries byte-for-byte the same numbers as the
-    API. Raises ``HTTPException(422)`` for empty, malformed or zero-area geometry.
+    API. Raises ``HTTPException(422)`` for empty, malformed or zero-area geometry
+    and for an unknown explicit biome.
 
     **Phase 3:** when ``explicit_biome`` is falsy the biome is detected from the
     geometry against ingested RESOLVE ecoregion boundaries (+ curated seeds) via
@@ -342,10 +343,17 @@ def build_valuation(
     _require_valid_geometry(geometry)
 
     if explicit_biome:
+        if explicit_biome not in BIOMES:
+            # Silently valuing a typo ("mangroves") as the default biome returned
+            # a confident, wrong figure labelled "biome supplied by caller".
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown biome '{explicit_biome}'. Expected one of: {', '.join(BIOMES)}.",
+            )
         chosen_biome = explicit_biome
         classification = {
-            "biome_key": explicit_biome if explicit_biome in BIOMES else DEFAULT_BIOME,
-            "biome_label": BIOMES.get(explicit_biome, BIOMES[DEFAULT_BIOME])["label"],
+            "biome_key": explicit_biome,
+            "biome_label": BIOMES[explicit_biome]["label"],
             "confidence": "explicit",
             "source": "biome supplied by caller",
         }

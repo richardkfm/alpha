@@ -29,7 +29,7 @@ geographic area. Part of the [`alpha`](../README.md) monorepo.
 
 Request body — a GeoJSON polygon/multipolygon (bare geometry or wrapped `Feature`).
 Optional `biome` and `currency` may be set in the body or as query params
-(`?biome=mangrove&currency=EUR`); the query param wins.
+(`?biome=mangrove&currency=EUR`); the query param wins. An unknown `biome` key, or a malformed geometry, is a `422`.
 
 ```json
 { "type": "Polygon", "coordinates": [[[-60,-3],[-60,-2],[-59,-2],[-59,-3],[-60,-3]]] }
