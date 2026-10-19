@@ -35,6 +35,15 @@ def test_carbon_override_env(monkeypatch):
     assert meta["live"] is True
 
 
+def test_non_finite_or_negative_carbon_override_is_ignored(monkeypatch):
+    monkeypatch.delenv("ALPHA_LIVE_DATA", raising=False)
+    for bad in ("nan", "inf", "-40", "0", "abc"):
+        monkeypatch.setenv("CARBON_PRICE_USD_PER_TCO2", bad)
+        price, meta = live_data.get_carbon_price()
+        assert price == CARBON_PRICE_USD_PER_TCO2, bad
+        assert meta["live"] is False
+
+
 def test_market_snapshot_shape(monkeypatch):
     monkeypatch.delenv("ALPHA_LIVE_DATA", raising=False)
     snap = live_data.market_snapshot()

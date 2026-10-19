@@ -67,6 +67,7 @@ If the provider prices in EUR rather than USD, convert before serving it
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 import urllib.request
@@ -185,13 +186,17 @@ def get_carbon_price() -> Tuple[float, Dict[str, Any]]:
     override = os.environ.get("CARBON_PRICE_USD_PER_TCO2")
     if override:
         try:
-            return float(override), {
+            value = float(override)
+        except ValueError:
+            value = float("nan")
+        # float() also accepts "nan", "inf" and negatives, which would turn every
+        # valuation into nulls or negative carbon yields — ignore those too.
+        if math.isfinite(value) and value > 0:
+            return value, {
                 "source": "operator override (CARBON_PRICE_USD_PER_TCO2)",
                 "as_of": "configured",
                 "live": True,
             }
-        except ValueError:
-            pass
 
     url = os.environ.get("CARBON_PRICE_URL")
     if not live_enabled() or not url:
