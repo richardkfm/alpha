@@ -28,7 +28,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
 from typing import Any, Optional
@@ -95,7 +94,7 @@ class ESVRecord:
 
 
 def _normalise_currency(token: Optional[str]) -> Optional[str]:
-    if not token:
+    if not token or not isinstance(token, str):
         return None
     token = token.strip()
     if token.upper() in CURRENCIES:
@@ -278,7 +277,11 @@ def extract_esv_records(
             return {"backend": "llm", "model": model,
                     "records": [asdict(r) for r in records], "count": len(records),
                     "fallback_reason": None}
-        except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError) as exc:
+        except Exception as exc:  # noqa: BLE001 — any model/transport failure falls back
+            # Not just transport errors: a reachable server answering with an
+            # unexpected shape ({"message": null}, a bare list, non-string
+            # content) used to raise AttributeError/TypeError straight out as
+            # a 500 instead of the documented regex fallback.
             records = extract_deterministic(text)
             return {"backend": "deterministic", "model": None,
                     "records": [asdict(r) for r in records], "count": len(records),
