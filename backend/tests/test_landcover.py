@@ -6,6 +6,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from landcover import (  # noqa: E402
     DEFAULT_INTACTNESS,
+    LC100_LEGEND,
+    NATURAL_COVER,
     aggregate_intactness,
     dominant_biome_hint,
     land_cover_profile,
@@ -51,4 +53,27 @@ def test_aggregate_empty_returns_default():
 
 def test_dominant_biome_hint_picks_largest_class():
     assert dominant_biome_hint({112: 0.7, 40: 0.3}) == "tropical_rainforest"
-    assert dominant_biome_hint({40: 0.9, 112: 0.1}) is None  # cropland has no hint
+    assert dominant_biome_hint({40: 0.9, 112: 0.1}) == "cropland"
+    assert dominant_biome_hint({50: 0.9, 112: 0.1}) is None  # built-up has no hint
+
+
+def test_every_biome_hint_is_a_valuation_biome():
+    from reference_data import BIOMES
+
+    hints = {land_cover_profile(c)["biome_hint"] for c in LC100_LEGEND} - {None}
+    assert hints <= set(BIOMES)
+    # The biomes added after the legend was first written are reachable too.
+    assert {"cropland", "freshwater", "tundra", "desert", "boreal_forest"} <= hints
+    assert set(NATURAL_COVER) <= set(BIOMES)
+
+
+def test_natural_cover_is_intact_for_its_own_biome():
+    # Open desert is bare/sparse vegetation: degraded for a forest, intact for a desert.
+    assert aggregate_intactness({60: 1.0}) == 0.05
+    assert aggregate_intactness({60: 1.0}, biome_key="desert") == 1.0
+    assert aggregate_intactness({100: 1.0}, biome_key="tundra") == 1.0
+    assert aggregate_intactness({80: 1.0}, biome_key="freshwater") == 1.0
+    # Cropland cover inside a rainforest is still degraded.
+    assert aggregate_intactness({40: 1.0}, biome_key="tropical_rainforest") == 0.1
+    # Mixed: half intact desert, half urban.
+    assert aggregate_intactness({60: 0.5, 50: 0.5}, biome_key="desert") == 0.5

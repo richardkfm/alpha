@@ -50,7 +50,7 @@ relying on one in production, and expect endpoints/auth to drift over time):
    roughly an annual cadence) but the most authoritative multi-jurisdiction
    reference available. Better suited to periodically refreshing the
    *static* ``CARBON_PRICE_USD_PER_TCO2`` constant in
-   ``reference_data.py`` (the way it was bumped $30→$40) than to wiring as
+   ``reference_data.py`` (the way it was revised $30→$40→$80) than to wiring as
    a live ``CARBON_PRICE_URL``.
 
 Also still viable, unranked: **Ember/Sandbag's Carbon Price Viewer**
@@ -73,7 +73,7 @@ import urllib.request
 from typing import Any, Dict, Optional, Tuple
 
 from reference_data import CARBON_PRICE_USD_PER_TCO2 as REF_CARBON
-from reference_data import CURRENCIES, FX_AS_OF
+from reference_data import CARBON_PRICE_AS_OF, CARBON_PRICE_SOURCE, CURRENCIES, FX_AS_OF, FX_SOURCE
 
 _DEFAULT_FX_URL = "https://api.frankfurter.dev/v1/latest?base=USD"
 _cache: Dict[str, Tuple[float, Any]] = {}
@@ -166,8 +166,8 @@ def _extract_carbon_price(data: Any) -> Optional[float]:
 def get_carbon_price() -> Tuple[float, Dict[str, Any]]:
     """Return ``(price_usd_per_tco2, meta)``; meta carries source/as_of/live."""
     ref_meta = {
-        "source": "IPCC AR6 WGIII (2022) reference price",
-        "as_of": "2022",
+        "source": CARBON_PRICE_SOURCE,
+        "as_of": CARBON_PRICE_AS_OF,
         "live": False,
     }
 
@@ -217,7 +217,7 @@ def _static_rates() -> Dict[str, float]:
 
 def get_fx_rates() -> Tuple[Dict[str, float], Dict[str, Any]]:
     """Return ``(rates_per_usd, meta)`` covering every supported currency."""
-    static_meta = {"source": "static reference rates", "as_of": FX_AS_OF, "live": False}
+    static_meta = {"source": f"static reference rates ({FX_SOURCE})", "as_of": FX_AS_OF, "live": False}
     if not live_enabled():
         return _static_rates(), static_meta
 
