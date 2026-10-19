@@ -26,7 +26,7 @@ const props = defineProps({
   // shows magnitude vs the strongest biome, not just composition within this one.
   ceilings: { type: Object, default: () => ({}) },
 })
-const emit = defineEmits(['close', 'update:showLiability', 'update:showSystemic', 'update:showRedLines'])
+const emit = defineEmits(['close', 'retry', 'update:showLiability', 'update:showSystemic', 'update:showRedLines'])
 
 // Intl places the currency symbol itself (de wants "1.234 €", not "€1.234"), so
 // the API's currency_symbol field is no longer read here.
@@ -237,11 +237,16 @@ async function copyEmbed() {
 </script>
 
 <template>
-  <aside class="panel">
+  <aside class="panel" :aria-label="region.name" :aria-busy="loading">
     <header class="panel-head">
       <div class="title-row">
         <h2>{{ region.name }}</h2>
-        <button class="close" @click="$emit('close')" :aria-label="t('sidePanel.close')">×</button>
+        <button
+          class="close"
+          @click="$emit('close')"
+          :aria-label="t('sidePanel.close')"
+          :title="t('sidePanel.closeTitle')"
+        >×</button>
       </div>
       <div class="subtitle-row">
         <p class="region">{{ region.region }}</p>
@@ -286,7 +291,16 @@ async function copyEmbed() {
       <div class="sk-hero"></div>
       <span class="sk-note">{{ t('sidePanel.loading.note') }}</span>
     </div>
-    <div v-else-if="error" class="state err">{{ error }}</div>
+    <div v-else-if="error" class="state err" role="alert">
+      <span class="state-icon" aria-hidden="true">!</span>
+      <span class="state-title">
+        {{ backendOnline === false ? t('sidePanel.error.offlineTitle') : t('sidePanel.error.title') }}
+      </span>
+      <span class="state-msg">{{ error }}</span>
+      <button class="state-retry" :disabled="loading" @click="emit('retry')">
+        {{ t('sidePanel.error.retry') }}
+      </button>
+    </div>
 
     <template v-else-if="valuation">
       <section v-if="classification" class="biome" :style="{ '--biome': biomeHue }">
@@ -486,7 +500,7 @@ async function copyEmbed() {
   height: 100%;
   width: min(420px, 94vw);
   overflow-y: auto;
-  padding: 78px 22px 30px; /* clears the floating topbar */
+  padding: calc(var(--topbar-h) + 6px) 22px 30px; /* clears the floating topbar */
   background: linear-gradient(180deg, var(--bg-panel), var(--bg-deep));
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-panel);
@@ -593,7 +607,7 @@ async function copyEmbed() {
 }
 .act-err {
   margin: -6px 0 12px;
-  color: #f87171;
+  color: var(--danger);
   font-size: 0.74rem;
 }
 .embed-box {
@@ -633,7 +647,7 @@ async function copyEmbed() {
 }
 .embed-copy:hover {
   background: var(--accent);
-  color: #04120c;
+  color: var(--on-accent);
 }
 .conn {
   flex: none;
@@ -654,17 +668,17 @@ async function copyEmbed() {
   background: var(--text-faint);
 }
 .conn.ok {
-  color: var(--teal);
+  color: var(--accent);
 }
 .conn.ok .conn-dot {
-  background: var(--teal);
-  box-shadow: 0 0 6px var(--teal);
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
 }
 .conn.down {
-  color: #f87171;
+  color: var(--danger);
 }
 .conn.down .conn-dot {
-  background: #f87171;
+  background: var(--danger);
 }
 
 /* Biome identity card, keyed to the biome's map colour. */
@@ -782,7 +796,56 @@ async function copyEmbed() {
   color: var(--text-muted);
 }
 .state.err {
-  color: #f87171;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+}
+.state-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 900;
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+}
+.state-title {
+  font-size: var(--fs-md);
+  font-weight: 800;
+  color: var(--text);
+}
+.state-msg {
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.state-retry {
+  margin-top: var(--space-1);
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.state-retry:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.state-retry:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 /* loading skeleton */
@@ -921,11 +984,11 @@ async function copyEmbed() {
   border-radius: var(--radius);
   background: radial-gradient(
       120% 140% at 0% 0%,
-      rgba(45, 212, 191, 0.14),
+      var(--accent-bg),
       transparent 60%
     ),
     var(--bg-elevated);
-  border: 1px solid rgba(45, 212, 191, 0.4);
+  border: 1px solid var(--accent-border);
   box-shadow: var(--shadow-glow);
   overflow: hidden;
 }
@@ -937,7 +1000,7 @@ async function copyEmbed() {
   width: 140px;
   height: 140px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(45, 212, 191, 0.18), transparent 70%);
+  background: radial-gradient(circle, var(--accent-bg), transparent 70%);
   pointer-events: none;
 }
 .tev-label {
@@ -1010,7 +1073,7 @@ async function copyEmbed() {
   color: var(--gold);
 }
 .liab .cmp-x {
-  color: #f87171;
+  color: var(--danger);
 }
 .tev-annual {
   display: flex;
@@ -1038,9 +1101,9 @@ async function copyEmbed() {
   margin: 0 0 16px;
   padding: 14px 16px;
   border-radius: var(--radius);
-  background: radial-gradient(120% 140% at 100% 0%, rgba(231, 200, 115, 0.14), transparent 60%),
+  background: radial-gradient(120% 140% at 100% 0%, var(--gold-bg), transparent 60%),
     var(--bg-elevated);
-  border: 1px solid rgba(231, 200, 115, 0.4);
+  border: 1px solid var(--gold-border);
 }
 .asset-head {
   display: flex;
@@ -1075,7 +1138,7 @@ async function copyEmbed() {
 }
 .asset-rates button.on {
   background: var(--gold);
-  color: #1c1606;
+  color: var(--on-gold);
 }
 .asset-value {
   font-family: 'Spline Sans Mono', ui-monospace, monospace;
@@ -1101,9 +1164,9 @@ async function copyEmbed() {
   margin: 18px 0;
   padding: 16px;
   border-radius: var(--radius);
-  background: linear-gradient(180deg, rgba(248, 113, 113, 0.06), transparent),
+  background: linear-gradient(180deg, var(--danger-bg), transparent),
     var(--bg-elevated);
-  border: 1px solid rgba(248, 113, 113, 0.32);
+  border: 1px solid var(--danger-border);
 }
 .conv-header {
   display: flex;
@@ -1118,7 +1181,7 @@ async function copyEmbed() {
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.3px;
-  color: #f8a8a8;
+  color: var(--danger-text);
 }
 .conv-modes {
   display: flex;
@@ -1129,16 +1192,16 @@ async function copyEmbed() {
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(248, 113, 113, 0.35);
+  border: 1px solid var(--danger-border);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   transition: color 0.15s var(--ease), background 0.15s var(--ease), border-color 0.15s var(--ease);
 }
 .conv-modes button.on {
-  background: rgba(248, 113, 113, 0.18);
-  border-color: rgba(248, 113, 113, 0.6);
-  color: #f8a8a8;
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger-text);
 }
 .liab {
   display: flex;
@@ -1156,7 +1219,7 @@ async function copyEmbed() {
   font-size: 1.7rem;
   font-weight: 800;
   line-height: 1.05;
-  color: #f87171;
+  color: var(--danger);
 }
 .liab-value em {
   font-style: normal;
@@ -1188,15 +1251,15 @@ async function copyEmbed() {
   margin-top: 12px;
   padding: 11px 13px;
   border-radius: var(--radius-sm);
-  background: rgba(248, 113, 113, 0.07);
-  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
 }
 .rl-head {
   display: block;
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.2px;
-  color: #f8a8a8;
+  color: var(--danger-text);
   margin-bottom: 7px;
   cursor: help;
 }
@@ -1214,7 +1277,7 @@ async function copyEmbed() {
   line-height: 1.4;
 }
 .redlines li strong {
-  color: #f8a8a8;
+  color: var(--danger-text);
 }
 
 .callout {

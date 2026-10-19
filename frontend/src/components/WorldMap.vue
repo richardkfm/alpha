@@ -13,12 +13,21 @@ const props = defineProps({
   // 'polygons' | 'bubbles' | 'outline'
   displayStyle: { type: String, default: 'polygons' },
   visibleLayers: { type: Object, default: () => ({}) },
+  // Follows the app theme so the basemap matches the UI chrome (Dark/Positron).
+  isDark: { type: Boolean, default: true },
 })
 const emit = defineEmits(['select'])
 const mapEl = ref(null)
 let map = null
 const leafletLayers = {} // id -> L.GeoJSON
 let bubbleLayer = null // L.LayerGroup of circle markers
+let glLayer = null // MapLibre basemap layer (once loaded)
+
+const BASEMAP_STYLES = {
+  dark: 'https://tiles.openfreemap.org/styles/dark',
+  light: 'https://tiles.openfreemap.org/styles/positron',
+}
+const basemapUrl = () => (props.isDark ? BASEMAP_STYLES.dark : BASEMAP_STYLES.light)
 
 onMounted(() => {
   map = L.map(mapEl.value, {
@@ -28,15 +37,16 @@ onMounted(() => {
     zoomControl: true,
   })
 
-  // Dark basemap keeps the neon overlays as the focal point: OpenFreeMap's Dark
-  // vector style (free, no API key), drawn through MapLibre inside Leaflet.
-  // Loaded on demand so MapLibre stays out of the main bundle.
+  // OpenFreeMap vector basemap (free, no API key), drawn through MapLibre inside
+  // Leaflet — Dark by default so the neon overlays stay the focal point,
+  // Positron in the light theme. Loaded on demand so MapLibre stays out of the
+  // main bundle.
   Promise.all([
     import('@maplibre/maplibre-gl-leaflet'),
     import('maplibre-gl/dist/maplibre-gl.css'),
   ]).then(([{ maplibreGL }]) => {
     if (!map) return
-    maplibreGL({ style: 'https://tiles.openfreemap.org/styles/dark' }).addTo(map)
+    glLayer = maplibreGL({ style: basemapUrl() }).addTo(map)
   })
 
   // Build one Leaflet layer per thematic layer from the shared registry, each
@@ -143,10 +153,15 @@ function applyStyle() {
 watch(() => props.visibleLayers, applyStyle, { deep: true })
 watch(() => props.displayStyle, applyStyle)
 watch(() => props.points, applyStyle)
+watch(
+  () => props.isDark,
+  () => glLayer?.getMaplibreMap?.()?.setStyle(basemapUrl()),
+)
 
 onBeforeUnmount(() => {
   if (map) map.remove()
   map = null
+  glLayer = null
 })
 </script>
 
@@ -182,7 +197,18 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .region-overlay--hover {
-  filter: drop-shadow(0 0 10px rgba(45, 212, 191, 0.55));
+  filter: drop-shadow(0 0 10px var(--accent-border));
+}
+/* Leaflet makes paths focusable; a click otherwise leaves the browser's
+   rectangular focus ring around the whole shape's bounding box. */
+.leaflet-interactive:focus {
+  outline: none;
+}
+
+/* Keep the zoom buttons clear of the floating brand pill. */
+.leaflet-top.leaflet-left {
+  top: calc(var(--map-ctrl-top) - 4px);
+  left: 8px;
 }
 
 .region-tooltip.leaflet-tooltip {
@@ -206,6 +232,7 @@ onBeforeUnmount(() => {
 /* Leaflet zoom + attribution chrome, themed. */
 .leaflet-control-zoom a {
   background: var(--bg-glass) !important;
+  font-family: inherit;
   color: var(--text) !important;
   border: 1px solid var(--border) !important;
   backdrop-filter: blur(10px);
@@ -224,7 +251,7 @@ onBeforeUnmount(() => {
 .leaflet-control-attribution {
   background: var(--bg-glass) !important;
   color: var(--text-faint) !important;
-  border-radius: 8px 0 0 0;
+  border-radius: var(--radius-sm) 0 0 0;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
