@@ -189,3 +189,37 @@ def test_export_rejects_bad_format():
 def test_export_rejects_empty_geometry():
     res = client.post("/api/v1/valuation/export?format=csv", json={})
     assert res.status_code == 422
+
+
+# --- user-supplied report names (regressions) ------------------------------
+def test_filename_slug_is_ascii_so_it_fits_a_content_disposition_header():
+    assert export.filename_slug({}, "São Paulo green belt") == "sao-paulo-green-belt"
+    assert export.filename_slug({"biome_key": "boreal_forest"}, "Москва") == "boreal-forest"
+    assert export.filename_slug({}, "東京") == "valuation"
+
+
+def test_export_with_a_non_latin_name_downloads():
+    for fmt in ("csv", "pdf"):
+        for name in ("Москва", "São Paulo", "東京湾"):
+            res = client.post(
+                "/api/v1/valuation/export", params={"format": fmt, "name": name}, json=AMAZON
+            )
+            assert res.status_code == 200, (fmt, name)
+            assert res.headers["content-disposition"].isascii()
+
+
+def test_pdf_title_with_markup_characters_does_not_crash():
+    for name in ("Lakes <north>", "A & B", "x</para>"):
+        res = client.post(
+            "/api/v1/valuation/export", params={"format": "pdf", "name": name}, json=AMAZON
+        )
+        assert res.status_code == 200, name
+        assert res.content[:4] == b"%PDF"
+
+
+def test_csv_region_name_cannot_inject_a_spreadsheet_formula():
+    sheet = export.to_csv(_result(), name='=HYPERLINK("http://evil","x")')
+    region = next(r for r in csv.reader(io.StringIO(sheet)) if r and r[0] == "Region")
+    assert region[1].startswith("'=")
+    plain = export.to_csv(_result(), name="Amazon")
+    assert next(r for r in csv.reader(io.StringIO(plain)) if r and r[0] == "Region")[1] == "Amazon"
