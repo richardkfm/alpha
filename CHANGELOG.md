@@ -12,6 +12,41 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
 
 ## [Unreleased]
 
+### Data & accuracy
+
+- **Full recalibration of every biome coefficient** (`backend/reference_data.py`,
+  `backend/METHODOLOGY.md`). Non-carbon values are now derived in code from the
+  published ESVD table cells they rest on (Brander et al. 2024; de Groot et al.
+  2012 medians), on a median basis, with ≥3 value estimates per cell. All figures
+  are restated in **2024 USD** (BLS CPI-U). The 15 of 55 coefficients without
+  enough evidence are kept as **flagged estimates**, and every valuation now
+  reports `basis` / `evidence_n` / `price_year` per category. TEV per hectare
+  moved substantially: rainforest −37%, mangrove +237%, wetland −67%,
+  freshwater −72%, peri-urban +344% (table in METHODOLOGY §10).
+- **Carbon price $40 → $80/tCO2** (2024 USD): the low end of the IPCC AR6 WGIII
+  2 °C-pathway range for 2030, close to the 2025 EU ETS average. The old
+  justification was wrong on two counts: $40 was below the AR6 range, and
+  China's ETS was quoted at ~$30–40 when it trades at ~$9.
+- **Sequestration** now comes from Pan et al. 2024 (forests: tropical 2.4,
+  temperate 3.2, boreal 1.0 tCO2/ha/yr) and the IPCC 2013 Wetlands Supplement
+  (mangrove 5.9). Cropland (IPCC Tier 1) and tundra (Natali et al. 2019) are set
+  to 0.
+- **Carbon debt** no longer assumes the entire 1 m soil stock is released. It is
+  now vegetation × intactness plus soil × an IPCC-based release fraction, with
+  pools from IPCC SRLULUCF / the Wetlands Supplement.
+- **Double counting and scope fixes:** ESVD "climate regulation" (carbon) is no
+  longer counted on top of carbon capture, and drinking-water supply
+  (provisioning) no longer inflates freshwater.
+- **Static FX refreshed** to the ECB 2026-10-16 rates (EUR 0.8887, BRL 5.0828).
+  The old EUR 0.92 "2025-12" rate was stale.
+- **Land-cover legend** (`backend/landcover.py`) now hints at the
+  boreal/cropland/freshwater/tundra/desert biomes. Optional biome-aware
+  intactness stops a biome's own natural cover (e.g. bare ground in a desert)
+  being scored as degraded.
+- **Data Hub provenance** (`backend/datasets.py`, `live_data.py`) cites the
+  new sources and dates. New `tests/test_reference_data.py` pins every
+  coefficient and checks unit, FX and CPI round-trips and totals = Σ services.
+
 ### Changed
 
 - **Carbon price reference bumped $30 → $40/tCO2** (`backend/reference_data.py`,

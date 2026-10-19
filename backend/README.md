@@ -45,26 +45,27 @@ Response:
   "currency_symbol": "$",
   "area": { "sqm": 12290000000.0, "hectares": 1229000.0 },
   "yields_per_sqm_year": {
-    "carbon_capture": 0.0092,
-    "climate_regulation": 0.036,
-    "water_filtration": 0.02,
-    "biodiversity_premium": 0.05,
-    "soil_nutrient_value": 0.012
+    "carbon_capture": 0.0192,
+    "climate_regulation": 0.0006,
+    "water_filtration": 0.0011,
+    "biodiversity_premium": 0.0569,
+    "soil_nutrient_value": 0.0017
   },
-  "yields_total_year": { "carbon_capture": 113068000.0, "...": "..." },
-  "total_ecosystem_value_per_sqm_year": 0.1272,
-  "total_ecosystem_value_per_year": 1563288000.0,
-  "fx": { "base": "USD", "rate_per_usd": 1.0, "as_of": "2025-12" },
+  "yields_total_year": { "carbon_capture": 235968000.0, "...": "..." },
+  "total_ecosystem_value_per_sqm_year": 0.0795,
+  "total_ecosystem_value_per_year": 977055000.0,
+  "fx": { "base": "USD", "rate_per_usd": 1.0, "as_of": "2026-10-16" },
   "methodology": { "carbon_capture": { "formula": "...", "citation": "..." } },
-  "methodology_note": "Phase 2 valuation engine. ... See backend/METHODOLOGY.md."
+  "methodology_note": "Per-biome regulating, habitat and non-use values from the ESVD ... See backend/METHODOLOGY.md."
 }
 ```
 
 The geodesic area is computed from the polygon (spherical-excess formula), the
 biome's reference yields are scaled by area, and everything is converted to the
 requested currency. **Formulas, reference values, and citations are documented in
-[`METHODOLOGY.md`](./METHODOLOGY.md)** (sources: de Groot et al. 2012 / ESVD,
-Costanza et al. 2014, Pan et al. 2011, IPCC AR6 WGIII).
+[`METHODOLOGY.md`](./METHODOLOGY.md)** (sources: ESVD — Brander et al. 2024 and
+de Groot et al. 2012; Pan et al. 2024; IPCC Wetlands Supplement 2013; IPCC AR6
+WGIII). All USD figures are 2024 dollars.
 
 Code layout:
 
@@ -129,8 +130,8 @@ extractor — see [`INGESTION.md`](./INGESTION.md). **Phase 4** is underway: liv
 feeds, CSV/PDF report export (`/api/v1/valuation/export`) and the embeddable widget
 (`/api/v1/regions/{id}` + `/embed.html`) are shipped. The carbon price now has a
 wiring path too — `CARBON_PRICE_URL` accepts most providers' payloads as-is
-(`live_data.py`), and the static reference was bumped from $30 to $40/tCO2 to
-track where compliance markets actually are (EU ETS ~$65-95/tCO2 in
-2025-2026) — but there's still no single free/keyless spot feed to default to
+(`live_data.py`), and the static reference is $80/tCO2 (2024 USD) — the low end
+of the IPCC AR6 2 °C-pathway range and close to the 2025 EU ETS average — but
+there's still no single free/keyless spot feed to default to
 out of the box, so an operator has to point it at one (see `.env.example`).
 API hardening (versioning, auth, rate limiting) is still to do.
