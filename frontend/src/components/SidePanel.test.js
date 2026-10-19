@@ -71,3 +71,24 @@ describe('SidePanel export', () => {
     expect(panel.find('.act-err').exists()).toBe(false)
   })
 })
+
+describe('SidePanel discount rate', () => {
+  const digits = (s) => Number(s.replace(/[^0-9]/g, ''))
+
+  it('recapitalises the conversion liability along with the standing asset', async () => {
+    const panel = mountPanel()
+    const v = fixture.valuation
+    // At the reference rate both figures are the payload's own.
+    expect(digits(panel.find('.liab-value').attributes('title'))).toBe(
+      Math.round(v.conversion_liability.present_value),
+    )
+    const rates = panel.findAll('.asset-rates button')
+    await rates[0].trigger('click') // 1%
+    const asset = digits(panel.find('.asset-value').attributes('title'))
+    const liab = digits(panel.find('.liab-value').attributes('title'))
+    expect(asset).toBe(Math.round(v.total_ecosystem_value_per_year / 0.01))
+    // The liability is the asset times the systemic premium, so it moves with
+    // the rate too — it used to stay at the 3% figure and dip below the asset.
+    expect(liab / asset).toBeCloseTo(v.systemic.multiplier, 2)
+  })
+})

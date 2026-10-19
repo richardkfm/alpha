@@ -103,7 +103,17 @@ const assetValue = computed(() => {
 
 // Cost-of-conversion reframing: a permanent liability + red lines, never a
 // price to net against revenue.
-const liability = computed(() => props.valuation?.conversion_liability ?? null)
+// Its present value is the standing asset times the systemic premium at the
+// backend's reference rate, so it is recapitalised at the selected rate just
+// like the asset. Left at the payload figure, a 1% rate showed a liability
+// smaller than the asset it is a premium on.
+const liability = computed(() => {
+  const l = props.valuation?.conversion_liability
+  if (!l) return null
+  const refRate = props.valuation?.capitalized_value?.discount_rate
+  if (l.present_value == null || !refRate) return l
+  return { ...l, present_value: (l.present_value * refRate) / discountRate.value }
+})
 const systemicMult = computed(() => props.valuation?.systemic?.multiplier ?? 1)
 const redLines = computed(() => props.valuation?.red_lines ?? [])
 
@@ -136,7 +146,8 @@ const { compare } = useComparison()
 const cmp = computed(() => props.valuation?.comparisons ?? {})
 // The discount-rate buttons recapitalise the asset locally, so its multiple has
 // to move with it — at 1% the figure is three times what the backend ranked.
-// The other two figures come straight off the payload and need no rescaling.
+// The liability is recapitalised by the same factor; the annual flow comes
+// straight off the payload and needs no rescaling.
 const assetFactor = computed(() => {
   const ranked = props.valuation?.capitalized_value?.asset_value_total
   if (!ranked || assetValue.value == null) return 1
@@ -150,6 +161,7 @@ const tevCmp = computed(() => compare(cmp.value.total_ecosystem_value_per_year))
 // other. Without excluding what the asset just used they cite the same anchor.
 const liabCmp = computed(() =>
   compare(cmp.value.conversion_liability, {
+    factor: assetFactor.value,
     exclude: assetCmp.value ? [assetCmp.value.anchor] : [],
   }),
 )
