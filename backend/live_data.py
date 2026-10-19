@@ -97,9 +97,20 @@ def _cached(key: str) -> Optional[Any]:
     return None
 
 
-def _store(key: str, value: Any) -> Any:
-    _cache[key] = (time.time() + _ttl(), value)
+# How long a failed fetch is remembered before the feed is tried again. Without
+# it an unreachable upstream was re-fetched on every request, so each
+# valuation (and /reference, which reads both feeds twice) blocked on the full
+# network timeout — 12-24 s per call on an offline host with live data on.
+_FAILURE_RETRY_S = 60.0
+
+
+def _store(key: str, value: Any, ttl: Optional[float] = None) -> Any:
+    _cache[key] = (time.time() + (_ttl() if ttl is None else ttl), value)
     return value
+
+
+def _store_failure(key: str, value: Any) -> Any:
+    return _store(key, value, ttl=min(_ttl(), _FAILURE_RETRY_S))
 
 
 def _fetch_json(url: str, timeout: float = 6.0) -> Dict[str, Any]:
@@ -205,7 +216,10 @@ def get_carbon_price() -> Tuple[float, Dict[str, Any]]:
             (price, {"source": url, "as_of": str(as_of), "live": True}),
         )
     except Exception:
-        return REF_CARBON, {**ref_meta, "note": "live carbon feed unreachable or implausible — using reference price"}
+        return _store_failure(
+            "carbon",
+            (REF_CARBON, {**ref_meta, "note": "live carbon feed unreachable or implausible — using reference price"}),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +259,10 @@ def get_fx_rates() -> Tuple[Dict[str, float], Dict[str, Any]]:
         }
         return _store("fx", (rates, meta))
     except Exception:
-        return _static_rates(), {**static_meta, "note": "live FX unreachable — using reference rates"}
+        return _store_failure(
+            "fx",
+            (_static_rates(), {**static_meta, "note": "live FX unreachable — using reference rates"}),
+        )
 
 
 def market_snapshot() -> Dict[str, Any]:
