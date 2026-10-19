@@ -310,7 +310,9 @@ function closePanel() {
           <span class="stage-spinner"></span>
           {{ t('stage.loading') }}
         </div>
-        <div v-else-if="regionsError" class="stage-state err">{{ regionsError }}</div>
+        <!-- Only when there is no catalogue at all: a failed currency re-price
+             keeps the already-loaded map (and any open panel) on screen. -->
+        <div v-else-if="regionsError && !regionsLoaded" class="stage-state err">{{ regionsError }}</div>
 
         <template v-else>
           <GlobeMap

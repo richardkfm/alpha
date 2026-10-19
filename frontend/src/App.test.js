@@ -23,11 +23,15 @@ function valuationFor(name, currency = 'USD') {
 // Each POST /api/v1/valuation waits until the test settles it explicitly, so
 // the test decides which response lands first.
 let pending
+let regionsFail
 beforeEach(() => {
   pending = []
+  regionsFail = () => false
   vi.stubGlobal('fetch', vi.fn((url, opts = {}) => {
     if (url === '/health') return Promise.resolve(json({ status: 'ok', version: '0.4.0' }))
-    if (url.startsWith('/api/v1/regions')) return Promise.resolve(json({ regions: [] }))
+    if (url.startsWith('/api/v1/regions')) {
+      return Promise.resolve(regionsFail(url) ? json({}, 502) : json({ regions: [] }))
+    }
     if (url.startsWith('/api/v1/valuation')) {
       const body = JSON.parse(opts.body)
       const currency = new URLSearchParams(url.split('?')[1]).get('currency')
@@ -112,5 +116,29 @@ describe('side panel request ordering', () => {
     settle('Basin', 'EUR')
     await flushPromises()
     expect(app.findComponent(SidePanel).props('valuation').currency).toBe('BRL')
+  })
+})
+
+describe('catalogue re-price failure', () => {
+  it('keeps the map and the open panel instead of replacing the stage with an error', async () => {
+    const app = await mountApp()
+    app.findComponent(SearchBar).vm.$emit('search', area('Basin'))
+    await flushPromises()
+    settle('Basin')
+    await flushPromises()
+    expect(app.find('.stage-state.err').exists()).toBe(false)
+
+    regionsFail = (url) => url.includes('currency=EUR')
+    await app.findAll('.currency-btn').find((b) => b.text() === 'EUR').trigger('click')
+    await flushPromises()
+    expect(app.find('.stage-state.err').exists()).toBe(false)
+    expect(app.findComponent(SearchBar).exists()).toBe(true)
+    expect(app.findComponent(SidePanel).exists()).toBe(true)
+  })
+
+  it('still shows the error when the catalogue never loaded at all', async () => {
+    regionsFail = () => true
+    const app = await mountApp()
+    expect(app.find('.stage-state.err').exists()).toBe(true)
   })
 })
