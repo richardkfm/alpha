@@ -64,3 +64,22 @@ def test_empty_text_is_handled():
     out = extract_esv_records("   ")
     assert out["count"] == 0
     assert out["records"] == []
+
+
+def test_a_leading_year_is_not_mistaken_for_the_value():
+    [rec] = extract_deterministic("In 2019, carbon sequestration was valued at $120 per ha per year.")
+    assert rec.value == 120.0
+    assert rec.currency == "USD"
+
+
+def test_unit_only_figure_is_the_one_before_the_unit():
+    [rec] = extract_deterministic("A 2021 survey put soil erosion control at 85 per hectare.")
+    assert rec.value == 85.0
+    assert rec.currency is None
+
+
+def test_iso_currency_codes_are_recognised():
+    [rec] = extract_deterministic("Soil erosion prevention: EUR 150 per ha.")
+    assert (rec.value, rec.currency) == (150.0, "EUR")
+    [rec] = extract_deterministic("Carbon storage was worth BRL 2,400 per ha per year.")
+    assert (rec.value, rec.currency) == (2400.0, "BRL")
