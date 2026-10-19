@@ -41,6 +41,7 @@ from biome_classifier import boundary_source, classify_geometry
 from datasets import data_catalog
 import export as export_report
 import json as _json
+import math as _math
 import os as _os
 from esv_extraction import extract_esv_records
 from live_data import get_carbon_price, get_fx_rates, market_snapshot
@@ -260,6 +261,65 @@ def datasets() -> Dict[str, Any]:
     return data_catalog()
 
 
+def _is_coordinate(value: Any) -> bool:
+    """A finite JSON number (``bool`` is an ``int`` subclass but not a number here)."""
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and _math.isfinite(value)
+    )
+
+
+def _polygon_geometry_error(geometry: Dict[str, Any]) -> Optional[str]:
+    """Why a Polygon/MultiPolygon's coordinates are malformed, or ``None`` if fine.
+
+    The area and classification maths index straight into the coordinate arrays,
+    so a structurally broken geometry (an empty ring, a bare number where a
+    ``[lon, lat]`` pair belongs, strings, NaN, a latitude of 200) used to escape
+    as an unhandled 500 or silently produce a nonsense area. Other geometry types
+    are left to the existing zero-area / default-classification handling.
+    """
+    if geometry.get("type") == "Feature":
+        geometry = geometry.get("geometry") or {}
+    if not isinstance(geometry, dict):
+        return "Feature geometry must be a GeoJSON object."
+    gtype = geometry.get("type")
+    if gtype not in ("Polygon", "MultiPolygon"):
+        return None
+    coords = geometry.get("coordinates")
+    polygons = [coords] if gtype == "Polygon" else coords
+    if not isinstance(polygons, list):
+        return "MultiPolygon coordinates must be an array of polygons."
+    for poly in polygons:
+        if not isinstance(poly, list) or not poly:
+            return "Each polygon needs at least an exterior ring."
+        for ring in poly:
+            if not isinstance(ring, list) or len(ring) < 3:
+                return "Each ring needs at least three [lon, lat] positions."
+            for pos in ring:
+                if (
+                    not isinstance(pos, list)
+                    or len(pos) < 2
+                    or not (_is_coordinate(pos[0]) and _is_coordinate(pos[1]))
+                ):
+                    return "Each position must be a [lon, lat] pair of finite numbers."
+                if not -90.0 <= pos[1] <= 90.0:
+                    return f"Latitude {pos[1]} is out of range — expected [lon, lat] with -90 <= lat <= 90."
+    return None
+
+
+def _require_valid_geometry(geometry: Dict[str, Any]) -> None:
+    """Raise a 422 for a missing or malformed geometry (see ``_polygon_geometry_error``)."""
+    if not geometry:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide a GeoJSON Polygon/MultiPolygon geometry (type+coordinates or a Feature).",
+        )
+    reason = _polygon_geometry_error(geometry)
+    if reason:
+        raise HTTPException(status_code=422, detail=f"Invalid GeoJSON geometry: {reason}")
+
+
 def build_valuation(
     geometry: Dict[str, Any],
     explicit_biome: Optional[str],
@@ -271,7 +331,7 @@ def build_valuation(
 
     The single code path behind both ``POST /api/v1/valuation`` and the export
     endpoint, so an exported report carries byte-for-byte the same numbers as the
-    API. Raises ``HTTPException(422)`` for empty or zero-area geometry.
+    API. Raises ``HTTPException(422)`` for empty, malformed or zero-area geometry.
 
     **Phase 3:** when ``explicit_biome`` is falsy the biome is detected from the
     geometry against ingested RESOLVE ecoregion boundaries (+ curated seeds) via
@@ -279,11 +339,7 @@ def build_valuation(
     detection (source + confidence) is returned under ``classification``. An
     explicit biome wins and is echoed back as an ``"explicit"`` classification.
     """
-    if not geometry:
-        raise HTTPException(
-            status_code=422,
-            detail="Provide a GeoJSON Polygon/MultiPolygon geometry (type+coordinates or a Feature).",
-        )
+    _require_valid_geometry(geometry)
 
     if explicit_biome:
         chosen_biome = explicit_biome
@@ -405,11 +461,7 @@ def classify(body: ValuationRequest) -> Dict[str, Any]:
     logic the valuation endpoint uses for auto-detection.
     """
     geometry = body.to_geometry()
-    if not geometry:
-        raise HTTPException(
-            status_code=422,
-            detail="Provide a GeoJSON Polygon/MultiPolygon geometry (type+coordinates or a Feature).",
-        )
+    _require_valid_geometry(geometry)
     return {
         "classification": classify_geometry(geometry),
         "boundary_dataset": boundary_source(),
