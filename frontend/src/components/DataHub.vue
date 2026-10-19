@@ -1,8 +1,12 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useFormat } from '../data/useFormat.js'
 
-// The hub's prose is English-only, but its figures should still follow the
+const { t } = useI18n()
+
+// The hub's chrome is translated; the catalogue entries themselves (labels,
+// notes, citations) come from the backend in English. Figures follow the
 // user's locale. The carbon price is quoted in USD by definition
 // (price_usd_per_tco2), so that formatter is pinned rather than following the
 // app's selected display currency.
@@ -14,14 +18,26 @@ const market = ref(null)
 const loading = ref(false)
 const error = ref('')
 
-const STATUS_META = {
-  authoritative: { label: 'Authoritative', color: 'var(--forest-overlay)' },
-  reference: { label: 'Reference', color: 'var(--teal)' },
-  placeholder: { label: 'Placeholder', color: 'var(--gold)' },
+const STATUS_COLORS = {
+  authoritative: 'var(--forest-overlay)',
+  reference: 'var(--accent)',
+  placeholder: 'var(--gold)',
 }
 function statusMeta(s) {
-  return STATUS_META[s] || { label: s, color: 'var(--text-muted)' }
+  if (!STATUS_COLORS[s]) return { label: s, color: 'var(--text-muted)', hint: '' }
+  return {
+    label: t(`dataHub.status.${s}.label`),
+    hint: t(`dataHub.status.${s}.hint`),
+    color: STATUS_COLORS[s],
+  }
 }
+
+// Either live feed off (unconfigured or unreachable) means valuations are
+// running on the documented static references — say so in words, not only
+// with a pill.
+const anyStatic = computed(
+  () => !!market.value && (!market.value.carbon?.live || !market.value.fx?.live),
+)
 
 async function loadCatalog() {
   loading.value = true
@@ -37,7 +53,7 @@ async function loadCatalog() {
     catalog.value = cat
     market.value = mkt
   } catch (e) {
-    error.value = 'Could not load the data catalogue from the alpha backend.'
+    error.value = t('dataHub.error')
   } finally {
     loading.value = false
   }
@@ -65,7 +81,7 @@ async function runExtract() {
     if (!res.ok) throw new Error(`extract HTTP ${res.status}`)
     esvResult.value = await res.json()
   } catch (e) {
-    esvError.value = 'Extraction failed. Is the backend running?'
+    esvError.value = t('dataHub.tools.esv.failed')
   } finally {
     esvLoading.value = false
   }
@@ -87,7 +103,7 @@ async function runClassify() {
   try {
     body = JSON.parse(geoText.value)
   } catch (e) {
-    clsError.value = 'That is not valid JSON. Paste a GeoJSON Polygon geometry.'
+    clsError.value = t('dataHub.tools.classify.invalidJson')
     clsLoading.value = false
     return
   }
@@ -100,7 +116,7 @@ async function runClassify() {
     if (!res.ok) throw new Error(`classify HTTP ${res.status}`)
     clsResult.value = await res.json()
   } catch (e) {
-    clsError.value = 'Classification failed. Check the geometry and the backend.'
+    clsError.value = t('dataHub.tools.classify.failed')
   } finally {
     clsLoading.value = false
   }
@@ -111,41 +127,64 @@ onMounted(loadCatalog)
 
 <template>
   <section class="hub">
+    <div class="hub-scroll">
     <div class="hub-inner">
       <header class="hub-head">
-        <h2>Data Hub</h2>
-        <p>Every input behind a valuation — where it comes from, how current it is, and what we still need.</p>
+        <h2>{{ t('dataHub.title') }}</h2>
+        <p>{{ t('dataHub.subtitle') }}</p>
       </header>
 
       <div v-if="market" class="market">
         <div class="market-item">
-          <span class="market-k">Carbon price</span>
+          <span class="market-k">{{ t('dataHub.market.carbon') }}</span>
           <span class="market-v">{{ usd(market.carbon.price_usd_per_tco2) }}<em>/tCO₂e</em></span>
-          <span class="live-pill" :class="{ on: market.carbon.live }">{{ market.carbon.live ? 'LIVE' : 'static' }}</span>
+          <span
+            class="live-pill"
+            :class="{ on: market.carbon.live }"
+            :title="market.carbon.live ? t('dataHub.market.liveTitle') : t('dataHub.market.staticTitle')"
+          >{{ market.carbon.live ? t('dataHub.market.live') : t('dataHub.market.static') }}</span>
         </div>
         <div class="market-item">
-          <span class="market-k">FX (per USD)</span>
+          <span class="market-k">{{ t('dataHub.market.fx') }}</span>
           <span class="market-v">
             <template v-for="(v, code) in market.fx.rates_per_usd" :key="code">
               <span v-if="code !== 'USD'" class="fx">{{ code }} {{ decimal(v) }}</span>
             </template>
           </span>
-          <span class="live-pill" :class="{ on: market.fx.live }">{{ market.fx.live ? 'LIVE' : 'static' }}</span>
+          <span
+            class="live-pill"
+            :class="{ on: market.fx.live }"
+            :title="market.fx.live ? t('dataHub.market.liveTitle') : t('dataHub.market.staticTitle')"
+          >{{ market.fx.live ? t('dataHub.market.live') : t('dataHub.market.static') }}</span>
         </div>
-        <span class="market-asof">as of {{ market.fx.as_of || '—' }}</span>
+        <span class="market-asof">{{ t('dataHub.asOf', { date: market.fx.as_of || '—' }) }}</span>
+        <p v-if="anyStatic" class="market-note">
+          <span class="note-dot" aria-hidden="true"></span>{{ t('dataHub.market.fallbackNote') }}
+        </p>
       </div>
+      <p v-else-if="catalog" class="market market-missing">{{ t('dataHub.market.unavailable') }}</p>
 
-      <div v-if="loading" class="hub-state">Loading data catalogue…</div>
-      <div v-else-if="error" class="hub-state err">{{ error }}</div>
+      <div v-if="loading" class="hub-state" role="status">
+        <span class="spinner" aria-hidden="true"></span>{{ t('dataHub.loading') }}
+      </div>
+      <div v-else-if="error" class="hub-state err" role="alert">
+        <span class="err-icon" aria-hidden="true">!</span>
+        <span>{{ error }}</span>
+        <button class="run" @click="loadCatalog">{{ t('stage.retry') }}</button>
+      </div>
 
       <template v-else-if="catalog">
         <!-- Sources -->
-        <h3 class="section-title">Data sources</h3>
+        <h3 class="section-title">{{ t('dataHub.sections.sources') }}</h3>
         <div class="cards">
           <article v-for="d in catalog.domains" :key="d.id" class="card">
             <div class="card-top">
               <span class="card-label">{{ d.label }}</span>
-              <span class="badge" :style="{ '--c': statusMeta(d.status).color }">
+              <span
+                class="badge"
+                :style="{ '--c': statusMeta(d.status).color }"
+                :title="statusMeta(d.status).hint"
+              >
                 {{ statusMeta(d.status).label }}
               </span>
             </div>
@@ -157,14 +196,14 @@ onMounted(loadCatalog)
               </li>
             </ul>
             <div class="card-foot">
-              <span v-if="d.as_of" class="asof">as of {{ d.as_of }}</span>
+              <span v-if="d.as_of" class="asof">{{ t('dataHub.asOf', { date: d.as_of }) }}</span>
               <span v-for="ep in d.exposed_via" :key="ep" class="endpoint">{{ ep }}</span>
             </div>
           </article>
         </div>
 
         <!-- Roadmap -->
-        <h3 class="section-title">Data we still need</h3>
+        <h3 class="section-title">{{ t('dataHub.sections.needs') }}</h3>
         <div class="needs">
           <article v-for="n in catalog.needs" :key="n.id" class="need">
             <div class="need-head">
@@ -173,7 +212,7 @@ onMounted(loadCatalog)
             </div>
             <div class="need-flow">
               <span class="now">{{ n.current }}</span>
-              <span class="arrow">→</span>
+              <span class="arrow" aria-hidden="true">→</span>
               <span class="next">{{ n.planned }}</span>
             </div>
             <p class="need-why">{{ n.why }}</p>
@@ -181,26 +220,31 @@ onMounted(loadCatalog)
         </div>
 
         <!-- Live tools -->
-        <h3 class="section-title">Live tools</h3>
+        <h3 class="section-title">{{ t('dataHub.sections.tools') }}</h3>
         <div class="tools">
           <!-- ESV extractor -->
           <article class="tool">
-            <h4>Extract ESV values from text</h4>
-            <p class="tool-sub">Pulls structured ecosystem-service values out of report / TNFD-disclosure prose.</p>
-            <textarea v-model="esvText" rows="4" spellcheck="false"></textarea>
-            <button class="run" :disabled="esvLoading" @click="runExtract">
-              {{ esvLoading ? 'Extracting…' : 'Extract' }}
+            <h4>{{ t('dataHub.tools.esv.title') }}</h4>
+            <p class="tool-sub">{{ t('dataHub.tools.esv.sub') }}</p>
+            <textarea v-model="esvText" rows="4" spellcheck="false" :aria-label="t('dataHub.tools.esv.title')"></textarea>
+            <button class="run" :disabled="esvLoading || !esvText.trim()" @click="runExtract">
+              {{ esvLoading ? t('dataHub.tools.esv.running') : t('dataHub.tools.esv.run') }}
             </button>
-            <div v-if="esvError" class="tool-err">{{ esvError }}</div>
-            <div v-else-if="esvResult" class="tool-out">
+            <div v-if="esvError" class="tool-err" role="alert">{{ esvError }}</div>
+            <div v-else-if="esvResult" class="tool-out" aria-live="polite">
               <div class="out-meta">
-                <span class="chip">{{ esvResult.count }} record(s)</span>
-                <span class="chip">backend: {{ esvResult.backend }}</span>
-                <span v-if="esvResult.fallback_reason" class="chip warn">fallback</span>
+                <span class="chip">{{ t('dataHub.tools.esv.records', { n: esvResult.count }, esvResult.count) }}</span>
+                <span class="chip">{{ t('dataHub.tools.esv.backend', { name: esvResult.backend }) }}</span>
+                <span v-if="esvResult.fallback_reason" class="chip warn" :title="esvResult.fallback_reason">{{ t('dataHub.tools.esv.fallback') }}</span>
               </div>
               <table v-if="esvResult.records && esvResult.records.length">
                 <thead>
-                  <tr><th>Service</th><th>Value</th><th>Cur.</th><th>Unit</th></tr>
+                  <tr>
+                    <th>{{ t('dataHub.tools.esv.cols.service') }}</th>
+                    <th>{{ t('dataHub.tools.esv.cols.value') }}</th>
+                    <th>{{ t('dataHub.tools.esv.cols.currency') }}</th>
+                    <th>{{ t('dataHub.tools.esv.cols.unit') }}</th>
+                  </tr>
                 </thead>
                 <tbody>
                   <tr v-for="(r, i) in esvResult.records" :key="i">
@@ -211,25 +255,25 @@ onMounted(loadCatalog)
                   </tr>
                 </tbody>
               </table>
-              <p v-else class="tool-empty">No structured values found in that text.</p>
+              <p v-else class="tool-empty">{{ t('dataHub.tools.esv.empty') }}</p>
             </div>
           </article>
 
           <!-- Biome classifier -->
           <article class="tool">
-            <h4>Classify a polygon's biome</h4>
-            <p class="tool-sub">Locates a GeoJSON polygon in the ingested boundary data and returns the detected biome + provenance.</p>
-            <textarea v-model="geoText" rows="4" spellcheck="false"></textarea>
-            <button class="run" :disabled="clsLoading" @click="runClassify">
-              {{ clsLoading ? 'Classifying…' : 'Classify' }}
+            <h4>{{ t('dataHub.tools.classify.title') }}</h4>
+            <p class="tool-sub">{{ t('dataHub.tools.classify.sub') }}</p>
+            <textarea v-model="geoText" rows="4" spellcheck="false" :aria-label="t('dataHub.tools.classify.title')"></textarea>
+            <button class="run" :disabled="clsLoading || !geoText.trim()" @click="runClassify">
+              {{ clsLoading ? t('dataHub.tools.classify.running') : t('dataHub.tools.classify.run') }}
             </button>
-            <div v-if="clsError" class="tool-err">{{ clsError }}</div>
-            <div v-else-if="clsResult" class="tool-out">
+            <div v-if="clsError" class="tool-err" role="alert">{{ clsError }}</div>
+            <div v-else-if="clsResult" class="tool-out" aria-live="polite">
               <div class="cls-biome">{{ clsResult.classification.biome_label }}</div>
               <div class="out-meta">
-                <span class="chip">confidence: {{ clsResult.classification.confidence }}</span>
+                <span class="chip">{{ t('dataHub.tools.classify.confidence', { value: clsResult.classification.confidence }) }}</span>
                 <span v-if="clsResult.classification.matched_region" class="chip">
-                  matched: {{ clsResult.classification.matched_region }}
+                  {{ t('dataHub.tools.classify.matched', { value: clsResult.classification.matched_region }) }}
                 </span>
               </div>
               <p class="cls-src">{{ clsResult.boundary_dataset.primary }}</p>
@@ -238,6 +282,7 @@ onMounted(loadCatalog)
         </div>
       </template>
     </div>
+    </div>
   </section>
 </template>
 
@@ -245,9 +290,17 @@ onMounted(loadCatalog)
 .hub {
   position: absolute;
   inset: 0;
+  background: var(--stage-bg);
+}
+/* Scrolls below the floating topbar, so content never slides under the brand
+   and controls; the top edge fades rather than cutting off hard. */
+.hub-scroll {
+  position: absolute;
+  inset: var(--topbar-h) 0 0;
   overflow-y: auto;
-  padding: 70px 18px 28px;
-  background: radial-gradient(circle at 30% 8%, #0a1424 0%, var(--bg) 70%);
+  padding: var(--space-3) 18px 28px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--space-4));
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--space-4));
 }
 .hub-inner {
   max-width: 1080px;
@@ -255,7 +308,7 @@ onMounted(loadCatalog)
 }
 .hub-head h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   font-weight: 800;
   color: var(--text);
 }
@@ -274,8 +327,31 @@ onMounted(loadCatalog)
   border-radius: var(--radius);
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.market-missing {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.market-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-basis: 100%;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.note-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
 }
 .market-item {
   display: flex;
@@ -306,9 +382,11 @@ onMounted(loadCatalog)
   color: var(--text);
 }
 .live-pill {
-  font-size: 0.58rem;
+  font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.6px;
+  text-transform: uppercase;
+  cursor: help;
   padding: 2px 7px;
   border-radius: 999px;
   color: var(--text-muted);
@@ -316,7 +394,7 @@ onMounted(loadCatalog)
   background: var(--bg-deep);
 }
 .live-pill.on {
-  color: #04120c;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
 }
@@ -327,11 +405,35 @@ onMounted(loadCatalog)
 }
 
 .hub-state {
-  padding: 40px 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius);
   color: var(--text-muted);
+  font-size: var(--fs-md);
 }
 .hub-state.err {
-  color: #f87171;
+  color: var(--text);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+}
+.hub-state .run {
+  margin-top: 0;
+  margin-left: auto;
+}
+.err-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 900;
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
 }
 
 .section-title {
@@ -357,8 +459,8 @@ onMounted(loadCatalog)
   border-radius: var(--radius);
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 .card-top {
   display: flex;
@@ -502,8 +604,8 @@ onMounted(loadCatalog)
   border-radius: var(--radius);
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 .tool h4 {
   margin: 0;
@@ -540,7 +642,7 @@ onMounted(loadCatalog)
   border-radius: 999px;
   border: none;
   background: linear-gradient(180deg, var(--accent), var(--teal-strong));
-  color: #04120c;
+  color: var(--on-accent);
   font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
@@ -552,8 +654,12 @@ onMounted(loadCatalog)
 }
 .tool-err {
   margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
   font-size: 0.78rem;
-  color: #f87171;
+  color: var(--text);
 }
 .tool-out {
   margin-top: 12px;

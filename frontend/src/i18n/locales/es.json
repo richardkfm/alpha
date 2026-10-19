@@ -9,7 +9,12 @@
     "data": "Datos",
     "mapView": "Vista del mapa",
     "globe": "Globo",
-    "flat": "Plano"
+    "flat": "Plano",
+    "mapHint": "Explora ecosistemas valorados en el globo o en el mapa plano",
+    "compareHint": "Compara hasta 5 ecosistemas lado a lado",
+    "dataHint": "Fuentes de datos, datos de mercado en vivo y herramientas",
+    "globeHint": "Vista de globo 3D",
+    "flatHint": "Mapa plano 2D con fronteras detalladas"
   },
   "currency": {
     "group": "Moneda"
@@ -25,7 +30,12 @@
   },
   "stage": {
     "loading": "Cargando datos del ecosistema…",
-    "hint": "Selecciona cualquier ecosistema para ver su Valor Total del Ecosistema"
+    "hint": "Selecciona cualquier ecosistema para ver su Valor Total del Ecosistema",
+    "errorTitle": "No se puede conectar con el motor de valoración",
+    "errorHint": "El mapa necesita la API de alpha. Comprueba que el backend esté en marcha y vuelve a intentarlo.",
+    "retry": "Reintentar",
+    "retrying": "Reintentando…",
+    "refreshFailed": "No se pudieron actualizar las cifras: se muestran los últimos valores cargados."
   },
   "errors": {
     "backendUnreachable": "No se pudo conectar con el backend de alpha. ¿Está corriendo en :8000?",
@@ -40,7 +50,19 @@
     "submit": "Valorar",
     "clear": "Borrar",
     "hint": "Prueba {point}, un rectángulo {box}, o un polígono GeoJSON.",
-    "customAreaLabel": "Área personalizada — valorada bajo demanda"
+    "customAreaLabel": "Área personalizada — valorada bajo demanda",
+    "errors": {
+      "empty": "Introduce coordenadas o pega un polígono GeoJSON.",
+      "badJson": "Parece JSON, pero no se pudo interpretar.",
+      "notPolygon": "Pega un Polygon o MultiPolygon GeoJSON (o un Feature que lo contenga).",
+      "outOfRange": "Punto fuera de rango: se espera \"lat, lng\".",
+      "unrecognised": "Introduce \"lat, lng\", un rectángulo \"o, s, e, n\" o pega un polígono GeoJSON."
+    },
+    "labels": {
+      "polygon": "Polígono personalizado",
+      "box": "Rectángulo",
+      "point": "Punto {coords}"
+    }
   },
   "layerControl": {
     "ariaLabel": "Capas de biomas",
@@ -62,7 +84,10 @@
         "label": "Contorno",
         "hint": "Límites detallados de ecorregiones, sin relleno"
       }
-    }
+    },
+    "collapse": "Contraer el panel de biomas",
+    "expand": "Desplegar el panel de biomas",
+    "styleLoading": "Cargando los límites detallados de las ecorregiones…"
   },
   "biomes": {
     "tropical_rainforest": { "label": "Selva Tropical", "short": "Selva", "sublabel": "bosque tropical húmedo latifoliado" },
@@ -161,7 +186,13 @@
       "redLinesHead": "⛔ No se puede reemplazar a ningún precio",
       "redLinesHeadTitle": "Líneas rojas, no partidas — deliberadamente excluidas de las cifras anteriores"
     },
-    "methodology": "Metodología"
+    "methodology": "Metodología",
+    "closeTitle": "Cerrar (Esc)",
+    "error": {
+      "title": "No se pudo valorar esta área",
+      "offlineTitle": "Motor de valoración sin conexión",
+      "retry": "Reintentar"
+    }
   },
   "comparisons": {
     "approx": "≈",
@@ -190,5 +221,152 @@
       "debt_usa": "la deuda pública de EE. UU.",
       "global_equity_marketcap": "todas las acciones cotizadas del mundo"
     }
+  },
+  "guide": {
+    "open": "Guía rápida",
+    "close": "Cerrar la guía",
+    "eyebrow": "Guía rápida",
+    "title": "¿Cuánto vale la naturaleza?",
+    "lead": "alpha pone precio a los servicios que los ecosistemas prestan cada año, y a lo que se pierde si el suelo se transforma.",
+    "steps": {
+      "click": {
+        "title": "Haz clic en cualquier área de color",
+        "body": "Cada forma es un ecosistema con nombre, coloreado según su bioma. Al hacer clic se abre su valoración completa a la derecha."
+      },
+      "numbers": {
+        "title": "Lee las tres cifras principales",
+        "body": "Valor del activo en pie: lo que vale la tierra intacta. Valor Ecosistémico Total: los servicios que presta cada año. Pasivo perpetuo: el coste permanente si se transformara."
+      },
+      "search": {
+        "title": "Valora tu propia área",
+        "body": "Escribe \"lat, lng\", un rectángulo \"o, s, e, n\" o pega un polígono GeoJSON en la barra de búsqueda."
+      },
+      "styles": {
+        "title": "Cambia la vista",
+        "body": "En el panel de biomas filtra capas y alterna entre relleno, burbujas de valor y contornos detallados; arriba cambia entre Globo / Plano y la moneda."
+      }
+    },
+    "note": "Las cifras son valores de referencia indicativos y documentados: cada panel enlaza a su metodología y el Centro de datos enumera cada fuente.",
+    "openCompare": "Comparar ecosistemas",
+    "openData": "Abrir el Centro de datos",
+    "start": "Empezar a explorar"
+  },
+  "globe": {
+    "pause": "Pausar la rotación",
+    "resume": "Reanudar la rotación",
+    "spinning": "Girando",
+    "paused": "En pausa",
+    "columnCaption": "Altura de la columna = valor ecosistémico anual"
+  },
+  "compare": {
+    "regions": "Regiones",
+    "selected": "{n} / {max} seleccionadas",
+    "capacityTitle": "Puedes comparar hasta {max} ecosistemas a la vez",
+    "searchPlaceholder": "Buscar ecosistemas…",
+    "searchLabel": "Buscar regiones",
+    "sortGroup": "Ordenar regiones",
+    "sort": {
+      "value": "Valor",
+      "area": "Superficie",
+      "name": "A–Z"
+    },
+    "loading": "Cargando ecosistemas…",
+    "noRegions": "Aún no hay ecosistemas disponibles.",
+    "noResults": "Ningún ecosistema coincide con «{query}».",
+    "clearSearch": "Borrar búsqueda",
+    "capacityFull": "Máximo alcanzado: quita uno para añadir otro.",
+    "pickSub": "{value} / ha · {area} ha",
+    "title": "Comparar ecosistemas",
+    "subtitle": "Valor Ecosistémico Total lado a lado: {currency} por hectárea y año. Añade hasta {max}.",
+    "clear": "Vaciar",
+    "empty": "Elige regiones a la izquierda para comparar sus servicios ecosistémicos y su Valor Ecosistémico Total.",
+    "remove": "Quitar {name}",
+    "rows": {
+      "tevHa": "VET / ha / año",
+      "annual": "Valor anual (toda el área)",
+      "asset": "Valor del activo en pie",
+      "liability": "Pasivo de transformación",
+      "redLines": "Líneas rojas",
+      "redLinesCount": "{n} pérdida irreversible | {n} pérdidas irreversibles",
+      "area": "Superficie",
+      "intactness": "Integridad"
+    }
+  },
+  "dataHub": {
+    "title": "Centro de datos",
+    "subtitle": "Cada dato de entrada de una valoración: de dónde viene, lo actual que es y lo que aún nos falta.",
+    "market": {
+      "carbon": "Precio del carbono",
+      "fx": "Tipos de cambio (por USD)",
+      "live": "En vivo",
+      "static": "Estático",
+      "liveTitle": "Obtenido en vivo del feed de mercado",
+      "staticTitle": "Feed en vivo no disponible o no configurado: se usa la referencia estática documentada",
+      "fallbackNote": "Uno o más feeds de mercado en vivo están desactivados o no responden, así que las valoraciones usan los valores de referencia estáticos documentados.",
+      "unavailable": "Los datos de mercado no están disponibles ahora mismo."
+    },
+    "asOf": "a {date}",
+    "loading": "Cargando el catálogo de datos…",
+    "error": "No se pudo cargar el catálogo de datos desde el backend de alpha.",
+    "status": {
+      "authoritative": {
+        "label": "Oficial",
+        "hint": "Conjunto de datos oficial o revisado por pares, usado tal cual"
+      },
+      "reference": {
+        "label": "Referencia",
+        "hint": "Valores de referencia documentados: sólidos, pero estáticos"
+      },
+      "placeholder": {
+        "label": "Provisional",
+        "hint": "Sustituto hasta conectar una fuente mejor"
+      }
+    },
+    "sections": {
+      "sources": "Fuentes de datos",
+      "needs": "Datos que aún necesitamos",
+      "tools": "Herramientas en vivo"
+    },
+    "tools": {
+      "esv": {
+        "title": "Extraer valores ESV de un texto",
+        "sub": "Extrae valores estructurados de servicios ecosistémicos de informes o divulgaciones TNFD.",
+        "run": "Extraer",
+        "running": "Extrayendo…",
+        "failed": "La extracción falló. ¿Está en marcha el backend?",
+        "records": "{n} registro | {n} registros",
+        "backend": "backend: {name}",
+        "fallback": "alternativa",
+        "cols": {
+          "service": "Servicio",
+          "value": "Valor",
+          "currency": "Mon.",
+          "unit": "Unidad"
+        },
+        "empty": "No se encontraron valores estructurados en ese texto."
+      },
+      "classify": {
+        "title": "Clasificar el bioma de un polígono",
+        "sub": "Ubica un polígono GeoJSON en los datos de límites cargados y devuelve el bioma detectado y su procedencia.",
+        "run": "Clasificar",
+        "running": "Clasificando…",
+        "invalidJson": "No es un JSON válido. Pega una geometría Polygon GeoJSON.",
+        "failed": "La clasificación falló. Revisa la geometría y el backend.",
+        "confidence": "confianza: {value}",
+        "matched": "coincidencia: {value}"
+      }
+    }
+  },
+  "embed": {
+    "noRegion": "No se indicó ninguna región.",
+    "notFound": "Región no encontrada.",
+    "failed": "No se pudo cargar la valoración.",
+    "open": "Abrir alpha",
+    "tev": "Valor Ecosistémico Total",
+    "perYear": "/ año",
+    "perYearAria": "al año",
+    "wholeArea": "al año, toda el área",
+    "standing": "Activo en pie",
+    "liability": "Si se transforma (pasivo)"
   }
 }
