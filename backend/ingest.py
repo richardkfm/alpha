@@ -19,9 +19,10 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import sys
 
-from biome_classifier import DATA_PATH, _load_boundaries, classify_point
+from biome_classifier import DATA_PATHS, _load_boundaries, classify_point
 from reference_data import BIOMES
 
 REFRESH_SOURCES = [
@@ -37,24 +38,28 @@ REFRESH_SOURCES = [
 
 
 def cmd_validate() -> int:
-    with open(DATA_PATH, "r", encoding="utf-8") as fh:
-        fc = json.load(fh)
-    features = fc.get("features", [])
     errors: list[str] = []
     counts: dict[str, int] = {}
-    for i, feat in enumerate(features):
-        key = feat.get("properties", {}).get("biome_key")
-        if key not in BIOMES:
-            errors.append(f"feature {i}: unknown biome_key {key!r}")
-            continue
-        geom = feat.get("geometry", {})
-        if geom.get("type") not in ("Polygon", "MultiPolygon") or not geom.get("coordinates"):
-            errors.append(f"feature {i} ({key}): missing/invalid geometry")
-            continue
-        counts[key] = counts.get(key, 0) + 1
+    total_features = 0
+    for path in DATA_PATHS:
+        with open(path, "r", encoding="utf-8") as fh:
+            fc = json.load(fh)
+        features = fc.get("features", [])
+        total_features += len(features)
+        print(f"dataset: {path} ({len(features)} features)")
+        name = os.path.basename(path)
+        for i, feat in enumerate(features):
+            key = (feat.get("properties") or {}).get("biome_key")
+            if key not in BIOMES:
+                errors.append(f"{name} feature {i}: unknown biome_key {key!r}")
+                continue
+            geom = feat.get("geometry") or {}
+            if geom.get("type") not in ("Polygon", "MultiPolygon") or not geom.get("coordinates"):
+                errors.append(f"{name} feature {i} ({key}): missing/invalid geometry")
+                continue
+            counts[key] = counts.get(key, 0) + 1
 
-    print(f"dataset: {DATA_PATH}")
-    print(f"features: {len(features)}  polygons: {len(_load_boundaries())}")
+    print(f"features: {total_features}  polygons: {len(_load_boundaries())}")
     for key in sorted(counts):
         print(f"  {key}: {counts[key]} feature(s)")
     missing = sorted(set(BIOMES) - set(counts))
@@ -73,7 +78,11 @@ def cmd_classify(args: list[str]) -> int:
     if len(args) != 2:
         print("usage: python ingest.py classify <lon> <lat>", file=sys.stderr)
         return 2
-    lon, lat = float(args[0]), float(args[1])
+    try:
+        lon, lat = float(args[0]), float(args[1])
+    except ValueError:
+        print("usage: python ingest.py classify <lon> <lat> (numbers)", file=sys.stderr)
+        return 2
     print(json.dumps(classify_point(lon, lat), indent=2))
     return 0
 
