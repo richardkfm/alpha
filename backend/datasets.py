@@ -17,9 +17,17 @@ from typing import Any, Dict, List
 from biome_classifier import boundary_source
 from live_data import get_carbon_price, get_fx_rates
 from reference_data import (
+    BIOMES,
+    CARBON_PRICE_AS_OF,
+    CARBON_PRICE_SOURCE,
     CARBON_PRICE_USD_PER_TCO2,
     CURRENCIES,
+    ESV_CATEGORIES,
+    ESV_ESTIMATES,
     FX_AS_OF,
+    FX_SOURCE,
+    PRICE_YEAR,
+    SEQUESTRATION,
 )
 from regions import dataset_provenance
 from scale_anchors import anchor_provenance
@@ -45,18 +53,18 @@ def _carbon_domain() -> Dict[str, Any]:
         "id": "carbon_price",
         "label": "Carbon price",
         "category": "valuation",
-        "status": _AUTHORITATIVE if live else _PLACEHOLDER,
+        "status": _AUTHORITATIVE if live else _REFERENCE,
         "sources": [
             {
                 "citation": (
                     f"Live feed — {meta.get('source')} (${price:.2f}/tCO2e)."
                     if live
-                    else "IPCC AR6 WGIII (2022), Ch. 7 & Annex III — sub-2 °C mitigation "
-                    f"pathways. Reference price ${CARBON_PRICE_USD_PER_TCO2:.0f}/tCO2e."
+                    else f"{CARBON_PRICE_SOURCE}. Reference price "
+                    f"${CARBON_PRICE_USD_PER_TCO2:.0f}/tCO2e ({PRICE_YEAR} USD)."
                 ),
             }
         ],
-        "as_of": str(meta.get("as_of", "2022")),
+        "as_of": str(meta.get("as_of", CARBON_PRICE_AS_OF)),
         "note": (
             "Live carbon-market price."
             if live
@@ -74,13 +82,13 @@ def _fx_domain() -> Dict[str, Any]:
         "id": "fx_rates",
         "label": "Currency exchange rates",
         "category": "finance",
-        "status": _AUTHORITATIVE if live else _PLACEHOLDER,
+        "status": _AUTHORITATIVE if live else _REFERENCE,
         "sources": [
             {
                 "citation": (
                     f"Live feed — {meta.get('source')}: "
                     if live
-                    else "Indicative reference rates: "
+                    else f"Static snapshot of {FX_SOURCE}: "
                 )
                 + ", ".join(f"{code} {rates.get(code, c['rate_per_usd'])}/USD" for code, c in CURRENCIES.items()),
                 "url": meta.get("url", ""),
@@ -90,10 +98,29 @@ def _fx_domain() -> Dict[str, Any]:
         "note": (
             "Live FX rates from the European Central Bank."
             if live
-            else "Static placeholder rates; enable ALPHA_LIVE_DATA for live FX."
+            else "Static ECB snapshot; enable ALPHA_LIVE_DATA for live FX."
         ),
         "exposed_via": ["GET /api/v1/market", "GET /api/v1/reference", "POST /api/v1/valuation (fx)"],
     }
+
+
+def _esv_estimate_counts() -> tuple[int, int]:
+    """(flagged estimates, total coefficients) across the biome table."""
+    total = len(BIOMES) * (len(ESV_CATEGORIES) + 1)  # four ESV categories + sequestration
+    flagged = len(ESV_ESTIMATES) + sum(
+        1 for s in SEQUESTRATION.values() if s["basis"] == "estimate"
+    )
+    return flagged, total
+
+
+def _esv_note() -> str:
+    flagged, total = _esv_estimate_counts()
+    return (
+        f"Per-biome USD/ha/yr reference yields in {PRICE_YEAR} USD, median basis, each "
+        "derived from published ESVD table cells backed by at least 3 value estimates. "
+        f"{flagged} of {total} coefficients lack enough published evidence and are "
+        "flagged as unverified estimates (see METHODOLOGY.md). Peer-reviewed but static."
+    )
 
 
 def _years(values: Any) -> List[str]:
@@ -180,20 +207,36 @@ def _domains() -> List[Dict[str, Any]]:
             "status": _REFERENCE,
             "sources": [
                 {
+                    "citation": "Brander, L.M. et al. (2024). Economic values for ecosystem "
+                    "services: A global synthesis and way forward. Ecosystem Services 66: 101606 (ESVD).",
+                    "url": "https://doi.org/10.1016/j.ecoser.2024.101606",
+                },
+                {
                     "citation": "de Groot, R. et al. (2012). Global estimates of the value of "
-                    "ecosystems and their services in monetary units. Ecosystem Services 1(1): 50-61 (ESVD).",
+                    "ecosystems and their services in monetary units. Ecosystem Services 1(1): 50-61, "
+                    "and Online Supporting Information.",
+                    "url": "https://doi.org/10.1016/j.ecoser.2012.07.005",
                 },
                 {
-                    "citation": "Costanza, R. et al. (2014). Changes in the global value of "
-                    "ecosystem services. Global Environmental Change 26: 152-158.",
+                    "citation": "de Groot, R., Brander, L., Solomonides, S. (2020). Update of global "
+                    "ecosystem service valuation database (ESVD). FSD report 2020-06.",
                 },
                 {
-                    "citation": "Pan, Y. et al. (2011). A Large and Persistent Carbon Sink in the "
-                    "World's Forests. Science 333(6045): 988-993.",
+                    "citation": "Pan, Y. et al. (2024). The enduring world forest carbon sink. "
+                    "Nature 631: 563-569.",
+                    "url": "https://doi.org/10.1038/s41586-024-07602-x",
+                },
+                {
+                    "citation": "IPCC (2014). 2013 Supplement to the 2006 IPCC Guidelines for "
+                    "National Greenhouse Gas Inventories: Wetlands (Ch. 2 & 4).",
+                },
+                {
+                    "citation": "IPCC (2000). Land Use, Land-Use Change and Forestry, Table 1; "
+                    "IPCC (2006) Guidelines Vol. 4, Ch. 5.",
                 },
             ],
-            "as_of": "2012",
-            "note": "Per-biome USD/ha/yr reference yields; peer-reviewed but static.",
+            "as_of": "2024",
+            "note": _esv_note(),
             "exposed_via": ["GET /api/v1/reference", "POST /api/v1/valuation"],
         },
         _carbon_domain(),
@@ -206,7 +249,8 @@ def _domains() -> List[Dict[str, Any]]:
             "status": _AUTHORITATIVE,
             "sources": [{"citation": _LC100_CITATION, "url": "https://doi.org/10.5281/zenodo.3939050"}],
             "as_of": "2020",
-            "note": "Authoritative CGLS-LC100 legend + intactness factors. Realised value is now "
+            "note": "Authoritative CGLS-LC100 legend; the per-class intactness factors and the "
+            "per-biome default intactness are heuristic, not literature-derived. Realised value is now "
             "scaled by intactness via per-biome/region defaults; per-polygon raster sampling "
             "(PostGIS) to derive true intactness is still pending.",
             "exposed_via": ["POST /api/v1/valuation (intactness)", "internal (landcover.py)"],
@@ -220,7 +264,7 @@ def _needs() -> List[Dict[str, Any]]:
         {
             "id": "live_fx",
             "label": "Live FX rates",
-            "current": "Static indicative rates (as of " + FX_AS_OF + ")",
+            "current": "Static ECB reference rates (as of " + FX_AS_OF + ")",
             "planned": "Live FX feed (e.g. central-bank / market API)",
             "why": "Valuations in EUR/BRL drift from reality as rates move.",
             "phase": "Phase 4",
@@ -228,7 +272,7 @@ def _needs() -> List[Dict[str, Any]]:
         {
             "id": "live_carbon",
             "label": "Live carbon-market price",
-            "current": f"Static ${CARBON_PRICE_USD_PER_TCO2:.0f}/tCO2e reference",
+            "current": f"Static ${CARBON_PRICE_USD_PER_TCO2:.0f}/tCO2e reference ({PRICE_YEAR} USD)",
             "planned": "Live voluntary / compliance carbon-market index",
             "why": "Carbon capture is a large share of TEV; its price is the most volatile input.",
             "phase": "Phase 4",
@@ -252,9 +296,10 @@ def _needs() -> List[Dict[str, Any]]:
         {
             "id": "live_esvd",
             "label": "Live ESVD values",
-            "current": "Static de Groot et al. 2012 reference yields",
-            "planned": "ESVD API for region-specific / updated service values",
-            "why": "Reference yields vary by region and have been updated since 2012.",
+            "current": "Static global ESVD summary values (Brander et al. 2024; de Groot et al. 2012)",
+            "planned": "ESVD records / value-transfer functions for region-specific service values",
+            "why": "Global summary values are Europe-weighted and thin for tropical, boreal, polar "
+            "and desert biomes; region-specific transfer would fill the flagged estimates.",
             "phase": "Phase 4+",
         },
         {

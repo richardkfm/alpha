@@ -13,13 +13,23 @@ function ringMean(ring) {
     ring[0][1] === ring[ring.length - 1][1]
       ? ring.length - 1
       : ring.length
+  // Longitudes are unwrapped along the ring before averaging: a ring crossing
+  // the antimeridian (178 .. -179) would otherwise average to ~0 and the globe
+  // would fly to the Gulf of Guinea instead of Fiji.
   let lng = 0
   let lat = 0
+  let prev = ring[0][0]
   for (let i = 0; i < n; i++) {
-    lng += ring[i][0]
+    const step = ring[i][0] - prev
+    prev += step - 360 * Math.round(step / 360)
+    lng += prev
     lat += ring[i][1]
   }
-  return { lng: lng / n, lat: lat / n, n }
+  return { lng: wrapLng(lng / n), lat: lat / n, n }
+}
+
+function wrapLng(lng) {
+  return ((((lng + 180) % 360) + 360) % 360) - 180
 }
 
 // Rough planar area of a ring (shoelace) — only used to pick the largest part
@@ -98,7 +108,13 @@ export function parseAreaInput(raw) {
     throw new Error('Paste a GeoJSON Polygon or MultiPolygon (or a Feature wrapping one).')
   }
 
-  const nums = text.split(/[\s,]+/).map(Number).filter((n) => !Number.isNaN(n))
+  // Every token must be a number: dropping the ones that aren't accepted
+  // "12 abc 34" as a point, and a trailing comma ("-3.1, -60.0,") produced an
+  // empty token that Number() read as a third coordinate, 0.
+  const nums = text.split(/[\s,]+/).filter(Boolean).map(Number)
+  if (nums.some((n) => !Number.isFinite(n))) {
+    throw new Error('Enter "lat, lng", a "w, s, e, n" box, or paste a GeoJSON polygon.')
+  }
   if (nums.length === 2) {
     const [lat, lng] = nums // geographic convention: latitude first
     if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
@@ -108,6 +124,9 @@ export function parseAreaInput(raw) {
   }
   if (nums.length === 4) {
     const [w, s, e, n] = nums
+    if (Math.abs(s) > 90 || Math.abs(n) > 90 || Math.abs(w) > 180 || Math.abs(e) > 180) {
+      throw new Error('Box out of range — expected "west, south, east, north" in degrees.')
+    }
     return {
       geometry: {
         type: 'Polygon',

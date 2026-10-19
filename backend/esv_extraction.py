@@ -28,7 +28,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
 from typing import Any, Optional
@@ -60,7 +59,7 @@ _CURRENCY_SYMBOLS = {"$": "USD", "US$": "USD", "€": "EUR", "R$": "BRL"}
 
 # A monetary figure with an optional currency marker and a magnitude suffix.
 _MONEY_RE = re.compile(
-    r"(?P<sym>US\$|R\$|[$€])?\s?(?P<num>\d[\d,]*(?:\.\d+)?)\s?(?P<mag>billion|million|bn|m|k|thousand)?\b",
+    r"(?P<sym>US\$|R\$|[$€]|\b(?:USD|EUR|BRL)\b)?\s?(?P<num>\d[\d,]*(?:\.\d+)?)\s?(?P<mag>billion|million|bn|m|k|thousand)?\b",
     re.IGNORECASE,
 )
 
@@ -95,7 +94,7 @@ class ESVRecord:
 
 
 def _normalise_currency(token: Optional[str]) -> Optional[str]:
-    if not token:
+    if not token or not isinstance(token, str):
         return None
     token = token.strip()
     if token.upper() in CURRENCIES:
@@ -128,6 +127,24 @@ def _split_sentences(text: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
+def _pick_money(sentence: str, unit_match: Optional[re.Match]) -> Optional[re.Match]:
+    """The figure a sentence is actually reporting, not merely its first number.
+
+    "In 2019, carbon sequestration was valued at $120 per ha" must yield 120,
+    not the year: prefer a figure carrying a currency marker; failing that, the
+    last figure before the per-area unit phrase it qualifies.
+    """
+    matches = [m for m in _MONEY_RE.finditer(sentence) if m.group("num")]
+    marked = next((m for m in matches if m.group("sym")), None)
+    if marked is not None:
+        return marked
+    if unit_match is not None:
+        before = [m for m in matches if m.end() <= unit_match.start()]
+        if before:
+            return before[-1]
+    return matches[0] if matches else None
+
+
 def extract_deterministic(text: str) -> list[ESVRecord]:
     """Regex extraction: one record per sentence that pairs a service with a value.
 
@@ -138,12 +155,12 @@ def extract_deterministic(text: str) -> list[ESVRecord]:
         service_key, raw_service = _match_service(sentence)
         if service_key is None:
             continue
-        money = _MONEY_RE.search(sentence)
-        if not money or not money.group("num"):
-            continue
         # Require a real monetary signal: a currency marker or a per-area unit,
         # so we don't capture stray years/counts.
         unit_match = _UNIT_RE.search(sentence)
+        money = _pick_money(sentence, unit_match)
+        if money is None:
+            continue
         currency = _normalise_currency(money.group("sym"))
         if currency is None and unit_match is None:
             continue
@@ -260,7 +277,11 @@ def extract_esv_records(
             return {"backend": "llm", "model": model,
                     "records": [asdict(r) for r in records], "count": len(records),
                     "fallback_reason": None}
-        except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError) as exc:
+        except Exception as exc:  # noqa: BLE001 — any model/transport failure falls back
+            # Not just transport errors: a reachable server answering with an
+            # unexpected shape ({"message": null}, a bare list, non-string
+            # content) used to raise AttributeError/TypeError straight out as
+            # a 500 instead of the documented regex fallback.
             records = extract_deterministic(text)
             return {"backend": "deterministic", "model": None,
                     "records": [asdict(r) for r in records], "count": len(records),

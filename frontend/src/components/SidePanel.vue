@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 // Shared yield-category metadata, also used by the Compare dashboard.
 import { YIELD_ROWS } from '../data/yields.js'
@@ -26,7 +26,7 @@ const props = defineProps({
   // shows magnitude vs the strongest biome, not just composition within this one.
   ceilings: { type: Object, default: () => ({}) },
 })
-const emit = defineEmits(['close', 'update:showLiability', 'update:showSystemic', 'update:showRedLines'])
+const emit = defineEmits(['close', 'retry', 'update:showLiability', 'update:showSystemic', 'update:showRedLines'])
 
 // Intl places the currency symbol itself (de wants "1.234 €", not "€1.234"), so
 // the API's currency_symbol field is no longer read here.
@@ -103,7 +103,17 @@ const assetValue = computed(() => {
 
 // Cost-of-conversion reframing: a permanent liability + red lines, never a
 // price to net against revenue.
-const liability = computed(() => props.valuation?.conversion_liability ?? null)
+// Its present value is the standing asset times the systemic premium at the
+// backend's reference rate, so it is recapitalised at the selected rate just
+// like the asset. Left at the payload figure, a 1% rate showed a liability
+// smaller than the asset it is a premium on.
+const liability = computed(() => {
+  const l = props.valuation?.conversion_liability
+  if (!l) return null
+  const refRate = props.valuation?.capitalized_value?.discount_rate
+  if (l.present_value == null || !refRate) return l
+  return { ...l, present_value: (l.present_value * refRate) / discountRate.value }
+})
 const systemicMult = computed(() => props.valuation?.systemic?.multiplier ?? 1)
 const redLines = computed(() => props.valuation?.red_lines ?? [])
 
@@ -136,7 +146,8 @@ const { compare } = useComparison()
 const cmp = computed(() => props.valuation?.comparisons ?? {})
 // The discount-rate buttons recapitalise the asset locally, so its multiple has
 // to move with it — at 1% the figure is three times what the backend ranked.
-// The other two figures come straight off the payload and need no rescaling.
+// The liability is recapitalised by the same factor; the annual flow comes
+// straight off the payload and needs no rescaling.
 const assetFactor = computed(() => {
   const ranked = props.valuation?.capitalized_value?.asset_value_total
   if (!ranked || assetValue.value == null) return 1
@@ -150,6 +161,7 @@ const tevCmp = computed(() => compare(cmp.value.total_ecosystem_value_per_year))
 // other. Without excluding what the asset just used they cite the same anchor.
 const liabCmp = computed(() =>
   compare(cmp.value.conversion_liability, {
+    factor: assetFactor.value,
     exclude: assetCmp.value ? [assetCmp.value.anchor] : [],
   }),
 )
@@ -175,6 +187,10 @@ const exporting = ref('')
 const exportError = ref('')
 async function downloadExport(format) {
   if (!props.valuation || exporting.value) return
+  // Snapshot the region being exported: the panel can switch to another one
+  // while the request is in flight, and the file used to be named after
+  // whichever region was showing when it arrived.
+  const region = props.region
   exporting.value = format
   exportError.value = ''
   try {
@@ -185,30 +201,38 @@ async function downloadExport(format) {
       currency: props.valuation.currency,
       locale: locale.value,
     })
-    if (props.region.name) params.set('name', props.region.name)
-    if (props.region.biome_key) params.set('biome', props.region.biome_key)
-    if (props.region.intactness != null) params.set('intactness', props.region.intactness)
+    if (region.name) params.set('name', region.name)
+    if (region.biome_key) params.set('biome', region.biome_key)
+    if (region.intactness != null) params.set('intactness', region.intactness)
     const res = await fetch(`/api/v1/valuation/export?${params}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(props.region.geojson),
+      body: JSON.stringify(region.geojson),
     })
     if (!res.ok) throw new Error(`export HTTP ${res.status}`)
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `alpha-${slugify(props.region.name || props.region.biome_key)}.${format}`
+    a.download = `alpha-${slugify(region.name || region.biome_key)}.${format}`
     document.body.appendChild(a)
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e) {
-    exportError.value = t('sidePanel.actions.exportFailed')
+    // Only report it against the region it belongs to.
+    if (props.region === region) exportError.value = t('sidePanel.actions.exportFailed')
   } finally {
     exporting.value = ''
   }
 }
+// A previous region's export failure must not follow the panel to the next one.
+watch(
+  () => props.region,
+  () => {
+    exportError.value = ''
+  },
+)
 
 // Embeddable widget: a copy-paste <iframe> snippet for a catalogue region (only
 // those carry a stable id). The iframe loads /embed.html from this same origin,
@@ -237,11 +261,16 @@ async function copyEmbed() {
 </script>
 
 <template>
-  <aside class="panel">
+  <aside class="panel" :aria-label="region.name" :aria-busy="loading">
     <header class="panel-head">
       <div class="title-row">
         <h2>{{ region.name }}</h2>
-        <button class="close" @click="$emit('close')" :aria-label="t('sidePanel.close')">×</button>
+        <button
+          class="close"
+          @click="$emit('close')"
+          :aria-label="t('sidePanel.close')"
+          :title="t('sidePanel.closeTitle')"
+        >×</button>
       </div>
       <div class="subtitle-row">
         <p class="region">{{ region.region }}</p>
@@ -286,7 +315,16 @@ async function copyEmbed() {
       <div class="sk-hero"></div>
       <span class="sk-note">{{ t('sidePanel.loading.note') }}</span>
     </div>
-    <div v-else-if="error" class="state err">{{ error }}</div>
+    <div v-else-if="error" class="state err" role="alert">
+      <span class="state-icon" aria-hidden="true">!</span>
+      <span class="state-title">
+        {{ backendOnline === false ? t('sidePanel.error.offlineTitle') : t('sidePanel.error.title') }}
+      </span>
+      <span class="state-msg">{{ error }}</span>
+      <button class="state-retry" :disabled="loading" @click="emit('retry')">
+        {{ t('sidePanel.error.retry') }}
+      </button>
+    </div>
 
     <template v-else-if="valuation">
       <section v-if="classification" class="biome" :style="{ '--biome': biomeHue }">
@@ -486,7 +524,7 @@ async function copyEmbed() {
   height: 100%;
   width: min(420px, 94vw);
   overflow-y: auto;
-  padding: 78px 22px 30px; /* clears the floating topbar */
+  padding: calc(var(--topbar-h) + 6px) 22px 30px; /* clears the floating topbar */
   background: linear-gradient(180deg, var(--bg-panel), var(--bg-deep));
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-panel);
@@ -593,7 +631,7 @@ async function copyEmbed() {
 }
 .act-err {
   margin: -6px 0 12px;
-  color: #f87171;
+  color: var(--danger);
   font-size: 0.74rem;
 }
 .embed-box {
@@ -633,7 +671,7 @@ async function copyEmbed() {
 }
 .embed-copy:hover {
   background: var(--accent);
-  color: #04120c;
+  color: var(--on-accent);
 }
 .conn {
   flex: none;
@@ -654,17 +692,17 @@ async function copyEmbed() {
   background: var(--text-faint);
 }
 .conn.ok {
-  color: var(--teal);
+  color: var(--accent);
 }
 .conn.ok .conn-dot {
-  background: var(--teal);
-  box-shadow: 0 0 6px var(--teal);
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
 }
 .conn.down {
-  color: #f87171;
+  color: var(--danger);
 }
 .conn.down .conn-dot {
-  background: #f87171;
+  background: var(--danger);
 }
 
 /* Biome identity card, keyed to the biome's map colour. */
@@ -782,7 +820,56 @@ async function copyEmbed() {
   color: var(--text-muted);
 }
 .state.err {
-  color: #f87171;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+}
+.state-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 900;
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+}
+.state-title {
+  font-size: var(--fs-md);
+  font-weight: 800;
+  color: var(--text);
+}
+.state-msg {
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.state-retry {
+  margin-top: var(--space-1);
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.state-retry:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.state-retry:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 /* loading skeleton */
@@ -921,11 +1008,11 @@ async function copyEmbed() {
   border-radius: var(--radius);
   background: radial-gradient(
       120% 140% at 0% 0%,
-      rgba(45, 212, 191, 0.14),
+      var(--accent-bg),
       transparent 60%
     ),
     var(--bg-elevated);
-  border: 1px solid rgba(45, 212, 191, 0.4);
+  border: 1px solid var(--accent-border);
   box-shadow: var(--shadow-glow);
   overflow: hidden;
 }
@@ -937,7 +1024,7 @@ async function copyEmbed() {
   width: 140px;
   height: 140px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(45, 212, 191, 0.18), transparent 70%);
+  background: radial-gradient(circle, var(--accent-bg), transparent 70%);
   pointer-events: none;
 }
 .tev-label {
@@ -1010,7 +1097,7 @@ async function copyEmbed() {
   color: var(--gold);
 }
 .liab .cmp-x {
-  color: #f87171;
+  color: var(--danger);
 }
 .tev-annual {
   display: flex;
@@ -1038,9 +1125,9 @@ async function copyEmbed() {
   margin: 0 0 16px;
   padding: 14px 16px;
   border-radius: var(--radius);
-  background: radial-gradient(120% 140% at 100% 0%, rgba(231, 200, 115, 0.14), transparent 60%),
+  background: radial-gradient(120% 140% at 100% 0%, var(--gold-bg), transparent 60%),
     var(--bg-elevated);
-  border: 1px solid rgba(231, 200, 115, 0.4);
+  border: 1px solid var(--gold-border);
 }
 .asset-head {
   display: flex;
@@ -1075,7 +1162,7 @@ async function copyEmbed() {
 }
 .asset-rates button.on {
   background: var(--gold);
-  color: #1c1606;
+  color: var(--on-gold);
 }
 .asset-value {
   font-family: 'Spline Sans Mono', ui-monospace, monospace;
@@ -1101,9 +1188,9 @@ async function copyEmbed() {
   margin: 18px 0;
   padding: 16px;
   border-radius: var(--radius);
-  background: linear-gradient(180deg, rgba(248, 113, 113, 0.06), transparent),
+  background: linear-gradient(180deg, var(--danger-bg), transparent),
     var(--bg-elevated);
-  border: 1px solid rgba(248, 113, 113, 0.32);
+  border: 1px solid var(--danger-border);
 }
 .conv-header {
   display: flex;
@@ -1118,7 +1205,7 @@ async function copyEmbed() {
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.3px;
-  color: #f8a8a8;
+  color: var(--danger-text);
 }
 .conv-modes {
   display: flex;
@@ -1129,16 +1216,16 @@ async function copyEmbed() {
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(248, 113, 113, 0.35);
+  border: 1px solid var(--danger-border);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   transition: color 0.15s var(--ease), background 0.15s var(--ease), border-color 0.15s var(--ease);
 }
 .conv-modes button.on {
-  background: rgba(248, 113, 113, 0.18);
-  border-color: rgba(248, 113, 113, 0.6);
-  color: #f8a8a8;
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger-text);
 }
 .liab {
   display: flex;
@@ -1156,7 +1243,7 @@ async function copyEmbed() {
   font-size: 1.7rem;
   font-weight: 800;
   line-height: 1.05;
-  color: #f87171;
+  color: var(--danger);
 }
 .liab-value em {
   font-style: normal;
@@ -1188,15 +1275,15 @@ async function copyEmbed() {
   margin-top: 12px;
   padding: 11px 13px;
   border-radius: var(--radius-sm);
-  background: rgba(248, 113, 113, 0.07);
-  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
 }
 .rl-head {
   display: block;
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.2px;
-  color: #f8a8a8;
+  color: var(--danger-text);
   margin-bottom: 7px;
   cursor: help;
 }
@@ -1214,7 +1301,7 @@ async function copyEmbed() {
   line-height: 1.4;
 }
 .redlines li strong {
-  color: #f8a8a8;
+  color: var(--danger-text);
 }
 
 .callout {

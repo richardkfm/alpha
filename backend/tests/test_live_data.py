@@ -35,6 +35,15 @@ def test_carbon_override_env(monkeypatch):
     assert meta["live"] is True
 
 
+def test_non_finite_or_negative_carbon_override_is_ignored(monkeypatch):
+    monkeypatch.delenv("ALPHA_LIVE_DATA", raising=False)
+    for bad in ("nan", "inf", "-40", "0", "abc"):
+        monkeypatch.setenv("CARBON_PRICE_USD_PER_TCO2", bad)
+        price, meta = live_data.get_carbon_price()
+        assert price == CARBON_PRICE_USD_PER_TCO2, bad
+        assert meta["live"] is False
+
+
 def test_market_snapshot_shape(monkeypatch):
     monkeypatch.delenv("ALPHA_LIVE_DATA", raising=False)
     snap = live_data.market_snapshot()
@@ -122,3 +131,45 @@ def test_injected_fx_rate_overrides_static():
         rel_tol=1e-6,
     )
     assert res["fx"]["as_of"] == "2030-01-01"
+
+
+def _unreachable_feed(monkeypatch):
+    """Enable live data against a feed that always fails; return the call log."""
+    calls = []
+
+    def boom(url, timeout=6.0):
+        calls.append(url)
+        raise OSError("timed out")
+
+    monkeypatch.setenv("ALPHA_LIVE_DATA", "1")
+    monkeypatch.setenv("CARBON_PRICE_URL", "https://example.invalid/carbon")
+    monkeypatch.delenv("CARBON_PRICE_USD_PER_TCO2", raising=False)
+    live_data._cache.clear()
+    monkeypatch.setattr(live_data, "_fetch_json", boom)
+    return calls
+
+
+def test_unreachable_feeds_are_not_refetched_on_every_request(monkeypatch):
+    calls = _unreachable_feed(monkeypatch)
+    for _ in range(5):
+        price, carbon_meta = live_data.get_carbon_price()
+        rates, fx_meta = live_data.get_fx_rates()
+        assert price == CARBON_PRICE_USD_PER_TCO2 and carbon_meta["live"] is False
+        assert rates["EUR"] == CURRENCIES["EUR"]["rate_per_usd"] and fx_meta["live"] is False
+    # One attempt per feed, not one per call (each was a full network timeout).
+    assert len(calls) == 2
+    live_data._cache.clear()
+
+
+def test_failed_feed_is_retried_after_the_short_failure_window(monkeypatch):
+    calls = _unreachable_feed(monkeypatch)
+    now = [1_000_000.0]
+    monkeypatch.setattr(live_data.time, "time", lambda: now[0])
+    live_data.get_fx_rates()
+    now[0] += live_data._FAILURE_RETRY_S - 1
+    live_data.get_fx_rates()
+    assert len(calls) == 1
+    now[0] += 2  # past the retry window, well inside the normal TTL
+    live_data.get_fx_rates()
+    assert len(calls) == 2
+    live_data._cache.clear()

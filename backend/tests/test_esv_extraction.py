@@ -1,6 +1,11 @@
 """Tests for the Phase 3 LLM-assisted ESV extraction (deterministic backend)."""
+import io
+import json
 import os
 import sys
+import urllib.request
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -64,3 +69,62 @@ def test_empty_text_is_handled():
     out = extract_esv_records("   ")
     assert out["count"] == 0
     assert out["records"] == []
+
+
+def test_a_leading_year_is_not_mistaken_for_the_value():
+    [rec] = extract_deterministic("In 2019, carbon sequestration was valued at $120 per ha per year.")
+    assert rec.value == 120.0
+    assert rec.currency == "USD"
+
+
+def test_unit_only_figure_is_the_one_before_the_unit():
+    [rec] = extract_deterministic("A 2021 survey put soil erosion control at 85 per hectare.")
+    assert rec.value == 85.0
+    assert rec.currency is None
+
+
+class _FakeResponse(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        {"message": None},
+        [1, 2, 3],
+        {"message": {"content": None}},
+        {"message": {"content": "not json at all"}},
+    ],
+)
+def test_llm_backend_falls_back_on_a_malformed_reply(monkeypatch, reply):
+    payload = json.dumps(reply).encode()
+    monkeypatch.setattr(
+        urllib.request, "urlopen", lambda req, timeout=None: _FakeResponse(payload)
+    )
+    out = extract_esv_records(SAMPLE, backend="llm", host="http://llm.invalid")
+    assert out["backend"] == "deterministic"
+    assert out["fallback_reason"]
+    assert out["count"] >= 3
+
+
+def test_llm_record_with_a_non_string_currency_is_tolerated(monkeypatch):
+    content = json.dumps([{"service": "carbon_capture", "value": 9, "currency": 5}])
+    payload = json.dumps({"message": {"content": content}}).encode()
+    monkeypatch.setattr(
+        urllib.request, "urlopen", lambda req, timeout=None: _FakeResponse(payload)
+    )
+    out = extract_esv_records(SAMPLE, backend="llm", host="http://llm.invalid")
+    assert out["backend"] == "llm"
+    assert out["records"][0]["currency"] is None
+    assert out["records"][0]["value"] == 9.0
+
+
+def test_iso_currency_codes_are_recognised():
+    [rec] = extract_deterministic("Soil erosion prevention: EUR 150 per ha.")
+    assert (rec.value, rec.currency) == (150.0, "EUR")
+    [rec] = extract_deterministic("Carbon storage was worth BRL 2,400 per ha per year.")
+    assert (rec.value, rec.currency) == (2400.0, "BRL")

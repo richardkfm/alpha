@@ -7,6 +7,7 @@ import LayerControl from './components/LayerControl.vue'
 import SearchBar from './components/SearchBar.vue'
 import BrandLogo from './components/BrandLogo.vue'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import OnboardingGuide from './components/OnboardingGuide.vue'
 import { useRegions } from './data/useRegions.js'
 import { serviceCeilings } from './data/yieldScale.js'
 import { version as frontendVersion } from '../package.json'
@@ -93,8 +94,38 @@ function setAllLayers(on) {
 const CURRENCIES = ['USD', 'EUR', 'BRL']
 const currency = ref('USD')
 
-// Dark is the default theme.
-const isDark = ref(true)
+// Dark is the default theme; an explicit choice is remembered per browser.
+// Storage can be unavailable (private mode, blocked site data), so every access
+// is guarded and the app simply falls back to the default.
+const THEME_KEY = 'alpha-theme'
+function readStored(key) {
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+function writeStored(key, value) {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    /* storage unavailable — the choice just isn't remembered */
+  }
+}
+const isDark = ref(readStored(THEME_KEY) !== 'light')
+
+// First-run orientation: a short guide shown until it is dismissed once, and
+// re-openable from the "?" button in the topbar.
+const GUIDE_KEY = 'alpha-guide-seen'
+const showGuide = ref(readStored(GUIDE_KEY) !== '1')
+function closeGuide() {
+  showGuide.value = false
+  writeStored(GUIDE_KEY, '1')
+}
+function goToMode(mode) {
+  closeGuide()
+  appMode.value = mode
+}
 
 // Conversion analysis mode toggles — let users opt out of modes they find too
 // radical without losing the core ESV numbers.
@@ -106,13 +137,21 @@ function applyTheme() {
 }
 function toggleTheme() {
   isDark.value = !isDark.value
+  writeStored(THEME_KEY, isDark.value ? 'dark' : 'light')
   applyTheme()
 }
 
-// Esc dismisses the side panel — the panel itself never steals focus, so a
-// global listener keeps the map interactions uninterrupted.
+// Esc dismisses the top-most layer: the guide first, then the side panel. The
+// panel itself never steals focus, so a global listener keeps the map
+// interactions uninterrupted. The search input handles its own Esc.
 function onKeydown(e) {
-  if (e.key === 'Escape' && selectedRegion.value) closePanel()
+  if (e.key !== 'Escape') return
+  if (showGuide.value) closeGuide()
+  else if (selectedRegion.value && appMode.value === 'map') closePanel()
+}
+
+function retryRegions() {
+  loadRegions(currency.value).then(syncLayerVisibility)
 }
 
 onMounted(async () => {
@@ -152,31 +191,42 @@ async function fetchValuation(region) {
   return res.json()
 }
 
+// Only the newest panel request may write to it. Without this, clicking region
+// A and then B (or switching currency mid-flight) let A's slower response land
+// last: the panel titled B showed A's valuation, and A's `finally` cleared the
+// spinner while B was still loading.
+let panelRequest = 0
+
 // On region click, confirm backend connectivity via GET /health, then value it.
 // Connectivity and valuation are reported separately: a reachable backend that
 // rejects a geometry must not masquerade as "backend offline".
 async function onRegionSelect(region) {
+  const req = ++panelRequest
   selectedRegion.value = region
   valuation.value = null
   errorMsg.value = ''
   loading.value = true
   try {
     const health = await fetch('/health').then((r) => r.json())
+    if (req !== panelRequest) return
     backendOnline.value = health.status === 'ok'
   } catch (e) {
+    if (req !== panelRequest) return
     backendOnline.value = false
     errorMsg.value = t('errors.backendUnreachable')
     loading.value = false
     return
   }
   try {
-    valuation.value = await fetchValuation(region)
+    const result = await fetchValuation(region)
+    if (req === panelRequest) valuation.value = result
   } catch (e) {
+    if (req !== panelRequest) return
     errorMsg.value = e.message
       ? t('errors.valuationFailed', { message: e.message })
       : t('errors.valuationFailedGeneric')
   } finally {
-    loading.value = false
+    if (req === panelRequest) loading.value = false
   }
 }
 
@@ -188,19 +238,23 @@ async function setCurrency(code) {
   // maps don't rebuild — only the Compare numbers and a selected region update).
   loadRegions(code)
   if (!selectedRegion.value) return
+  const req = ++panelRequest
   loading.value = true
   errorMsg.value = ''
   try {
-    valuation.value = await fetchValuation(selectedRegion.value)
+    const result = await fetchValuation(selectedRegion.value)
+    if (req === panelRequest) valuation.value = result
   } catch (e) {
-    errorMsg.value = t('errors.repriceFailed', { code })
+    if (req === panelRequest) errorMsg.value = t('errors.repriceFailed', { code })
   } finally {
-    loading.value = false
+    if (req === panelRequest) loading.value = false
   }
 }
 
 function closePanel() {
+  panelRequest++ // a response still in flight belongs to a closed panel
   selectedRegion.value = null
+  loading.value = false
 }
 </script>
 
@@ -221,23 +275,29 @@ function closePanel() {
           <button
             class="view-btn"
             :class="{ active: appMode === 'map' }"
+            :aria-pressed="appMode === 'map'"
+            :title="t('nav.mapHint')"
             @click="appMode = 'map'"
           >
-            ◍ {{ t('nav.map') }}
+            <span class="btn-icon" aria-hidden="true">◍</span>{{ t('nav.map') }}
           </button>
           <button
             class="view-btn"
             :class="{ active: appMode === 'compare' }"
+            :aria-pressed="appMode === 'compare'"
+            :title="t('nav.compareHint')"
             @click="appMode = 'compare'"
           >
-            ⊞ {{ t('nav.compare') }}
+            <span class="btn-icon" aria-hidden="true">⊞</span>{{ t('nav.compare') }}
           </button>
           <button
             class="view-btn"
             :class="{ active: appMode === 'data' }"
+            :aria-pressed="appMode === 'data'"
+            :title="t('nav.dataHint')"
             @click="appMode = 'data'"
           >
-            ⛁ {{ t('nav.data') }}
+            <span class="btn-icon" aria-hidden="true">⛁</span>{{ t('nav.data') }}
           </button>
         </div>
         <div
@@ -249,16 +309,20 @@ function closePanel() {
           <button
             class="view-btn"
             :class="{ active: viewMode === '3d' }"
+            :aria-pressed="viewMode === '3d'"
+            :title="t('nav.globeHint')"
             @click="viewMode = '3d'"
           >
-            ◐ {{ t('nav.globe') }}
+            <span class="btn-icon" aria-hidden="true">◐</span>{{ t('nav.globe') }}
           </button>
           <button
             class="view-btn"
             :class="{ active: viewMode === '2d' }"
+            :aria-pressed="viewMode === '2d'"
+            :title="t('nav.flatHint')"
             @click="viewMode = '2d'"
           >
-            ▦ {{ t('nav.flat') }}
+            <span class="btn-icon" aria-hidden="true">▦</span>{{ t('nav.flat') }}
           </button>
         </div>
         <div class="currency" role="group" :aria-label="t('currency.group')">
@@ -267,35 +331,63 @@ function closePanel() {
             :key="c"
             class="currency-btn"
             :class="{ active: c === currency }"
+            :aria-pressed="c === currency"
             @click="setCurrency(c)"
           >
             {{ c }}
           </button>
         </div>
         <LanguageSwitcher />
-        <button class="theme-toggle" @click="toggleTheme" :aria-label="isDark ? t('theme.switchToLight') : t('theme.switchToDark')">
-          <span class="toggle-icon">{{ isDark ? '☀' : '☾' }}</span>
+        <button
+          class="theme-toggle"
+          @click="toggleTheme"
+          :aria-label="isDark ? t('theme.switchToLight') : t('theme.switchToDark')"
+          :title="isDark ? t('theme.switchToLight') : t('theme.switchToDark')"
+        >
+          <span class="toggle-icon" aria-hidden="true">{{ isDark ? '☀' : '☾' }}</span>
           <span class="toggle-label">{{ isDark ? t('theme.light') : t('theme.dark') }}</span>
         </button>
+        <button
+          class="help-btn"
+          :class="{ active: showGuide }"
+          :aria-label="t('guide.open')"
+          :title="t('guide.open')"
+          @click="showGuide = true"
+        >?</button>
       </div>
     </header>
 
     <main class="stage">
-      <CompareDashboard
-        v-if="appMode === 'compare'"
-        :regions="regions"
-        :ceilings="serviceMax"
-        :show-liability="showLiability"
-        :show-red-lines="showRedLines"
-      />
-      <DataHub v-else-if="appMode === 'data'" />
+      <transition name="view" mode="out-in">
+        <CompareDashboard
+          v-if="appMode === 'compare'"
+          key="compare"
+          :regions="regions"
+          :ceilings="serviceMax"
+          :show-liability="showLiability"
+          :show-red-lines="showRedLines"
+          :loading="regionsLoading && !regionsLoaded"
+          :error="regionsLoaded ? '' : regionsError"
+          @retry="retryRegions"
+        />
+        <DataHub v-else-if="appMode === 'data'" key="data" />
 
-      <template v-else>
-        <div v-if="!regionsLoaded && regionsLoading" class="stage-state">
-          <span class="stage-spinner"></span>
+        <div v-else key="map" class="map-view" :class="{ 'has-panel': !!selectedRegion }">
+        <div v-if="!regionsLoaded && regionsLoading" class="stage-state" role="status">
+          <span class="spinner" aria-hidden="true"></span>
           {{ t('stage.loading') }}
         </div>
-        <div v-else-if="regionsError" class="stage-state err">{{ regionsError }}</div>
+        <div v-else-if="regionsError && !regionsLoaded" class="stage-state">
+          <div class="state-card" role="alert">
+            <span class="state-icon" aria-hidden="true">!</span>
+            <h2 class="state-title">{{ t('stage.errorTitle') }}</h2>
+            <p class="state-body">{{ regionsError }}</p>
+            <p class="state-hint">{{ t('stage.errorHint') }}</p>
+            <button class="state-retry" :disabled="regionsLoading" @click="retryRegions">
+              {{ regionsLoading ? t('stage.retrying') : t('stage.retry') }}
+            </button>
+          </div>
+        </div>
 
         <template v-else>
           <GlobeMap
@@ -316,6 +408,7 @@ function closePanel() {
             :points="pointFeatures"
             :display-style="displayStyle"
             :visible-layers="visibleLayers"
+            :is-dark="isDark"
             @select="onRegionSelect"
           />
 
@@ -323,6 +416,7 @@ function closePanel() {
             :layers="biomeLayers"
             :visible-layers="visibleLayers"
             :display-style="displayStyle"
+            :style-loading="displayStyle === 'outline' && ecoLoading"
             @toggle="toggleLayer"
             @set-all="setAllLayers"
             @set-style="displayStyle = $event"
@@ -331,7 +425,7 @@ function closePanel() {
           <SearchBar @search="onRegionSelect" />
 
           <transition name="hint">
-            <div v-if="!selectedRegion" class="hint" aria-hidden="true">
+            <div v-if="!selectedRegion && !showGuide" class="hint" aria-hidden="true">
               <span class="hint-pulse"></span>
               <span class="hint-text">{{ t('stage.hint') }}</span>
             </div>
@@ -350,17 +444,36 @@ function closePanel() {
               v-model:show-systemic="showSystemic"
               v-model:show-red-lines="showRedLines"
               @close="closePanel"
+              @retry="onRegionSelect(selectedRegion)"
             />
           </transition>
         </template>
-      </template>
+        </div>
+      </transition>
     </main>
+
+    <transition name="guide">
+      <OnboardingGuide v-if="showGuide" @close="closeGuide" @go="goToMode" />
+    </transition>
+
+    <!-- Non-blocking notice when a re-price fails after the catalogue loaded:
+         the map keeps the last good figures instead of being replaced. -->
+    <transition name="toast">
+      <div v-if="regionsError && regionsLoaded" class="toast" role="status">
+        <span class="toast-dot" aria-hidden="true"></span>
+        <span>{{ t('stage.refreshFailed') }}</span>
+        <button class="toast-btn" :disabled="regionsLoading" @click="retryRegions">
+          {{ t('stage.retry') }}
+        </button>
+      </div>
+    </transition>
 
     <div class="build-footer" :title="backendVersion ? `frontend v${frontendVersion} · backend v${backendVersion}` : `frontend v${frontendVersion}`">
       v{{ frontendVersion }}<template v-if="backendVersion && backendVersion !== frontendVersion"> · api v{{ backendVersion }}</template>
     </div>
   </div>
 </template>
+
 
 <style scoped>
 .app {
@@ -379,7 +492,7 @@ function closePanel() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   padding: 14px 18px;
   pointer-events: none;
 }
@@ -387,13 +500,14 @@ function closePanel() {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
+  flex: none;
   padding: 8px 16px 8px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-soft);
   pointer-events: auto;
 }
@@ -405,7 +519,7 @@ function closePanel() {
   height: 40px;
   border-radius: 50%;
   color: var(--text); /* geodesic mesh strokes inherit this */
-  background: radial-gradient(circle at 30% 25%, rgba(45, 212, 191, 0.22), transparent 70%);
+  background: radial-gradient(circle at 30% 25%, var(--accent-bg), transparent 70%);
   transition: transform 0.5s var(--ease);
 }
 .brand:hover .brand-logo {
@@ -429,7 +543,7 @@ function closePanel() {
 }
 
 .brand-tag {
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   letter-spacing: 0.2px;
 }
@@ -437,38 +551,54 @@ function closePanel() {
 .controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2);
+  min-width: 0;
   padding: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-soft);
   pointer-events: auto;
 }
 
-.viewmode {
+/* Segmented controls (mode, map view, currency) share one look with the
+   language switcher and the layer panel's display-style switch. */
+.viewmode,
+.currency {
   display: inline-flex;
+  flex: none;
   gap: 2px;
   padding: 3px;
   background: var(--bg-deep);
   border: 1px solid var(--border-soft);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
-.view-btn {
+.view-btn,
+.currency-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   color: var(--text-muted);
   border: none;
   padding: 6px 12px;
+  font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.3px;
-  border-radius: 999px;
+  white-space: nowrap;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   transition: color 0.18s var(--ease), background 0.18s var(--ease);
 }
-.view-btn:hover {
+.btn-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.view-btn:hover,
+.currency-btn:hover {
   color: var(--text);
 }
 .view-btn.active {
@@ -476,52 +606,40 @@ function closePanel() {
   color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--border);
 }
-
-.currency {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  background: var(--bg-deep);
-  border: 1px solid var(--border-soft);
-  border-radius: 999px;
-}
-.currency-btn {
-  background: transparent;
-  color: var(--text-muted);
-  border: none;
-  padding: 6px 13px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: color 0.18s var(--ease), background 0.18s var(--ease);
-}
-.currency-btn:hover {
-  color: var(--text);
-}
 .currency-btn.active {
   background: linear-gradient(180deg, var(--accent), var(--teal-strong));
-  color: #04120c;
-  box-shadow: 0 2px 10px rgba(45, 212, 191, 0.3);
+  color: var(--on-accent);
+  box-shadow: 0 2px 10px var(--accent-bg);
 }
 
-.theme-toggle {
+.theme-toggle,
+.help-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex: none;
   gap: 7px;
   pointer-events: auto;
   background: var(--bg-deep);
   color: var(--text);
   border: 1px solid var(--border-soft);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 7px 14px;
+  font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.18s var(--ease), color 0.18s var(--ease);
 }
-.theme-toggle:hover {
+.help-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-weight: 800;
+}
+.theme-toggle:hover,
+.help-btn:hover,
+.help-btn.active {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -535,6 +653,20 @@ function closePanel() {
   flex: 1;
   min-height: 0;
 }
+.map-view {
+  position: absolute;
+  inset: 0;
+}
+/* With the side panel open, keep the search bar centred over the visible map
+   rather than half-hidden under the panel. (On phones the panel covers the
+   whole map anyway.) */
+@media (min-width: 861px) {
+  .map-view.has-panel :deep(.search) {
+    left: calc((100% - min(420px, 94vw)) / 2);
+    /* 300px leaves room for the spin toggle / zoom buttons on either side. */
+    width: min(520px, calc(100% - min(420px, 94vw) - 300px));
+  }
+}
 
 /* Full-stage loading / error state while the region catalogue is fetched. */
 .stage-state {
@@ -543,26 +675,72 @@ function closePanel() {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: var(--space-3);
+  padding: var(--topbar-h) var(--space-4) var(--space-4);
   color: var(--text-muted);
-  font-size: 0.9rem;
-  background: radial-gradient(circle at 50% 40%, #0a1424 0%, var(--bg) 70%);
+  font-size: var(--fs-md);
+  background: var(--stage-bg);
 }
-.stage-state.err {
-  color: #f87171;
+.state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 420px;
+  padding: var(--space-6);
+  text-align: center;
+  border-radius: var(--radius-lg);
+  background: var(--bg-glass);
+  border: 1px solid var(--danger-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-soft);
 }
-.stage-spinner {
-  width: 18px;
-  height: 18px;
+.state-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  animation: stage-spin 0.8s linear infinite;
+  font-weight: 900;
+  font-size: 1.2rem;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
 }
-@keyframes stage-spin {
-  to {
-    transform: rotate(360deg);
-  }
+.state-title {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  color: var(--text);
+}
+.state-body {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.state-hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+.state-retry {
+  margin-top: var(--space-2);
+  padding: 8px 20px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: linear-gradient(180deg, var(--accent), var(--teal-strong));
+  color: var(--on-accent);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.state-retry:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 /* Inviting call-to-action while no region is selected. */
@@ -576,11 +754,11 @@ function closePanel() {
   align-items: center;
   gap: 10px;
   padding: 10px 18px 10px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-soft);
   color: var(--text-muted);
   font-size: 0.82rem;
@@ -598,18 +776,18 @@ function closePanel() {
   height: 9px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.6);
+  box-shadow: 0 0 0 0 var(--accent-border);
   animation: pulse 2s infinite var(--ease);
 }
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.55);
+    box-shadow: 0 0 0 0 var(--accent-border);
   }
   70% {
-    box-shadow: 0 0 0 12px rgba(45, 212, 191, 0);
+    box-shadow: 0 0 0 12px transparent;
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(45, 212, 191, 0);
+    box-shadow: 0 0 0 0 transparent;
   }
 }
 
@@ -634,12 +812,115 @@ function closePanel() {
   opacity: 0;
 }
 
-@media (max-width: 560px) {
+/* Guide fade. */
+.guide-enter-active,
+.guide-leave-active {
+  transition: opacity 0.3s var(--ease);
+}
+.guide-enter-from,
+.guide-leave-to {
+  opacity: 0;
+}
+
+/* Re-price failure notice. */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  z-index: 1250;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-glass);
+  border: 1px solid var(--danger-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-soft);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.toast-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+.toast-btn {
+  flex: none;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-deep);
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+}
+
+/* Narrower desktops: drop the decorative labels before anything wraps. */
+@media (max-width: 1180px) {
+  .toggle-label,
+  .btn-icon {
+    display: none;
+  }
+  .theme-toggle {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+  }
+}
+@media (max-width: 1040px) {
   .brand-tag {
     display: none;
   }
-  .toggle-label {
+}
+
+/* Phones / small tablets: the brand gets its own row and the controls become a
+   single horizontally scrollable strip, so nothing is cut off. */
+@media (max-width: 860px) {
+  .app {
+    --topbar-h: 118px;
+    --map-ctrl-top: 178px; /* below the search bar, which shares the row on desktop */
+  }
+  .topbar {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: 10px 12px;
+  }
+  .brand {
+    padding: 4px 12px 4px 6px;
+  }
+  .brand-logo {
+    width: 32px;
+    height: 32px;
+  }
+  .controls {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-radius: var(--radius);
+  }
+  .controls::-webkit-scrollbar {
     display: none;
+  }
+  .hint {
+    bottom: 96px; /* above the collapsed Biomes panel */
+    font-size: var(--fs-xs);
   }
 }
 

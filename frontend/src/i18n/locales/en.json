@@ -9,7 +9,12 @@
     "data": "Data",
     "mapView": "Map view",
     "globe": "Globe",
-    "flat": "Flat"
+    "flat": "Flat",
+    "mapHint": "Explore valued ecosystems on the globe or flat map",
+    "compareHint": "Compare up to 5 ecosystems side by side",
+    "dataHint": "Data sources, live market data and tools",
+    "globeHint": "3D globe view",
+    "flatHint": "2D flat map with detailed borders"
   },
   "currency": {
     "group": "Currency"
@@ -25,7 +30,12 @@
   },
   "stage": {
     "loading": "Loading ecosystem data…",
-    "hint": "Select any ecosystem to reveal its Total Ecosystem Value"
+    "hint": "Select any ecosystem to reveal its Total Ecosystem Value",
+    "errorTitle": "Can't reach the valuation engine",
+    "errorHint": "The map needs the alpha API. Check that the backend is running, then try again.",
+    "retry": "Try again",
+    "retrying": "Retrying…",
+    "refreshFailed": "Couldn't refresh the figures — showing the last values loaded."
   },
   "errors": {
     "backendUnreachable": "Could not reach the alpha backend. Is it running on :8000?",
@@ -40,7 +50,19 @@
     "submit": "Value",
     "clear": "Clear",
     "hint": "Try {point}, a box {box}, or a GeoJSON Polygon.",
-    "customAreaLabel": "Custom area — valued on demand"
+    "customAreaLabel": "Custom area — valued on demand",
+    "errors": {
+      "empty": "Enter coordinates or paste a GeoJSON polygon.",
+      "badJson": "That looks like JSON but could not be parsed.",
+      "notPolygon": "Paste a GeoJSON Polygon or MultiPolygon (or a Feature wrapping one).",
+      "outOfRange": "Point out of range — expected \"lat, lng\".",
+      "unrecognised": "Enter \"lat, lng\", a \"w, s, e, n\" box, or paste a GeoJSON polygon."
+    },
+    "labels": {
+      "polygon": "Custom polygon",
+      "box": "Bounding box",
+      "point": "Point {coords}"
+    }
   },
   "layerControl": {
     "ariaLabel": "Biome layers",
@@ -62,7 +84,10 @@
         "label": "Outline",
         "hint": "Detailed ecoregion borders, no fill"
       }
-    }
+    },
+    "collapse": "Collapse the biome panel",
+    "expand": "Expand the biome panel",
+    "styleLoading": "Loading detailed ecoregion borders…"
   },
   "biomes": {
     "tropical_rainforest": { "label": "Tropical Rainforest", "short": "Rainforest", "sublabel": "tropical moist broadleaf" },
@@ -161,7 +186,13 @@
       "redLinesHead": "⛔ Cannot be replaced at any price",
       "redLinesHeadTitle": "Red lines, not line items — deliberately left out of the figures above"
     },
-    "methodology": "Methodology"
+    "methodology": "Methodology",
+    "closeTitle": "Close (Esc)",
+    "error": {
+      "title": "This area couldn't be valued",
+      "offlineTitle": "Valuation engine offline",
+      "retry": "Try again"
+    }
   },
   "comparisons": {
     "approx": "≈",
@@ -190,5 +221,152 @@
       "debt_usa": "US national debt",
       "global_equity_marketcap": "all listed shares on earth"
     }
+  },
+  "guide": {
+    "open": "Quick guide",
+    "close": "Close guide",
+    "eyebrow": "Quick guide",
+    "title": "What is nature worth?",
+    "lead": "alpha puts a price on the services ecosystems deliver every year — and on what is lost if the land is converted.",
+    "steps": {
+      "click": {
+        "title": "Click any coloured area",
+        "body": "Each shape is a named ecosystem, coloured by biome. Clicking one opens its full valuation on the right."
+      },
+      "numbers": {
+        "title": "Read the three headline figures",
+        "body": "Standing asset value — what the land is worth left intact. Total Ecosystem Value — the services it delivers per year. Perpetual liability — the permanent cost if it were converted."
+      },
+      "search": {
+        "title": "Value your own area",
+        "body": "Type \"lat, lng\", a \"w, s, e, n\" box, or paste a GeoJSON polygon into the search bar."
+      },
+      "styles": {
+        "title": "Change the view",
+        "body": "Use the Biomes panel to filter layers and switch between fill, value bubbles and detailed outlines; toggle Globe / Flat and the currency in the top bar."
+      }
+    },
+    "note": "Figures are indicative, citation-backed reference values — every panel links to its methodology, and the Data Hub lists each source.",
+    "openCompare": "Compare ecosystems",
+    "openData": "Open the Data Hub",
+    "start": "Start exploring"
+  },
+  "globe": {
+    "pause": "Pause rotation",
+    "resume": "Resume rotation",
+    "spinning": "Spinning",
+    "paused": "Paused",
+    "columnCaption": "Column height = annual ecosystem value"
+  },
+  "compare": {
+    "regions": "Regions",
+    "selected": "{n} / {max} selected",
+    "capacityTitle": "You can compare up to {max} ecosystems at once",
+    "searchPlaceholder": "Search ecosystems…",
+    "searchLabel": "Search regions",
+    "sortGroup": "Sort regions",
+    "sort": {
+      "value": "Value",
+      "area": "Area",
+      "name": "A–Z"
+    },
+    "loading": "Loading ecosystems…",
+    "noRegions": "No ecosystems available yet.",
+    "noResults": "No ecosystems match “{query}”.",
+    "clearSearch": "Clear search",
+    "capacityFull": "Maximum reached — remove one to add another.",
+    "pickSub": "{value} / ha · {area} ha",
+    "title": "Compare ecosystems",
+    "subtitle": "Total Ecosystem Value side by side — {currency} per hectare per year. Add up to {max}.",
+    "clear": "Clear",
+    "empty": "Pick regions from the left to compare their ecosystem-service yields and Total Ecosystem Value.",
+    "remove": "Remove {name}",
+    "rows": {
+      "tevHa": "TEV / ha / yr",
+      "annual": "Annual value (whole area)",
+      "asset": "Standing asset value",
+      "liability": "Conversion liability",
+      "redLines": "Red lines",
+      "redLinesCount": "{n} irreversible loss | {n} irreversible losses",
+      "area": "Area",
+      "intactness": "Intactness"
+    }
+  },
+  "dataHub": {
+    "title": "Data Hub",
+    "subtitle": "Every input behind a valuation — where it comes from, how current it is, and what we still need.",
+    "market": {
+      "carbon": "Carbon price",
+      "fx": "FX (per USD)",
+      "live": "Live",
+      "static": "Static",
+      "liveTitle": "Fetched live from the market feed",
+      "staticTitle": "Live feed unavailable or not configured — using the documented static reference",
+      "fallbackNote": "One or more live market feeds are off or unreachable, so valuations use the documented static reference values.",
+      "unavailable": "Market data is unavailable right now."
+    },
+    "asOf": "as of {date}",
+    "loading": "Loading data catalogue…",
+    "error": "Could not load the data catalogue from the alpha backend.",
+    "status": {
+      "authoritative": {
+        "label": "Authoritative",
+        "hint": "Peer-reviewed or official dataset used as-is"
+      },
+      "reference": {
+        "label": "Reference",
+        "hint": "Documented reference values — sound, but static"
+      },
+      "placeholder": {
+        "label": "Placeholder",
+        "hint": "Stand-in until a better source is wired in"
+      }
+    },
+    "sections": {
+      "sources": "Data sources",
+      "needs": "Data we still need",
+      "tools": "Live tools"
+    },
+    "tools": {
+      "esv": {
+        "title": "Extract ESV values from text",
+        "sub": "Pulls structured ecosystem-service values out of report / TNFD-disclosure prose.",
+        "run": "Extract",
+        "running": "Extracting…",
+        "failed": "Extraction failed. Is the backend running?",
+        "records": "{n} record | {n} records",
+        "backend": "backend: {name}",
+        "fallback": "fallback",
+        "cols": {
+          "service": "Service",
+          "value": "Value",
+          "currency": "Cur.",
+          "unit": "Unit"
+        },
+        "empty": "No structured values found in that text."
+      },
+      "classify": {
+        "title": "Classify a polygon's biome",
+        "sub": "Locates a GeoJSON polygon in the ingested boundary data and returns the detected biome + provenance.",
+        "run": "Classify",
+        "running": "Classifying…",
+        "invalidJson": "That is not valid JSON. Paste a GeoJSON Polygon geometry.",
+        "failed": "Classification failed. Check the geometry and the backend.",
+        "confidence": "confidence: {value}",
+        "matched": "matched: {value}"
+      }
+    }
+  },
+  "embed": {
+    "noRegion": "No region specified.",
+    "notFound": "Region not found.",
+    "failed": "Could not load valuation.",
+    "open": "Open alpha",
+    "tev": "Total Ecosystem Value",
+    "perYear": "/ yr",
+    "perYearAria": "per year",
+    "wholeArea": "per year, whole area",
+    "standing": "Standing asset",
+    "liability": "If converted (liability)"
   }
 }

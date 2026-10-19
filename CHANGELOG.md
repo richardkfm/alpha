@@ -12,6 +12,41 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
 
 ## [Unreleased]
 
+### Data & accuracy
+
+- **Full recalibration of every biome coefficient** (`backend/reference_data.py`,
+  `backend/METHODOLOGY.md`). Non-carbon values are now derived in code from the
+  published ESVD table cells they rest on (Brander et al. 2024; de Groot et al.
+  2012 medians), on a median basis, with ≥3 value estimates per cell. All figures
+  are restated in **2024 USD** (BLS CPI-U). The 15 of 55 coefficients without
+  enough evidence are kept as **flagged estimates**, and every valuation now
+  reports `basis` / `evidence_n` / `price_year` per category. TEV per hectare
+  moved substantially: rainforest −37%, mangrove +237%, wetland −67%,
+  freshwater −72%, peri-urban +344% (table in METHODOLOGY §10).
+- **Carbon price $40 → $80/tCO2** (2024 USD): the low end of the IPCC AR6 WGIII
+  2 °C-pathway range for 2030, close to the 2025 EU ETS average. The old
+  justification was wrong on two counts: $40 was below the AR6 range, and
+  China's ETS was quoted at ~$30–40 when it trades at ~$9.
+- **Sequestration** now comes from Pan et al. 2024 (forests: tropical 2.4,
+  temperate 3.2, boreal 1.0 tCO2/ha/yr) and the IPCC 2013 Wetlands Supplement
+  (mangrove 5.9). Cropland (IPCC Tier 1) and tundra (Natali et al. 2019) are set
+  to 0.
+- **Carbon debt** no longer assumes the entire 1 m soil stock is released. It is
+  now vegetation × intactness plus soil × an IPCC-based release fraction, with
+  pools from IPCC SRLULUCF / the Wetlands Supplement.
+- **Double counting and scope fixes:** ESVD "climate regulation" (carbon) is no
+  longer counted on top of carbon capture, and drinking-water supply
+  (provisioning) no longer inflates freshwater.
+- **Static FX refreshed** to the ECB 2026-10-16 rates (EUR 0.8887, BRL 5.0828).
+  The old EUR 0.92 "2025-12" rate was stale.
+- **Land-cover legend** (`backend/landcover.py`) now hints at the
+  boreal/cropland/freshwater/tundra/desert biomes. Optional biome-aware
+  intactness stops a biome's own natural cover (e.g. bare ground in a desert)
+  being scored as degraded.
+- **Data Hub provenance** (`backend/datasets.py`, `live_data.py`) cites the
+  new sources and dates. New `tests/test_reference_data.py` pins every
+  coefficient and checks unit, FX and CPI round-trips and totals = Σ services.
+
 ### Changed
 
 - **Carbon price reference bumped $30 → $40/tCO2** (`backend/reference_data.py`,
@@ -74,6 +109,82 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
   - Figures below ~1 billion USD get no comparison at all. `0.000002× Austria's
     GDP` is worse than saying nothing.
   - The PDF brief carries the same cue next to each headline row.
+
+### Design & UI
+
+- **First-run guide.** A short, dismissible orientation card explains what to
+  click, what the three headline figures mean (standing asset, annual TEV,
+  conversion liability), how to value a custom area and where display styles,
+  Compare and the Data Hub live. Shown once, re-openable from a new **?**
+  button in the topbar; Esc or a backdrop click closes it.
+- **Loading, empty and error states everywhere.** Backend-unreachable now shows
+  a card with a **Try again** button instead of a bare red line; the side panel
+  error, Data Hub and Compare all get retry actions; a failed currency re-price
+  keeps the last good figures and shows a small notice instead of blanking the
+  map; Compare says when a search matches nothing (with "Clear search"), shows
+  an "n / 5 selected" counter and explains the cap; the Data Hub says in words
+  when live market feeds have fallen back to static references.
+- **Fully localised UI.** Compare, Data Hub, globe controls, search errors and
+  the embeddable card were English-only; every string now goes through the
+  en/de/es catalogues. The embed card lazy-loads just its one locale.
+- **Design tokens.** `theme.css` gains a spacing scale, type scale, pill radius,
+  semantic status colours (`--danger`, `--warn`, `--accent-bg`, `--gold-bg`, …),
+  `--on-accent`, `--stage-bg` and topbar/map-control offsets; hard-coded hex and
+  rgba colours in components were replaced with them. Buttons and inputs now
+  inherit Inter.
+- **Light theme fixed and legible.** Compare, Data Hub, the loading stage and the
+  globe no longer paint a dark navy blob behind light-theme content; the flat
+  map switches to the light Positron basemap; light accent, gold, faint-text
+  and danger colours were darkened for contrast on white. The theme choice is
+  remembered per browser.
+- **Layout & discoverability.** Mode buttons carry tooltips; the Biomes panel is
+  collapsible (collapsed by default on phones), labels its display-style switch
+  and states what the active style encodes; Outline shows a spinner while
+  detailed borders load. Zoom controls no longer hide under the topbar, clicked
+  flat-map shapes lose the stray focus rectangle, the 3D column caption no
+  longer sits under the Biomes panel, and the search bar re-centres beside an
+  open side panel. Data Hub content scrolls below the topbar instead of under
+  it. On phones the topbar wraps to a scrollable control strip and Compare
+  stacks vertically. Map / Compare / Data switch with a short fade.
+- **Keyboard.** Esc closes the guide, then the side panel; inside the search
+  field it clears the input first. Toggle buttons expose `aria-pressed`.
+
+### Bug fixes
+
+- **API input validation:** malformed GeoJSON (empty rings, non-numeric or NaN
+  positions, latitudes outside ±90°) now gets a `422` instead of a `500` or a
+  nonsense area, and an unknown explicit `biome` is a `422` rather than being
+  silently valued as tropical rainforest.
+- **Antimeridian-crossing polygons** (`178 … -179`) are valued and classified
+  correctly — previously ~119× too large and located half a planet away. The
+  frontend's centroid (globe fly-to, bubbles) got the same fix.
+- **Exports:** region names with `<`, non-Latin scripts (`Москва`) or accents
+  no longer crash the PDF/CSV download; the CSV neutralises formula-like names.
+- **Live data:** an unreachable FX/carbon feed is remembered for 60 s instead
+  of costing a 6 s timeout on every request; a `nan`/negative
+  `CARBON_PRICE_USD_PER_TCO2` override is ignored.
+- **ESV extraction:** a leading year (`In 2019, … $120 per ha`) is no longer
+  taken as the value, ISO codes (`EUR 150`) are recognised, and a malformed
+  LLM reply falls back to the regex extractor instead of a `500`.
+- **`ingest.py`** works again (it imported a removed `DATA_PATH`).
+- **UI races / stale state:** a slow valuation for a previously clicked region,
+  or an out-of-order currency re-price, can no longer overwrite the current
+  panel or catalogue; exports are named after the region actually exported;
+  Compare seeds itself when opened before the catalogue arrives; a failed
+  re-price keeps the map on screen.
+- **Outline mode** now really draws the detailed RESOLVE ecoregion borders
+  (both maps ignored the swapped geometry).
+- **Side panel:** the conversion liability follows the selected discount rate
+  like the standing asset it is a premium on; custom search areas no longer
+  offer a broken embed snippet.
+- **Embed widget:** an unsupported `?currency=` no longer crashes the card or
+  mislabels dollar figures.
+- **Search box:** rejects non-numeric input instead of dropping tokens, accepts
+  a trailing comma, and range-checks bounding boxes.
+- **Start-up:** blocked `localStorage` no longer prevents the app from loading.
+- **Deployment:** `scripts/gen-env.sh` generates a URL-safe password (base64's
+  `/` broke `DATABASE_URL`); the frontend image no longer copies a host
+  `node_modules` and installs from the lockfile.
 
 ## [0.4.0]
 

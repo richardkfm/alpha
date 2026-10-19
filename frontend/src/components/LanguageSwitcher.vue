@@ -5,6 +5,8 @@ import { SUPPORTED_LOCALES, setLocale } from '../i18n/index.js'
 const { locale, t } = useI18n()
 
 const LABELS = { en: 'EN', de: 'DE', es: 'ES' }
+// Endonyms: each language is named in itself, so they need no translation.
+const NAMES = { en: 'English', de: 'Deutsch', es: 'Español' }
 </script>
 
 <template>
@@ -14,6 +16,9 @@ const LABELS = { en: 'EN', de: 'DE', es: 'ES' }
       :key="code"
       class="language-btn"
       :class="{ active: code === locale }"
+      :aria-pressed="code === locale"
+      :title="NAMES[code]"
+      :lang="code"
       @click="setLocale(code)"
     >
       {{ LABELS[code] }}
@@ -28,7 +33,7 @@ const LABELS = { en: 'EN', de: 'DE', es: 'ES' }
   padding: 3px;
   background: var(--bg-deep);
   border: 1px solid var(--border-soft);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 .language-btn {
   background: transparent;
@@ -38,7 +43,7 @@ const LABELS = { en: 'EN', de: 'DE', es: 'ES' }
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   transition: color 0.18s var(--ease), background 0.18s var(--ease);
 }
