@@ -14,7 +14,10 @@ if grep -q '^ALPHA_DB_PASSWORD=.\+' .env; then
   exit 0
 fi
 
-password="$(openssl rand -base64 24)"
+# Hex, not base64: base64 emits "/" and "+", and the password is spliced
+# into DATABASE_URL (postgresql://alpha:<password>@db…), where a "/" ends
+# the authority part and breaks the URL.
+password="$(openssl rand -hex 24)"
 if grep -q '^ALPHA_DB_PASSWORD=' .env; then
   sed -i.bak "s|^ALPHA_DB_PASSWORD=.*|ALPHA_DB_PASSWORD=${password}|" .env
   rm -f .env.bak
