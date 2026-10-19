@@ -79,6 +79,7 @@ onMounted(() => {
       },
     })
     leafletLayers[def.id] = gjLayer
+    layerData[def.id] = def.geojson
   })
 
   applyStyle()
@@ -140,9 +141,27 @@ function applyStyle() {
   if (style === 'bubbles') bubbleLayer.addTo(map)
 }
 
+// The parent swaps each layer's geometry — Outline mode switches to the
+// detailed RESOLVE ecoregions once they've lazy-loaded, and back again. The
+// layers above were only ever built from the geometry present at mount, so
+// Outline kept drawing the coarse catalogue shapes. Refill changed layers.
+const layerData = {} // id -> geojson currently drawn
+function syncLayerData() {
+  if (!map) return
+  for (const def of props.layers) {
+    const lyr = leafletLayers[def.id]
+    if (!lyr || layerData[def.id] === def.geojson) continue
+    lyr.clearLayers()
+    lyr.addData(def.geojson)
+    layerData[def.id] = def.geojson
+  }
+  applyStyle()
+}
+
 watch(() => props.visibleLayers, applyStyle, { deep: true })
 watch(() => props.displayStyle, applyStyle)
 watch(() => props.points, applyStyle)
+watch(() => props.layers, syncLayerData)
 
 onBeforeUnmount(() => {
   if (map) map.remove()

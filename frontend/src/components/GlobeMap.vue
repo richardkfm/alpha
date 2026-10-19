@@ -457,6 +457,7 @@ function addThematicLayers() {
     const srcId = `layer-${l.id}`
     if (!map.getSource(srcId)) {
       map.addSource(srcId, { type: 'geojson', data: l.geojson, promoteId: 'regionId' })
+      layerData[l.id] = l.geojson
     }
     // soft outer glow (under), translucent fill, crisp neon outline (over)
     map.addLayer({
@@ -730,6 +731,21 @@ function updatePoints() {
   if (src) src.setData(visiblePointData())
 }
 
+// The parent swaps each layer's geometry — Outline mode switches to the
+// detailed RESOLVE ecoregions once they've lazy-loaded, and back again. The
+// sources were only ever filled at load, so Outline kept drawing the coarse
+// catalogue shapes. Push changed geometry into the existing sources.
+const layerData = {} // id -> geojson currently in the source
+function syncLayerData() {
+  if (!map) return
+  for (const l of props.layers) {
+    const src = map.getSource(`layer-${l.id}`)
+    if (!src || layerData[l.id] === l.geojson) continue
+    src.setData(l.geojson)
+    layerData[l.id] = l.geojson
+  }
+}
+
 // Visibility is the product of the active display style and the per-biome toggles.
 function applyVisibility() {
   if (!map) return
@@ -849,6 +865,7 @@ onBeforeUnmount(() => {
 watch(() => props.visibleLayers, applyVisibility, { deep: true })
 watch(() => props.displayStyle, applyVisibility)
 watch(() => props.points, updatePoints)
+watch(() => props.layers, syncLayerData)
 watch(() => props.isDark, updateTheme)
 watch(() => props.selected, (region) => updateSelection(region))
 </script>
