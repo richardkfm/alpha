@@ -258,6 +258,12 @@
     "paused": "Paused",
     "columnCaption": "Column height = annual ecosystem value"
   },
+  "rankingNote": {
+    "panel": "Why so high? Per hectare, published studies value farmland and urban green space at or above tropical forest, because many people live close enough to benefit from their services (Costanza et al. 2014; Brander et al. 2024). Natural biomes cover far larger areas and carry irreversible losses (red lines) that no per-hectare figure captures.",
+    "compare": "Cropland and peri-urban areas can rank at or above rainforest per hectare. That follows the published evidence: their services reach many people nearby (Costanza et al. 2014; Brander et al. 2024). Look at the totals too, and at the red lines in each region's panel.",
+    "hubTitle": "How to read the rankings",
+    "hubBody": "Per-hectare values follow the published syntheses, not intuition. Farmland and urban green space rank at or above tropical forest per hectare because many people live close enough to benefit from their services (Costanza et al. 2014; Brander et al. 2024). Each biome is valued against its own reference state, so managed land is not discounted a second time for not being natural. Irreversible losses (extinction, peat, permafrost) are flagged as red lines rather than priced."
+  },
   "compare": {
     "regions": "Regions",
     "selected": "{n} / {max} selected",

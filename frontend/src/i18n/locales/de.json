@@ -258,6 +258,12 @@
     "paused": "Angehalten",
     "columnCaption": "Säulenhöhe = jährlicher Ökosystemwert"
   },
+  "rankingNote": {
+    "panel": "Warum so hoch? Pro Hektar bewerten veröffentlichte Studien Ackerland und städtisches Grün gleich hoch wie oder höher als Tropenwald, weil viele Menschen nah genug leben, um von ihren Leistungen zu profitieren (Costanza et al. 2014; Brander et al. 2024). Natürliche Biome umfassen weit größere Flächen und bergen unumkehrbare Verluste (rote Linien), die kein Hektarwert erfasst.",
+    "compare": "Ackerland und stadtnahe Flächen können pro Hektar gleichauf mit oder über Regenwald liegen. Das entspricht der veröffentlichten Evidenz: Ihre Leistungen kommen vielen Menschen in der Nähe zugute (Costanza et al. 2014; Brander et al. 2024). Achten Sie auch auf die Gesamtwerte und auf die roten Linien im Panel jeder Region.",
+    "hubTitle": "So lesen Sie die Rangfolge",
+    "hubBody": "Hektarwerte folgen den veröffentlichten Synthesen, nicht der Intuition. Ackerland und städtisches Grün liegen pro Hektar gleichauf mit oder über Tropenwald, weil viele Menschen nah genug leben, um von ihren Leistungen zu profitieren (Costanza et al. 2014; Brander et al. 2024). Jedes Biom wird an seinem eigenen Referenzzustand gemessen; bewirtschaftete Flächen werden also nicht ein zweites Mal dafür abgewertet, dass sie nicht natürlich sind. Unumkehrbare Verluste (Artensterben, Torf, Permafrost) werden als rote Linien markiert statt bepreist."
+  },
   "compare": {
     "regions": "Regionen",
     "selected": "{n} / {max} ausgewählt",

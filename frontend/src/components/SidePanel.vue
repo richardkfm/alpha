@@ -37,6 +37,9 @@ const { money, moneyFull, perHa, count, hectares, decimal, percent, likeTarget }
 // Phase 3: the backend now detects the biome from ingested boundary data.
 const classification = computed(() => props.valuation?.classification ?? null)
 const biomeKey = computed(() => classification.value?.biome_key ?? props.region.biome_key)
+// Farmland and peri-urban land can outrank rainforest per hectare (the published
+// evidence says so); explain that rather than let it read as a bug.
+const showRankingNote = computed(() => ['cropland', 'peri_urban'].includes(biomeKey.value))
 const biomeHue = computed(() => biomeColor(biomeKey.value))
 // The backend's classification.biome_label is English-only; prefer the
 // frontend's translated biome catalogue keyed by biome_key instead.
@@ -399,6 +402,7 @@ async function copyEmbed() {
           <small>{{ t('sidePanel.yields.unit', { currency: valuation.currency }) }}</small>
         </h3>
         <p class="yields-scale">{{ t('sidePanel.yields.scale') }}</p>
+        <p v-if="showRankingNote" class="rank-note">{{ t('rankingNote.panel') }}</p>
         <ul>
           <li
             v-for="row in yieldRows"
@@ -943,6 +947,16 @@ async function copyEmbed() {
   font-size: 0.68rem;
   font-style: italic;
   color: var(--text-faint);
+}
+.rank-note {
+  margin: -6px 0 14px;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--gold);
+  border-radius: 4px;
+  background: var(--gold-bg);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 .yields ul {
   list-style: none;

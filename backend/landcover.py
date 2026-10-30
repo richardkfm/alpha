@@ -81,6 +81,9 @@ NATURAL_COVER: dict[str, frozenset[int]] = {
     "wetland": frozenset({80, 90}),
     "temperate_grassland": frozenset({20, 30}),
     "cropland": frozenset({40}),
+    # Peri-urban ESV is measured on built and farmed land (ESVD urban / intensive),
+    # so that cover is its reference state, not degradation.
+    "peri_urban": frozenset({20, 30, 40, 50}),
     "mangrove": frozenset({MANGROVE_PSEUDO_CODE, 80}),
 }
 

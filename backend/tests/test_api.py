@@ -149,7 +149,9 @@ def test_valuation_intactness_query_scales_value():
 def test_regions_carry_intactness_and_asset_value():
     regions = client.get("/api/v1/regions").json()["regions"]
     crop = next(r for r in regions if r["biome_key"] == "cropland")
-    assert 0 < crop["intactness"] < 1  # managed land is below full intactness
+    # Cropland ESV is already measured on managed land; a further intactness
+    # haircut would count that degradation twice.
+    assert crop["intactness"] == 1.0
     assert crop["capitalized_value"]["asset_value_total"] > 0
 
 

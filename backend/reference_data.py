@@ -576,6 +576,11 @@ DEFAULT_DISCOUNT_RATE = 0.03
 # land-cover sampling (``landcover.py``) is wired in. These are heuristic
 # judgements, not literature-derived values. A region may override this with an
 # explicit ``intactness`` property.
+#
+# Cropland and peri-urban are 1.0: their ESV coefficients (ESVD "intensive land
+# uses" / "urban & industrial") are already measured on managed land, so a
+# further haircut for "not being natural" would count that degradation twice.
+# Each biome is judged against its own reference state.
 # ---------------------------------------------------------------------------
 BIOME_DEFAULT_INTACTNESS: dict[str, float] = {
     "tropical_rainforest": 0.85,
@@ -585,8 +590,8 @@ BIOME_DEFAULT_INTACTNESS: dict[str, float] = {
     "wetland": 0.85,
     "freshwater": 0.95,
     "temperate_grassland": 0.80,
-    "cropland": 0.45,
-    "peri_urban": 0.50,
+    "cropland": 1.0,
+    "peri_urban": 1.0,
     "tundra": 0.95,
     "desert": 0.90,
 }

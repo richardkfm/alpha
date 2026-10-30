@@ -168,6 +168,14 @@ The per-cell derivation (source, statistic, raw value, *n*, 2024-USD value) is i
   upper-end figure.
 - **Temperate forest** air-quality regulation (n = 302) comes overwhelmingly from
   the same UK study; its pollination value rests on 4 estimates.
+- **Managed land is not discounted twice.** The cropland and peri-urban values
+  above are measured *on* managed land (ESVD "intensive land uses" / "urban &
+  industrial"). Their default intactness is therefore 1.0, and farmed or built
+  cover counts as their reference state in `landcover.NATURAL_COVER`. A further
+  intactness haircut would penalise the same degradation twice. Every biome is
+  judged against its own reference state; what conversion destroys is carried by
+  the liability and red lines, not by a lower intactness. The UI explains this
+  ranking next to cropland / peri-urban figures, in Compare and in the Data Hub.
 
 ---
 

@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import EmbedCard from './EmbedCard.vue'
+import { formatMoney } from '../data/formatNumber.js'
 
 // Shaped like GET /api/v1/regions/{id}: the backend prices an unsupported
 // ?currency= in USD and says so in `currency`.
@@ -14,6 +15,7 @@ function regionResponse(currency) {
       currency,
       area: { hectares: 652_000_000 },
       total_ecosystem_value_per_year: 705_000_000_000,
+      capitalized_value: { discount_rate: 0.03, asset_value_total: 19_900_000_000_000 },
       conversion_liability: { present_value: 37_500_000_000_000 },
     },
     currency,
@@ -60,5 +62,11 @@ describe('EmbedCard', () => {
     const { wrapper, fetchMock } = await mountWith('region=amazon&currency=eur&locale=de', 'EUR')
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/regions/amazon?currency=EUR')
     expect(wrapper.text()).toContain('€')
+  })
+
+  it("shows the backend's capitalised value rather than recomputing it", async () => {
+    const { wrapper } = await mountWith('region=amazon&currency=USD', 'USD')
+    // 705 bn / 0.03 would be 23.5 T; the backend figure must win.
+    expect(wrapper.text()).toContain(formatMoney(19_900_000_000_000, { locale: 'en', currency: 'USD' }))
   })
 })

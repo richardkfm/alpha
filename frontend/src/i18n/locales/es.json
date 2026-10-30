@@ -258,6 +258,12 @@
     "paused": "En pausa",
     "columnCaption": "Altura de la columna = valor ecosistémico anual"
   },
+  "rankingNote": {
+    "panel": "¿Por qué tan alto? Por hectárea, los estudios publicados valoran las tierras de cultivo y las zonas verdes urbanas igual o por encima del bosque tropical, porque mucha gente vive lo bastante cerca para beneficiarse de sus servicios (Costanza et al. 2014; Brander et al. 2024). Los biomas naturales abarcan superficies mucho mayores y conllevan pérdidas irreversibles (líneas rojas) que ninguna cifra por hectárea recoge.",
+    "compare": "Las tierras de cultivo y las zonas periurbanas pueden igualar o superar a la selva tropical por hectárea. Así lo indica la evidencia publicada: sus servicios llegan a mucha gente cercana (Costanza et al. 2014; Brander et al. 2024). Fíjese también en los totales y en las líneas rojas del panel de cada región.",
+    "hubTitle": "Cómo leer las clasificaciones",
+    "hubBody": "Los valores por hectárea siguen las síntesis publicadas, no la intuición. Las tierras de cultivo y las zonas verdes urbanas se sitúan igual o por encima del bosque tropical por hectárea porque mucha gente vive lo bastante cerca para beneficiarse de sus servicios (Costanza et al. 2014; Brander et al. 2024). Cada bioma se valora frente a su propio estado de referencia, de modo que la tierra gestionada no se penaliza por segunda vez por no ser natural. Las pérdidas irreversibles (extinción, turba, permafrost) se señalan como líneas rojas en lugar de tener precio."
+  },
   "compare": {
     "regions": "Regiones",
     "selected": "{n} / {max} seleccionadas",

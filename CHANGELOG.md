@@ -46,6 +46,16 @@ This file starts at 0.4.0. Earlier phases predate it and are described in
 - **Data Hub provenance** (`backend/datasets.py`, `live_data.py`) cites the
   new sources and dates. New `tests/test_reference_data.py` pins every
   coefficient and checks unit, FX and CPI round-trips and totals = Σ services.
+- **No double haircut on managed land:** cropland and peri-urban default
+  intactness is now 1.0 (was 0.45 / 0.50), and built/farmed cover counts as
+  peri-urban's natural state. Their ESVD values are already measured on managed
+  land, so scaling them down again for "not being natural" counted that
+  degradation twice. Each biome is now judged against its own reference state.
+- **Ranking note in the UI:** the side panel (cropland / peri-urban regions),
+  Compare (when either is selected) and the Data Hub explain why farmland and
+  peri-urban land can rank at or above rainforest per hectare, in en/de/es.
+- **Embed card** shows the backend's `capitalized_value` instead of recomputing
+  `annual / 0.03`, so it cannot drift from the side panel.
 
 ### Changed
 

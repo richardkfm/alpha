@@ -73,6 +73,7 @@ def test_natural_cover_is_intact_for_its_own_biome():
     assert aggregate_intactness({60: 1.0}, biome_key="desert") == 1.0
     assert aggregate_intactness({100: 1.0}, biome_key="tundra") == 1.0
     assert aggregate_intactness({80: 1.0}, biome_key="freshwater") == 1.0
+    assert aggregate_intactness({50: 1.0}, biome_key="peri_urban") == 1.0
     # Cropland cover inside a rainforest is still degraded.
     assert aggregate_intactness({40: 1.0}, biome_key="tropical_rainforest") == 0.1
     # Mixed: half intact desert, half urban.

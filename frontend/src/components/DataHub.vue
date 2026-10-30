@@ -174,6 +174,9 @@ onMounted(loadCatalog)
       </div>
 
       <template v-else-if="catalog">
+        <h3 class="section-title">{{ t('rankingNote.hubTitle') }}</h3>
+        <p class="rank-note">{{ t('rankingNote.hubBody') }}</p>
+
         <!-- Sources -->
         <h3 class="section-title">{{ t('dataHub.sections.sources') }}</h3>
         <div class="cards">
@@ -442,6 +445,14 @@ onMounted(loadCatalog)
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.rank-note {
+  max-width: 80ch;
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
   color: var(--text-muted);
 }
 

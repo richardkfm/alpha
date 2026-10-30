@@ -47,12 +47,9 @@ document.documentElement.lang = locale
 const biomeKey = computed(() => region.value?.biome_key ?? 'tropical_rainforest')
 const accent = computed(() => biomeColor(biomeKey.value))
 
-// Capitalise the annual flow at the standard 3% reference so the embed shows the
-// same standing-asset figure the side panel defaults to.
-const standingValue = computed(() => {
-  const annual = region.value?.total_ecosystem_value_per_year
-  return annual == null ? null : annual / 0.03
-})
+// The backend's capitalised value at its default discount rate — the same
+// standing-asset figure the side panel opens with.
+const standingValue = computed(() => region.value?.capitalized_value?.asset_value_total ?? null)
 const liability = computed(() => region.value?.conversion_liability?.present_value ?? null)
 
 // Format in the currency the backend actually priced in, not the one the URL

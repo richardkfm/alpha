@@ -89,6 +89,10 @@ function clearAll() {
 
 // ----- comparison (right) --------------------------------------------------
 // Resolve selected ids to live region objects, preserving pick order.
+// Explain why farmland / peri-urban can outrank rainforest per hectare.
+const showRankingNote = computed(() =>
+  selected.value.some((r) => r.biome_key === 'cropland' || r.biome_key === 'peri_urban'),
+)
 const selected = computed(() =>
   selectedIds.value
     .map((id) => props.regions.find((r) => r.id === id))
@@ -316,6 +320,7 @@ watch(
             </div>
           </template>
         </div>
+        <p v-if="showRankingNote" class="rank-note">{{ t('rankingNote.compare') }}</p>
       </div>
     </div>
   </section>
@@ -645,6 +650,13 @@ watch(
   flex: 1;
   overflow: auto;
   padding: 6px 18px 18px;
+}
+.rank-note {
+  max-width: 72ch;
+  margin: var(--space-3) 0 0;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 .matrix {
   display: grid;
