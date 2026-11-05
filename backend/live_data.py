@@ -50,7 +50,7 @@ relying on one in production, and expect endpoints/auth to drift over time):
    roughly an annual cadence) but the most authoritative multi-jurisdiction
    reference available. Better suited to periodically refreshing the
    *static* ``CARBON_PRICE_USD_PER_TCO2`` constant in
-   ``reference_data.py`` (the way it was bumped $30→$40) than to wiring as
+   ``reference_data.py`` (the way it was revised $30→$40→$80) than to wiring as
    a live ``CARBON_PRICE_URL``.
 
 Also still viable, unranked: **Ember/Sandbag's Carbon Price Viewer**
@@ -67,13 +67,14 @@ If the provider prices in EUR rather than USD, convert before serving it
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 import urllib.request
 from typing import Any, Dict, Optional, Tuple
 
 from reference_data import CARBON_PRICE_USD_PER_TCO2 as REF_CARBON
-from reference_data import CURRENCIES, FX_AS_OF
+from reference_data import CARBON_PRICE_AS_OF, CARBON_PRICE_SOURCE, CURRENCIES, FX_AS_OF, FX_SOURCE
 
 _DEFAULT_FX_URL = "https://api.frankfurter.dev/v1/latest?base=USD"
 _cache: Dict[str, Tuple[float, Any]] = {}
@@ -97,9 +98,20 @@ def _cached(key: str) -> Optional[Any]:
     return None
 
 
-def _store(key: str, value: Any) -> Any:
-    _cache[key] = (time.time() + _ttl(), value)
+# How long a failed fetch is remembered before the feed is tried again. Without
+# it an unreachable upstream was re-fetched on every request, so each
+# valuation (and /reference, which reads both feeds twice) blocked on the full
+# network timeout — 12-24 s per call on an offline host with live data on.
+_FAILURE_RETRY_S = 60.0
+
+
+def _store(key: str, value: Any, ttl: Optional[float] = None) -> Any:
+    _cache[key] = (time.time() + (_ttl() if ttl is None else ttl), value)
     return value
+
+
+def _store_failure(key: str, value: Any) -> Any:
+    return _store(key, value, ttl=min(_ttl(), _FAILURE_RETRY_S))
 
 
 def _fetch_json(url: str, timeout: float = 6.0) -> Dict[str, Any]:
@@ -166,21 +178,25 @@ def _extract_carbon_price(data: Any) -> Optional[float]:
 def get_carbon_price() -> Tuple[float, Dict[str, Any]]:
     """Return ``(price_usd_per_tco2, meta)``; meta carries source/as_of/live."""
     ref_meta = {
-        "source": "IPCC AR6 WGIII (2022) reference price",
-        "as_of": "2022",
+        "source": CARBON_PRICE_SOURCE,
+        "as_of": CARBON_PRICE_AS_OF,
         "live": False,
     }
 
     override = os.environ.get("CARBON_PRICE_USD_PER_TCO2")
     if override:
         try:
-            return float(override), {
+            value = float(override)
+        except ValueError:
+            value = float("nan")
+        # float() also accepts "nan", "inf" and negatives, which would turn every
+        # valuation into nulls or negative carbon yields — ignore those too.
+        if math.isfinite(value) and value > 0:
+            return value, {
                 "source": "operator override (CARBON_PRICE_USD_PER_TCO2)",
                 "as_of": "configured",
                 "live": True,
             }
-        except ValueError:
-            pass
 
     url = os.environ.get("CARBON_PRICE_URL")
     if not live_enabled() or not url:
@@ -205,7 +221,10 @@ def get_carbon_price() -> Tuple[float, Dict[str, Any]]:
             (price, {"source": url, "as_of": str(as_of), "live": True}),
         )
     except Exception:
-        return REF_CARBON, {**ref_meta, "note": "live carbon feed unreachable or implausible — using reference price"}
+        return _store_failure(
+            "carbon",
+            (REF_CARBON, {**ref_meta, "note": "live carbon feed unreachable or implausible — using reference price"}),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +236,7 @@ def _static_rates() -> Dict[str, float]:
 
 def get_fx_rates() -> Tuple[Dict[str, float], Dict[str, Any]]:
     """Return ``(rates_per_usd, meta)`` covering every supported currency."""
-    static_meta = {"source": "static reference rates", "as_of": FX_AS_OF, "live": False}
+    static_meta = {"source": f"static reference rates ({FX_SOURCE})", "as_of": FX_AS_OF, "live": False}
     if not live_enabled():
         return _static_rates(), static_meta
 
@@ -245,7 +264,10 @@ def get_fx_rates() -> Tuple[Dict[str, float], Dict[str, Any]]:
         }
         return _store("fx", (rates, meta))
     except Exception:
-        return _static_rates(), {**static_meta, "note": "live FX unreachable — using reference rates"}
+        return _store_failure(
+            "fx",
+            (_static_rates(), {**static_meta, "note": "live FX unreachable — using reference rates"}),
+        )
 
 
 def market_snapshot() -> Dict[str, Any]:

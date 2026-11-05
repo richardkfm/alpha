@@ -23,20 +23,61 @@
   --border-soft: #16291f;
   --text: #e9f4ee;
   --text-muted: #8aab9b;
-  --text-faint: #5f7a6c;
+  --text-faint: #6b8778;
   --accent: var(--teal);
+  --on-accent: #04120c; /* text on a solid accent / teal fill */
+  --on-gold: #1c1606; /* text on a solid gold fill */
+
+  /* semantic status colours — always via these, never raw hex in components */
+  --danger: #f87171;
+  --danger-text: #f8a8a8; /* headings/labels inside a danger-tinted surface */
+  --danger-bg: rgba(248, 113, 113, 0.07);
+  --danger-border: rgba(248, 113, 113, 0.32);
+  --warn: #f6a96b;
+  --accent-bg: rgba(45, 212, 191, 0.14);
+  --accent-border: rgba(45, 212, 191, 0.4);
+  --gold-bg: rgba(231, 200, 115, 0.14);
+  --gold-border: rgba(231, 200, 115, 0.4);
+
+  /* full-bleed backdrop behind non-map views (Compare, Data Hub, loading) */
+  --stage-bg: radial-gradient(circle at 50% 30%, #0a1424 0%, var(--bg) 70%);
+  --scrim: rgba(2, 6, 4, 0.55);
 
   /* techie globe + thematic layer palette (multi-hue neon, not all-green) */
   --space: #05070d;
+  --globe-core: #0a1424; /* centre of the radial field behind the globe */
   --layer-water: #38bdf8;
   --layer-soil: #f5b14e;
   --layer-violet: #a78bfa;
   --layer-magenta: #f472b6;
 
+  /* spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* type scale */
+  --fs-2xs: 0.66rem; /* uppercase eyebrows, badges */
+  --fs-xs: 0.72rem; /* captions, pill buttons */
+  --fs-sm: 0.8rem; /* secondary body */
+  --fs-md: 0.9rem; /* body */
+  --fs-lg: 1.15rem; /* card / view titles */
+  --fs-xl: 1.5rem; /* page titles */
+
+  /* floating chrome */
+  --topbar-h: 72px; /* space reserved under the floating topbar */
+  --map-ctrl-top: 72px; /* top of in-map controls (zoom, spin toggle) */
+  --glass-blur: blur(14px) saturate(1.2);
+
   /* depth + motion */
+  --radius-xs: 6px;
   --radius-sm: 8px;
   --radius: 14px;
   --radius-lg: 20px;
+  --radius-pill: 999px;
   --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-panel: -24px 0 60px rgba(0, 0, 0, 0.45);
   --shadow-glow: 0 0 0 1px rgba(45, 212, 191, 0.25), 0 0 28px rgba(45, 212, 191, 0.22);
@@ -61,10 +102,23 @@
   --border-soft: #e2ede7;
   --text: #0c1f17;
   --text-muted: #4d6b5c;
-  --text-faint: #7c9588;
-  --accent: var(--teal-strong);
-  --gold: #b8923a;
+  --text-faint: #6b8578;
+  /* teal-600: #14b8a6 is only ~2.5:1 on white, too faint for accent text */
+  --accent: #0d9488;
+  --gold: #9a7425;
+  --danger: #dc2626;
+  --danger-text: #b91c1c;
+  --danger-bg: rgba(220, 38, 38, 0.06);
+  --danger-border: rgba(220, 38, 38, 0.28);
+  --warn: #c2410c;
+  --accent-bg: rgba(13, 148, 136, 0.1);
+  --accent-border: rgba(13, 148, 136, 0.42);
+  --gold-bg: rgba(154, 116, 37, 0.1);
+  --gold-border: rgba(154, 116, 37, 0.38);
+  --stage-bg: radial-gradient(circle at 50% 30%, #f8fcfa 0%, var(--bg) 70%);
+  --scrim: rgba(12, 31, 23, 0.28);
   --space: #dfeaf0;
+  --globe-core: #f4f9fb;
   --shadow-soft: 0 1px 2px rgba(20, 50, 38, 0.06), 0 10px 30px rgba(20, 50, 38, 0.1);
   --shadow-panel: -24px 0 60px rgba(20, 50, 38, 0.14);
   --shadow-glow: 0 0 0 1px rgba(20, 184, 166, 0.25), 0 0 24px rgba(20, 184, 166, 0.16);
@@ -94,6 +148,15 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Form controls don't inherit the page font by default — make every button and
+   field speak Inter, so pills across views share one typeface. */
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
 }
 
 /* tabular figures everywhere numbers matter read as data, not prose */
@@ -131,6 +194,49 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Shared view entrance: Map / Compare / Data swap with a short fade-rise. */
+.view-enter-active,
+.view-leave-active {
+  transition: opacity 0.28s var(--ease), transform 0.28s var(--ease);
+}
+.view-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.view-leave-to {
+  opacity: 0;
+}
+
+/* Small inline spinner shared by loading states. */
+.spinner {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: alpha-spin 0.8s linear infinite;
+}
+@keyframes alpha-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Visually hidden but announced by screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

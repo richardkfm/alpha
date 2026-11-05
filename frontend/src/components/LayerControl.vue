@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
@@ -8,15 +8,26 @@ const props = defineProps({
   visibleLayers: { type: Object, required: true },
   // Active map display style: 'polygons' | 'bubbles' | 'outline'.
   displayStyle: { type: String, default: 'polygons' },
+  // True while the selected style's data is still arriving (Outline lazy-loads
+  // the detailed ecoregion borders), so the button can say so.
+  styleLoading: { type: Boolean, default: false },
 })
 const emit = defineEmits(['toggle', 'set-all', 'set-style'])
 const { t } = useI18n()
+
+// On a phone the open panel covers most of the globe, so start it collapsed
+// there; on desktop it starts open so the display styles are discoverable.
+const collapsed = ref(typeof window !== 'undefined' && window.innerWidth < 720)
 
 const STYLES = computed(() => [
   { id: 'polygons', label: t('layerControl.style.polygons.label'), icon: '▦', hint: t('layerControl.style.polygons.hint') },
   { id: 'bubbles', label: t('layerControl.style.bubbles.label'), icon: '⦿', hint: t('layerControl.style.bubbles.hint') },
   { id: 'outline', label: t('layerControl.style.outline.label'), icon: '□', hint: t('layerControl.style.outline.hint') },
 ])
+
+// One-line explanation of the active style, so what the bubbles/outlines
+// encode is visible without hovering.
+const activeHint = computed(() => STYLES.value.find((s) => s.id === props.displayStyle)?.hint ?? '')
 
 const onCount = computed(
   () => props.layers.filter((l) => props.visibleLayers[l.id]).length,
@@ -29,17 +40,27 @@ function chipTitle(l) {
 </script>
 
 <template>
-  <aside class="layers" :aria-label="t('layerControl.ariaLabel')">
+  <aside class="layers" :class="{ collapsed }" :aria-label="t('layerControl.ariaLabel')">
     <header class="layers-head">
-      <span class="layers-title">
-        {{ t('layerControl.title') }}
-        <span class="layers-count num">{{ onCount }}/{{ layers.length }}</span>
-      </span>
-      <button class="bulk-btn" @click="emit('set-all', !allOn)">
+      <button
+        class="collapse-btn"
+        :aria-expanded="!collapsed"
+        aria-controls="layer-body"
+        :title="collapsed ? t('layerControl.expand') : t('layerControl.collapse')"
+        @click="collapsed = !collapsed"
+      >
+        <span class="caret" aria-hidden="true">▾</span>
+        <span class="layers-title">
+          {{ t('layerControl.title') }}
+          <span class="layers-count num">{{ onCount }}/{{ layers.length }}</span>
+        </span>
+      </button>
+      <button v-if="!collapsed" class="bulk-btn" @click="emit('set-all', !allOn)">
         {{ allOn ? t('layerControl.hideAll') : t('layerControl.showAll') }}
       </button>
     </header>
 
+    <div v-show="!collapsed" id="layer-body">
     <div class="chips">
       <button
         v-for="l in layers"
@@ -58,17 +79,28 @@ function chipTitle(l) {
       </button>
     </div>
 
+    <span class="style-heading">{{ t('layerControl.styleGroup') }}</span>
     <div class="style-switch" role="group" :aria-label="t('layerControl.styleGroup')">
       <button
         v-for="s in STYLES"
         :key="s.id"
         class="style-btn"
         :class="{ on: displayStyle === s.id }"
+        :aria-pressed="displayStyle === s.id"
         :title="s.hint"
         @click="emit('set-style', s.id)"
       >
-        <span class="style-icon" aria-hidden="true">{{ s.icon }}</span>{{ s.label }}
+        <span
+          v-if="styleLoading && displayStyle === s.id"
+          class="spinner spinner-xs"
+          aria-hidden="true"
+        ></span>
+        <span v-else class="style-icon" aria-hidden="true">{{ s.icon }}</span>{{ s.label }}
       </button>
+    </div>
+    <p class="style-hint" aria-live="polite">
+      {{ styleLoading ? t('layerControl.styleLoading') : activeHint }}
+    </p>
     </div>
   </aside>
 </template>
@@ -81,22 +113,52 @@ function chipTitle(l) {
   z-index: 1000;
   width: 264px;
   max-width: calc(100vw - 36px);
-  max-height: calc(100vh - 90px);
+  max-height: calc(100% - var(--topbar-h) - 90px);
   overflow-y: auto;
-  padding: 13px 13px 11px;
+  padding: var(--space-3);
   border-radius: var(--radius);
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-soft);
+  transition: width 0.25s var(--ease);
+}
+.layers.collapsed {
+  width: auto;
 }
 
 .layers-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
+}
+.layers:not(.collapsed) .layers-head {
   margin-bottom: 10px;
+}
+.collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.caret {
+  display: inline-block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.2s var(--ease);
+}
+.layers.collapsed .caret {
+  transform: rotate(-90deg);
+}
+.collapse-btn:hover .caret {
+  color: var(--accent);
 }
 .layers-title {
   display: inline-flex;
@@ -194,11 +256,30 @@ function chipTitle(l) {
   color: color-mix(in srgb, var(--c) 75%, var(--text));
 }
 
+.style-heading {
+  display: block;
+  margin: var(--space-3) 2px 6px;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.style-hint {
+  margin: 6px 2px 0;
+  font-size: var(--fs-2xs);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.spinner-xs {
+  width: 11px;
+  height: 11px;
+  border-width: 1.5px;
+}
 .style-switch {
   display: flex;
   gap: 2px;
   padding: 3px;
-  margin-top: 10px;
   background: var(--bg-deep);
   border: 1px solid var(--border-soft);
   border-radius: 999px;
@@ -227,6 +308,13 @@ function chipTitle(l) {
   background: var(--bg-elevated);
   color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--border);
+}
+/* Phones: sit clear of the basemap attribution strip along the bottom edge. */
+@media (max-width: 860px) {
+  .layers {
+    left: 12px;
+    bottom: 40px;
+  }
 }
 .style-icon {
   font-size: 0.85rem;

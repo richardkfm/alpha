@@ -64,7 +64,11 @@ npm test
 
 Vitest, no jsdom — the formatters in `src/data/formatNumber.js` are deliberately
 pure so they can be tested without a Vue component context. The suite is mostly
-a locale × magnitude table; see below for what it is guarding.
+a locale × magnitude table; see below for what it is guarding. Component
+regression tests (`src/**/*.test.js` starting with
+`// @vitest-environment happy-dom`) mount single components with
+`@vue/test-utils` against a stubbed `fetch`; the maps themselves need WebGL and
+are not unit-tested.
 
 ## Numbers & localisation
 
@@ -144,7 +148,8 @@ frontend/
     │   ├── SidePanel.vue       # TEV breakdown + GDP callout + export/embed
     │   ├── EmbedCard.vue       # compact single-region widget (the iframe body)
     │   ├── CompareDashboard.vue# side-by-side TEV comparison
-    │   └── DataHub.vue         # data catalogue + live tools
+    │   ├── DataHub.vue         # data catalogue + live tools
+    │   └── OnboardingGuide.vue # first-run orientation card (re-open via "?")
     ├── i18n/
     │   ├── index.js            # vue-i18n setup; locale persisted to localStorage
     │   └── locales/            # en.json, de.json, es.json

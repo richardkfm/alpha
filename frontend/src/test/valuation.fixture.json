@@ -1,0 +1,175 @@
+{
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          -3,
+          -3
+        ],
+        [
+          3,
+          -3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          -3,
+          3
+        ],
+        [
+          -3,
+          -3
+        ]
+      ]
+    ]
+  },
+  "valuation": {
+    "biome": "Tropical Rainforest",
+    "biome_key": "tropical_rainforest",
+    "currency": "USD",
+    "currency_symbol": "$",
+    "area": {
+      "sqm": 444913093793.58,
+      "hectares": 44491309.3794
+    },
+    "yields_per_sqm_year": {
+      "carbon_capture": 0.0092,
+      "climate_regulation": 0.036,
+      "water_filtration": 0.02,
+      "biodiversity_premium": 0.05,
+      "soil_nutrient_value": 0.012
+    },
+    "yields_total_year": {
+      "carbon_capture": 4093200462.9,
+      "climate_regulation": 16016871376.57,
+      "water_filtration": 8898261875.87,
+      "biodiversity_premium": 22245654689.68,
+      "soil_nutrient_value": 5338957125.52
+    },
+    "total_ecosystem_value_per_sqm_year": 0.1272,
+    "total_ecosystem_value_per_year": 56592945530.54,
+    "intactness": 1.0,
+    "potential": {
+      "total_ecosystem_value_per_sqm_year": 0.1272,
+      "total_ecosystem_value_per_year": 56592945530.54
+    },
+    "capitalized_value": {
+      "discount_rate": 0.03,
+      "asset_value_per_sqm": 4.24,
+      "asset_value_total": 1886431517684.78
+    },
+    "systemic": {
+      "scarcity_weight": 0.7,
+      "multiplier": 1.7,
+      "value_per_sqm_year": 0.21624,
+      "rationale": "Rare, intact systems are load-bearing; their loss degrades the wider network beyond the parcel itself. Premium = 1 + scarcity x intactness."
+    },
+    "conversion_liability": {
+      "annual_loss": 56592945530.54,
+      "present_value": 3206933580064.12,
+      "carbon_debt_onetime": 1601687137656.89,
+      "incidence": "Borne by the public, downstream communities and future generations — not captured by whoever converts the land.",
+      "note": "A debt owed to others in perpetuity, not a price the project can buy out."
+    },
+    "red_lines": [
+      {
+        "service": "biodiversity_premium",
+        "label": "Species & habitat",
+        "reason": "Extinctions are irreversible — biodiversity cannot be recreated at any price."
+      },
+      {
+        "service": "biodiversity_premium",
+        "label": "Old-growth structure",
+        "reason": "Centuries to regenerate the structure and soils, if ever."
+      }
+    ],
+    "comparisons": {
+      "total_ecosystem_value_per_year": [
+        {
+          "anchor": "nasa_annual_budget",
+          "multiple": 2.264,
+          "locales": []
+        },
+        {
+          "anchor": "revenue_netflix",
+          "multiple": 1.451,
+          "locales": []
+        },
+        {
+          "anchor": "eu_annual_budget",
+          "multiple": 0.269,
+          "locales": [
+            "de",
+            "es"
+          ]
+        }
+      ],
+      "asset_value_total": [
+        {
+          "anchor": "debt_germany",
+          "multiple": 0.65,
+          "locales": [
+            "de"
+          ]
+        },
+        {
+          "anchor": "apollo_programme",
+          "multiple": 6.737,
+          "locales": []
+        },
+        {
+          "anchor": "marketcap_apple",
+          "multiple": 0.539,
+          "locales": []
+        }
+      ],
+      "conversion_liability": [
+        {
+          "anchor": "marketcap_apple",
+          "multiple": 0.916,
+          "locales": []
+        },
+        {
+          "anchor": "marketcap_nvidia",
+          "multiple": 0.746,
+          "locales": []
+        },
+        {
+          "anchor": "apollo_programme",
+          "multiple": 11.453,
+          "locales": []
+        }
+      ]
+    },
+    "fx": {
+      "base": "USD",
+      "rate_per_usd": 1.0,
+      "as_of": "2025-12"
+    },
+    "methodology_note": "Phase 2 valuation engine. Per-biome reference values from the ESVD (de Groot et al. 2012) and carbon sequestration from Pan et al. 2011, priced via an IPCC-AR6-consistent reference carbon price. FX rates are indicative (as of 2025-12). See backend/METHODOLOGY.md.",
+    "classification": {
+      "biome_key": "tropical_rainforest",
+      "biome_label": "Tropical Rainforest",
+      "confidence": "explicit",
+      "source": "biome supplied by caller"
+    },
+    "market": {
+      "carbon": {
+        "price_usd_per_tco2": 40.0,
+        "source": "IPCC AR6 WGIII (2022) reference price",
+        "as_of": "2022",
+        "live": false
+      },
+      "fx": {
+        "base": "USD",
+        "rate_per_usd": 1.0,
+        "source": "static reference rates",
+        "as_of": "2025-12",
+        "live": false
+      }
+    }
+  }
+}

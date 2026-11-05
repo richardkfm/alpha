@@ -43,16 +43,23 @@ python ingest.py validate             # check the bundled dataset is well-formed
 The full TEOW / Copernicus layers need network access and GIS tooling, so they are
 not downloaded automatically. `python ingest.py refresh` prints the procedure and
 source URLs. In short: download TEOW → dissolve ecoregions to the WWF biome class →
-map each class to one of alpha's five valuation biomes → simplify → export GeoJSON
-with a `biome_key` per feature → `python ingest.py validate`.
+map each class to one of alpha's eleven valuation biomes (`reference_data.BIOMES`)
+→ simplify → export GeoJSON with a `biome_key` per feature → `python ingest.py
+validate`.
 
 | WWF biome class | alpha `biome_key` |
 | --- | --- |
 | Tropical & Subtropical Moist Broadleaf Forests | `tropical_rainforest` |
 | Temperate Broadleaf / Conifer Forests | `temperate_forest` |
+| Boreal Forests / Taiga | `boreal_forest` |
 | Mangroves (GMW overlay) | `mangrove` |
 | Flooded Grasslands & Savannas / Ramsar wetlands | `wetland` |
 | Temperate Grasslands, Savannas & Shrublands | `temperate_grassland` |
+| Tundra | `tundra` |
+| Deserts & Xeric Shrublands | `desert` |
+
+Cropland, peri-urban land and lakes/rivers are land-use or freshwater types the
+ecoregion layers omit; they come from the curated seeds.
 
 ---
 
@@ -61,15 +68,25 @@ with a `biome_key` per feature → `python ingest.py validate`.
 Ships the **CGLS-LC100** (Copernicus Global Land Service, Dynamic Land Cover, 100 m,
 collection 3) discrete-classification legend and maps each class code to:
 
-- a **biome hint** (cross-checks the coarse boundary classifier), and
+- a **biome hint** (cross-checks the coarse boundary classifier) — cropland (40)
+  → `cropland`, bare/sparse (60) → `desert`, permanent water (80) →
+  `freshwater`, herbaceous wetland (90) → `wetland`, moss & lichen (100) →
+  `tundra`, deciduous needleleaf forest (113/123, larch) → `boreal_forest`,
+  evergreen broadleaf (112/122) → `tropical_rainforest`, evergreen needleleaf,
+  deciduous broadleaf and mixed forest → `temperate_forest`; and
 - an **intactness factor** in `[0, 1]` — the share of the intact-biome reference
   yield a parcel in that land-cover class is assumed to still deliver (closed
-  broadleaf forest ≈ 1.0, cropland ≈ 0.1, urban = 0.0).
+  broadleaf forest ≈ 1.0, cropland ≈ 0.1, urban = 0.0). These factors are
+  **heuristic judgements, not literature-derived values**.
 
-`aggregate_intactness({class_code: area_fraction})` returns the area-weighted
-intactness for a polygon's land-cover mix — the value a deployment multiplies
-against the reference yield once it samples the CGLS-LC100 raster (via PostGIS /
-the ingestion pipeline). The legend mapping is unit-tested offline.
+`aggregate_intactness({class_code: area_fraction}, biome_key=None)` returns the
+area-weighted intactness for a polygon's land-cover mix — the value a deployment
+multiplies against the reference yield once it samples the CGLS-LC100 raster (via
+PostGIS / the ingestion pipeline). Pass `biome_key` so a biome's own natural cover
+(`NATURAL_COVER`: bare/sparse and shrubs for desert, moss/lichen/snow for tundra,
+open water for freshwater, …) counts as intact (1.0) instead of being scored with
+the generic factor meant for, say, a cleared forest. The legend mapping is
+unit-tested offline.
 
 > Source: Buchhorn, M. et al. (2020). *Copernicus Global Land Service: Land Cover
 > 100m: collection 3.* Zenodo. https://doi.org/10.5281/zenodo.3939050

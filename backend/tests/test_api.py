@@ -149,7 +149,9 @@ def test_valuation_intactness_query_scales_value():
 def test_regions_carry_intactness_and_asset_value():
     regions = client.get("/api/v1/regions").json()["regions"]
     crop = next(r for r in regions if r["biome_key"] == "cropland")
-    assert 0 < crop["intactness"] < 1  # managed land is below full intactness
+    # Cropland ESV is already measured on managed land; a further intactness
+    # haircut would count that degradation twice.
+    assert crop["intactness"] == 1.0
     assert crop["capitalized_value"]["asset_value_total"] > 0
 
 
@@ -177,3 +179,17 @@ def test_regions_respects_currency():
     assert brl_amazon["total_ecosystem_value_per_year"] > usd_amazon[
         "total_ecosystem_value_per_year"
     ]
+
+
+def test_unknown_explicit_biome_is_rejected_not_valued_as_the_default():
+    for params, body in (
+        ({"biome": "mangroves"}, AMAZON),
+        ({}, {**AMAZON, "biome": "rainforest"}),
+    ):
+        res = client.post("/api/v1/valuation", params=params, json=body)
+        assert res.status_code == 422
+        assert "Unknown biome" in res.json()["detail"]
+    export = client.post(
+        "/api/v1/valuation/export", params={"format": "csv", "biome": "nope"}, json=AMAZON
+    )
+    assert export.status_code == 422

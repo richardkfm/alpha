@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import csv
 import io
+import unicodedata
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+from xml.sax.saxutils import escape as _xml_escape
 
 # Human labels for the five yield categories, in the product-spec order. Mirrors
 # frontend/src/data/yields.js and reference_data.YIELD_CATEGORIES so the report
@@ -143,13 +145,29 @@ def report_title(result: Dict[str, Any], name: Optional[str] = None) -> str:
     return f"{name} — {biome}" if name else biome
 
 
-def filename_slug(result: Dict[str, Any], name: Optional[str] = None) -> str:
-    """URL/filename-safe slug from the region name (or biome key)."""
-    base = str(name or result.get("biome_key") or "valuation")
-    slug = "".join(c if c.isalnum() else "-" for c in base.lower())
+def _ascii_slug(text: str) -> str:
+    # ASCII only: the slug goes into a Content-Disposition header, which HTTP
+    # encodes as latin-1 — "Москва" made the response itself raise a 500, and
+    # "São Paulo" sent a raw non-UTF-8 byte. Accents are folded ("sao-paulo").
+    folded = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    slug = "".join(c if c.isalnum() else "-" for c in folded.lower())
     while "--" in slug:
         slug = slug.replace("--", "-")
-    return slug.strip("-") or "valuation"
+    return slug.strip("-")
+
+
+def filename_slug(result: Dict[str, Any], name: Optional[str] = None) -> str:
+    """URL/filename-safe ASCII slug from the region name (or biome key)."""
+    return (
+        _ascii_slug(str(name or ""))
+        or _ascii_slug(str(result.get("biome_key") or ""))
+        or "valuation"
+    )
+
+
+def _csv_safe(text: str) -> str:
+    """Neutralise a user-supplied cell that a spreadsheet would run as a formula."""
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
 
 
 def _generated_utc() -> str:
@@ -180,7 +198,7 @@ def to_csv(result: Dict[str, Any], name: Optional[str] = None) -> str:
     # Block 1 — summary / provenance.
     w.writerow(["alpha — Total Ecosystem Value report"])
     w.writerow(["Field", "Value"])
-    w.writerow(["Region", name or "—"])
+    w.writerow(["Region", _csv_safe(name) if name else "—"])
     w.writerow(["Biome", result.get("biome", "")])
     w.writerow(["Biome source", f"{cls.get('confidence', '')} ({cls.get('source', '')})"])
     w.writerow(["Currency", cur])
@@ -299,7 +317,9 @@ def to_pdf(
 
     elements: List[Any] = []
     elements.append(Paragraph("alpha · Total Ecosystem Value", h_sec))
-    elements.append(Paragraph(report_title(result, name), h_title))
+    # Paragraph parses its text as markup, so a user-supplied name like
+    # "Lakes <north>" must be escaped or reportlab raises (a 500 on export).
+    elements.append(Paragraph(_xml_escape(report_title(result, name)), h_title))
     cls = result.get("classification") or {}
     elements.append(
         Paragraph(
